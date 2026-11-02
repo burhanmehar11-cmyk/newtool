@@ -92,7 +92,8 @@ Google calls this **Google Auth Platform** (older screens say **OAuth consent sc
 3. When asked which environments to connect, keep **Production** and **Preview** (and **Development** if offered). Vercel adds `DATABASE_URL` and related settings automatically.
 4. Open the database's **Open in Neon** (or **Neon Console**) link → **SQL Editor**.
 5. In another tab, open GitHub → **burhanmehar11-cmyk/newtool** → branch `claude/compassionate-knuth-hewpfn` → `database/migrations/0000_auth.sql` → **Copy raw file** (two-squares icon). Paste into the SQL Editor → **Run**.
-6. Clear the editor. Do the same with `database/migrations/0001_foundation.sql` → **Run**.
+6. Clear the editor. Do the same with `database/migrations/0001_foundation.sql` → **Run**, then `database/migrations/0002_password_and_discovery.sql` → **Run**.
+   - Already ran 0000 and 0001 earlier? Just run **0002**. It only adds things and is safe to run on top.
 7. Check by running:
 
    ```sql
@@ -101,7 +102,7 @@ Google calls this **Google Auth Platform** (older screens say **OAuth consent sc
      (select count(*) from information_schema.tables where table_schema = 'auth') as auth_tables;
    ```
 
-   Expected: `public_tables = 30`, `auth_tables = 2`.
+   Expected: `public_tables = 31`, `auth_tables = 4`.
 
 If a migration shows an error, **stop and report the exact message**. Don't run it twice.
 
@@ -125,6 +126,23 @@ Then **Deployments** → latest production deployment → **⋯ → Redeploy**. 
 
 ✅ Check: `https://YOUR-URL/sign-in` shows a **Continue with Google** button instead of "Sign-in isn't configured".
 
+## Part E2: Email + password sign-in (optional, free)
+
+Google sign-in works without this. Add it if invited people should also be able to sign in with an email and password. It sends their confirmation and password-reset emails from a Gmail account.
+
+1. The Gmail account that will send these emails needs **2-Step Verification** on: https://myaccount.google.com/security
+2. Open https://myaccount.google.com/apppasswords → app name `Locentio` → **Create**. Google shows a 16-character **App Password**. **The owner copies it; it's a secret.**
+3. In Vercel, the owner adds `SMTP_URL` (mark **Sensitive**), built like this. Replace the `@` in the Gmail address with `%40`, and remove the spaces from the App Password:
+
+   ```
+   smtps://yourname%40gmail.com:abcdabcdabcdabcd@smtp.gmail.com:465
+   ```
+
+4. Optional: `EMAIL_FROM` = the address shown as sender (defaults to that Gmail address).
+5. **Redeploy.** `/sign-up` now shows the email form, and "Forgot your password?" sends reset links.
+
+Gmail's free sending limit (about 500 emails a day) is far more than sign-ups and resets need.
+
 ## Part F: First sign-in (owner)
 
 1. Open `https://YOUR-URL/sign-in` → **Continue with Google** → pick a Gmail account that is both a **test user** (Part B) and on `BETA_ALLOWED_EMAILS` (Part E).
@@ -141,6 +159,8 @@ Then **Deployments** → latest production deployment → **⋯ → Redeploy**. 
 | `Error 400: redirect_uri_mismatch` (from Google) | The redirect URI registered in Part C doesn't exactly match the one the app sends | See **Fixing redirect_uri_mismatch** below |
 | `Error 403: access_denied` / "app is being tested" | The Gmail account isn't a test user | Add it under Audience → Test users (Part B) |
 | "This Google account isn't on the private-beta list yet" | Email missing from `BETA_ALLOWED_EMAILS` | Add it, then redeploy |
+| "Email sign-up isn't available yet" | `SMTP_URL` not set | Part E2, or use Google sign-in |
+| Confirmation or reset email never arrives | Wrong App Password, or the email is in spam | Check spam; recreate the App Password and update `SMTP_URL` |
 | "Sign-in isn't configured in this environment yet" | A setting is missing, or no redeploy happened | Recheck Part E (`SESSION_SECRET` must be 32+ characters), then redeploy |
 | "That sign-in link expired or was opened in another browser" | Took over 10 minutes, or opened in a different browser | Start again from the sign-in page |
 | Signs in, then an error page | Database not connected or migrations not run | Recheck Part D; `DATABASE_URL` must exist in Vercel |

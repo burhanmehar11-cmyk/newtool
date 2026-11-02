@@ -1,12 +1,13 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createRemoteJWKSet, jwtVerify } from "jose";
-import { GOOGLE_ISSUERS, GOOGLE_JWKS_URL, GOOGLE_TOKEN_URL, SESSION_COOKIE, SESSION_MAX_AGE_S, STATE_COOKIE } from "@/lib/auth/constants";
+import { GOOGLE_ISSUERS, GOOGLE_JWKS_URL, GOOGLE_TOKEN_URL, SESSION_COOKIE, STATE_COOKIE } from "@/lib/auth/constants";
 import { callbackUrl, checkIdTokenClaims, resolveAppOrigin } from "@/lib/auth/oidc";
-import { signSession, verifyState } from "@/lib/auth/tokens";
+import { verifyState } from "@/lib/auth/tokens";
 import { isAllowedBetaEmail } from "@/lib/beta-allowlist";
 import { accountsConfigured, configuredSiteUrl, googleOAuth, sessionSecret } from "@/server/env";
 import { withService } from "@/server/db";
-import { AUTH_SQL } from "@/server/db-sql";
+import { googleSignIn, type Q } from "@/server/auth-store";
+import { newSessionToken, sessionCookieOptions } from "@/server/session";
 
 const googleKeys = createRemoteJWKSet(new URL(GOOGLE_JWKS_URL));
 
@@ -57,20 +58,16 @@ export async function GET(request: NextRequest) {
   // Private beta: only listed emails may sign in (checked on every sign-in, so removal takes effect).
   if (!isAllowedBetaEmail(claims.email)) return fail("not_invited");
 
-  const { userId, sessionId } = await withService(async (q) => {
-    const u = await q.query<{ id: string }>(AUTH_SQL.upsertUser, [claims.subject, claims.email, claims.name]);
-    const s = await q.query<{ id: string }>(AUTH_SQL.createSession, [u.rows[0].id, SESSION_MAX_AGE_S, (request.headers.get("user-agent") ?? "").slice(0, 300)]);
-    return { userId: u.rows[0].id, sessionId: s.rows[0].id };
-  });
+  let token: string;
+  try {
+    const userId = await withService((q) => googleSignIn(q as unknown as Q, claims.subject, claims.email, claims.name));
+    token = await newSessionToken(userId, request.headers.get("user-agent"));
+  } catch {
+    return fail("server");
+  }
 
   const res = NextResponse.redirect(new URL(saved.next, request.url));
   res.cookies.delete({ name: STATE_COOKIE, path: "/api/auth/google" });
-  res.cookies.set(SESSION_COOKIE, await signSession({ sid: sessionId, uid: userId }, secret), {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: SESSION_MAX_AGE_S,
-  });
+  res.cookies.set(SESSION_COOKIE, token, sessionCookieOptions);
   return res;
 }

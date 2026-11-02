@@ -5,11 +5,6 @@ export const USER_SCOPE_SQL = {
 } as const;
 
 export const AUTH_SQL = {
-  /** $1 subject, $2 email, $3 display name */
-  upsertUser: `insert into auth.users (auth_subject, email, raw_user_meta_data, last_sign_in_at)
-     values ($1, $2, jsonb_build_object('full_name', $3::text), now())
-     on conflict (auth_subject) do update set email = excluded.email, last_sign_in_at = now()
-     returning id`,
   /** $1 user id, $2 lifetime in seconds, $3 user agent */
   createSession: `insert into auth.sessions (user_id, expires_at, user_agent)
      values ($1, now() + make_interval(secs => $2), $3) returning id`,
