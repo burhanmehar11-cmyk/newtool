@@ -20,7 +20,7 @@ export function getProviderStatus(): ProviderStatus[] {
   const rows: Omit<ProviderStatus, "configured">[] = [
     { key: "auth", label: "Sign in with Google", envVars: ["GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET", "SESSION_SECRET"], milestone: "M2" },
     { key: "database", label: "Database (Postgres)", envVars: ["DATABASE_URL"], milestone: "M2" },
-    { key: "discovery", label: "Business discovery", envVars: ["DISCOVERY_PROVIDER", "DISCOVERY_API_KEY"], milestone: "M2" },
+    { key: "discovery", label: "Business discovery (OpenStreetMap, free, no key needed)", envVars: [], milestone: "M2" },
     { key: "verification", label: "Email verification", envVars: ["VERIFICATION_PROVIDER", "VERIFICATION_API_KEY"], milestone: "M2" },
     { key: "ai", label: "AI research and drafts (Anthropic)", envVars: ["ANTHROPIC_API_KEY", "ANTHROPIC_MODEL"], milestone: "M2" },
     { key: "mailbox", label: "Gmail sending (same Google client, extra permission later)", envVars: ["GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET", "TOKEN_ENCRYPTION_KEY"], milestone: "M2" },

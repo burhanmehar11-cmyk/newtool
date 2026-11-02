@@ -12,7 +12,8 @@ function getPool(): pg.Pool {
   if (!url) throw new Error("Database is not configured");
   // Small pool: serverless functions each hold their own. Works with poolers in
   // transaction mode because all per-user settings are transaction-local.
-  pool ??= new pg.Pool({ connectionString: url, max: 3, idleTimeoutMillis: 10_000 });
+  const max = Math.min(Math.max(Number(process.env.DB_POOL_MAX) || 3, 1), 20);
+  pool ??= new pg.Pool({ connectionString: url, max, idleTimeoutMillis: 10_000 });
   return pool;
 }
 

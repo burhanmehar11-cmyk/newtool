@@ -11,7 +11,7 @@ Locentio is a local prospecting and outreach workspace for agencies: discover bu
 | Milestone | Scope | Status |
 | --- | --- | --- |
 | **M1** | Brand, landing page, interactive demo on fixture data | **Complete. Not production-ready.** |
-| M2 | Accounts, persistence, real discovery, research, Gmail sending, reply sync | **In progress.** Step 1 (Sign in with Google + workspaces) built; free setup, not yet verified with the live Google client |
+| M2 | Accounts, persistence, real discovery, research, Gmail sending, reply sync | **In progress.** Steps 1–2 built: sign-in (Google or email), workspaces, free OpenStreetMap search and saved leads |
 | M3 | Billing, team roles, public API, webhooks, MCP | Not started |
 
 ### What is simulated in M1

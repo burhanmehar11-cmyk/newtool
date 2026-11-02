@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, LogOut, Menu, Settings } from "lucide-react";
+import { LayoutDashboard, LogOut, Menu, Search, Settings, Users } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogTrigger, SheetCloseButton, SheetContent } from "@/components/ui/sheet";
@@ -12,10 +12,12 @@ import { signOutAction } from "@/server/actions/auth";
 
 /**
  * Shell for the live product. Only shipped areas appear in the navigation;
- * Discover, Leads, Campaigns and Inbox are added as each M2 step lands.
+ * Campaigns and Inbox are added as their M2 steps land.
  */
 const nav = [
   { href: "/app", label: "Overview", icon: LayoutDashboard },
+  { href: "/app/discover", label: "Discover", icon: Search },
+  { href: "/app/leads", label: "Leads", icon: Users },
   { href: "/app/settings", label: "Settings", icon: Settings },
 ] as const;
 

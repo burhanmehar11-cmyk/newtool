@@ -10,7 +10,7 @@ import { PageLoading } from "@/features/product/page-loading";
 import { usageUnitDefinitions } from "@/config/plans";
 import { requireWorkspace } from "@/server/auth";
 import { getOfferProfile, getUsage } from "@/server/services/workspaces";
-import { getProviderStatus } from "@/server/providers/status";
+import { getLeads, getRecentSearches } from "@/server/services/discovery";
 
 export const metadata: Metadata = { title: "Overview" };
 
@@ -30,15 +30,16 @@ const usageLabels = {
 
 async function Overview() {
   const { user, workspace } = await requireWorkspace("/app");
-  const [offer, usage] = await Promise.all([getOfferProfile(workspace), getUsage(workspace)]);
-  const providers = getProviderStatus();
-  const configured = (k: string) => providers.find((p) => p.key === k)?.configured ?? false;
+  const [offer, usage, recent, leads] = await Promise.all([getOfferProfile(workspace), getUsage(workspace), getRecentSearches(), getLeads()]);
+  const searches = recent.length;
+  const leadCount = leads.length;
 
   const steps = [
     { done: true, label: "Account created", detail: user.email ?? "" },
     { done: true, label: "Workspace created", detail: workspace.name },
     { done: !!offer, label: "Offer profile", detail: offer ? offer.service : "Tell us what you sell", href: "/app/settings" },
-    { done: false, label: "Search for businesses", detail: configured("discovery") ? "Provider configured. The search screen arrives in the next beta step." : "Arrives in the next beta step" },
+    { done: searches > 0, label: "Search for businesses", detail: searches > 0 ? `${searches}${searches >= 8 ? "+" : ""} search${searches === 1 ? "" : "es"} so far` : "Free OpenStreetMap search", href: "/app/discover" },
+    { done: leadCount > 0, label: "Save leads", detail: leadCount > 0 ? `${leadCount} saved` : "Choose which results to keep", href: "/app/leads" },
     { done: false, label: "Verify contacts and research leads", detail: "Planned for the private beta" },
     { done: false, label: "Connect Gmail and send an approved sequence", detail: "Planned for the private beta" },
   ];
@@ -47,7 +48,7 @@ async function Overview() {
     <div>
       <PageHeader
         title={`Welcome to ${workspace.name}`}
-        description="Your private-beta workspace. Discovery, research and sending are added here step by step."
+        description="Your private-beta workspace. Search and leads are live; research and sending are added step by step."
         actions={
           <Button asChild variant="secondary">
             <Link href="/demo">

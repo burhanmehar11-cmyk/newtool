@@ -22,7 +22,7 @@ Build order: auth and workspaces → one real search-to-saved-lead flow → enri
 | Step | Status | Notes |
 | --- | --- | --- |
 | 1. Accounts and workspaces | **Built, tested offline** | Sign in with Google (OAuth code flow + PKCE, ID-token verification, invite allowlist on every sign-in), revocable server sessions, `/app` behind `proxy.ts`, workspace + offer profile onboarding, settings, usage view. Free setup: Google OAuth client + Neon Postgres via Vercel. Not yet run against the live Google client; guide in `docs/GOOGLE_CLOUD_SETUP.md`. |
-| 2. Search → saved lead | Not started | Needs a discovery provider decision and key. |
+| 2. Search → saved lead | **Built, tested against Postgres** | Free OpenStreetMap discovery (Nominatim + Overpass; no key, no billing). Usage reserved before and settled after; failed searches release everything. Businesses deduplicated per workspace; listing kept as evidence; public emails stored unverified; explicit "Save to leads"; `/app/discover`, `/app/leads`; ODbL attribution. Live OSM calls not run here (sandbox network blocks them). Ratings and review counts are unavailable from OSM and shown as such. |
 | 3. Enrichment and verification | Not started | Needs a verification provider decision and key; SSRF-safe crawler. |
 | 4. Evidence-based drafts | Not started | Needs `ANTHROPIC_API_KEY` and `ANTHROPIC_MODEL`. |
 | 5. Approved Gmail sequence | Not started | Needs a Google OAuth client and a test mailbox; durable job runner. |
@@ -34,7 +34,7 @@ Build order: auth and workspaces → one real search-to-saved-lead flow → enri
 - Weak: quota concurrency. PGlite runs queries serially, so this checks the arithmetic, not real lock contention. Add a real-Postgres CI job (a Postgres service container).
 - Still to write, per step: suppression after re-import, stale approvals, pause/reply races, ambiguous send recovery, revoked mailbox, injected research content, and the sandbox end-to-end flow.
 
-**Blockers needing the owner:** completing `docs/GOOGLE_CLOUD_SETUP.md` (Google OAuth client, Neon database, Vercel variables); a choice of discovery and verification providers (and their terms); an Anthropic API key and model; a Google Cloud OAuth client (and verification for production scopes); a job-runner account; a test mailbox; the sender identity and business address for the beta; target markets for outreach rules.
+**Blockers needing the owner:** completing `docs/GOOGLE_CLOUD_SETUP.md` (Google OAuth client, Neon database, Vercel variables, migration 0002); a verification provider choice (and its terms); an Anthropic API key and model; a Google Cloud OAuth client (and verification for production scopes); a job-runner account; a test mailbox; the sender identity and business address for the beta; target markets for outreach rules.
 
 ## M3: paid launch
 

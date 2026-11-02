@@ -1,6 +1,6 @@
 # Handoff
 
-_Last updated: 2026-11-02. M1 complete; M2 step 1 built with free Sign in with Google + Neon Postgres._
+_Last updated: 2026-11-02. M1 complete; M2 steps 1–2 built: Google + email/password sign-in, workspaces, free OpenStreetMap search, saved leads._
 
 ## State
 
@@ -24,7 +24,7 @@ BASE_URL=http://localhost:3000 npm run test:e2e
 ## M2 step 1: what exists
 
 - Schema and RLS: `database/migrations/0000_auth.sql` (roles, `auth.users`, `auth.sessions`, `auth.uid()`) and `0001_foundation.sql`. Tests: `tests/db/`.
-- Auth: `app/api/auth/google/start` and `callback` routes, `lib/auth/` (OIDC helpers, signed tokens, constants), `server/auth.ts` (DAL), `server/actions/auth.ts` (sign-out revokes the session), `proxy.ts`, pages `app/(marketing)/sign-in` and `sign-up`.
+- Auth: Google (`app/api/auth/google/*`) and email/password (`server/actions/password.ts`, `server/auth-store.ts`, `app/api/auth/verify`, pages under `app/(auth)/`), `lib/auth/` (OIDC helpers, signed tokens, constants), `server/auth.ts` (DAL), `server/actions/auth.ts` (sign-out revokes the session), `proxy.ts`, pages `app/(marketing)/sign-in` and `sign-up`.
 - Database access: `server/db.ts` (`withUser` runs as `authenticated` with `app.user_id`; `withService` for user and session bookkeeping), `server/db-sql.ts` (SQL shared with tests).
 - Product: `app/app/*` (overview, onboarding, settings), `server/services/workspaces.ts`, `server/actions/workspace.ts`, `components/app/product-shell.tsx`.
 - Shared UI between demo and product: `features/onboarding/onboarding-wizard.tsx`, `features/settings/offer-profile-form.tsx`, `features/settings/offer-fields.tsx`.
@@ -36,9 +36,15 @@ Nothing has run against the live Google OAuth client or Neon yet. Follow `docs/G
 
 Before launch: a dedicated least-privilege database role for the app; real-Postgres CI for lock-contention tests; publish the OAuth app (Audience → Publish) when opening sign-up.
 
-## Next action (M2 step 2)
+## M2 step 2: what exists
 
-1. Owner picks a discovery provider; check its current docs, terms, storable fields, attribution and pricing units, then implement `BusinessDiscoveryProvider`.
-2. Durable job (Trigger.dev or equivalent, after a host-compatibility check) that reserves usage, pages through results, upserts `businesses`, and settles usage.
-3. `/app/discover` and `/app/leads` reusing the demo screens through a data-source boundary.
+- Pure helpers `lib/discovery/` (niche → OSM tags, Overpass query builder, response parsing); network calls in `server/providers/osm.ts`; persistence in `server/discovery-store.ts` (tested in `tests/db/discovery.test.ts`); service `server/services/discovery.ts`; pages `/app/discover` and `/app/leads`.
+- Verified against a real Postgres (PGlite socket) in a browser: failed search releases units; results display; saving leads; overview counts; foreign job ids show nothing.
+- Not verified: live OpenStreetMap calls (blocked by this sandbox's network policy). First live check: run a search on the deployed app.
+
+## Next action (M2 step 3: research and verification)
+
+1. Website research: SSRF-safe fetch of a few public pages per lead (homepage, contact) → evidence and signals, feeding the existing Opportunity Brief rules.
+2. Email verification: choose a provider (free tiers exist; check terms) behind `EmailVerificationProvider`; until then, contacts stay "Unverified" and can't be sent to.
+3. Lead detail drawer in `/app/leads` reusing the demo's brief and evidence components.
 4. Add a real-Postgres CI job for concurrency tests.
