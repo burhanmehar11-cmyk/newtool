@@ -138,12 +138,22 @@ Then **Deployments** → latest production deployment → **⋯ → Redeploy**. 
 
 | Message | Cause | Fix |
 | --- | --- | --- |
-| `Error 400: redirect_uri_mismatch` (from Google) | Redirect URI in Part C doesn't exactly match the site address | Add `https://YOUR-URL/api/auth/google/callback` exactly (https, no trailing slash) |
+| `Error 400: redirect_uri_mismatch` (from Google) | The redirect URI registered in Part C doesn't exactly match the one the app sends | See **Fixing redirect_uri_mismatch** below |
 | `Error 403: access_denied` / "app is being tested" | The Gmail account isn't a test user | Add it under Audience → Test users (Part B) |
 | "This Google account isn't on the private-beta list yet" | Email missing from `BETA_ALLOWED_EMAILS` | Add it, then redeploy |
 | "Sign-in isn't configured in this environment yet" | A setting is missing, or no redeploy happened | Recheck Part E (`SESSION_SECRET` must be 32+ characters), then redeploy |
 | "That sign-in link expired or was opened in another browser" | Took over 10 minutes, or opened in a different browser | Start again from the sign-in page |
 | Signs in, then an error page | Database not connected or migrations not run | Recheck Part D; `DATABASE_URL` must exist in Vercel |
+
+### Fixing `redirect_uri_mismatch`
+
+1. Open `https://YOUR-URL/api/auth/google/setup` in the browser (it shows no secrets). Note `authorizedRedirectUri` and `authorizedJavaScriptOrigin`.
+2. Google Cloud Console → **Google Auth Platform → Clients** → open the web client (**Locentio web**). Check that the **Client ID** starts and ends like `clientIdInUse` from step 1. If not, `GOOGLE_OAUTH_CLIENT_ID` in Vercel belongs to a different client: fix it there and redeploy.
+3. Under **Authorized redirect URIs**, add `authorizedRedirectUri` **exactly** as shown (copy and paste: `https`, the full path, no trailing slash). Under **Authorized JavaScript origins**, add `authorizedJavaScriptOrigin`. **Save.**
+4. Wait about 5 minutes. Google can take a few minutes, occasionally longer, to apply changes. Then try again in a new tab.
+5. If the address in step 1 isn't your real site (for example it shows a `-git-` preview link), set `NEXT_PUBLIC_SITE_URL` in Vercel to your real URL and redeploy. The app then always signs in through that one address.
+
+Tip: on Google's error page, **"error details"** shows the `redirect_uri` that was sent. It must appear in the client's list character for character.
 
 ## Cost and limits
 

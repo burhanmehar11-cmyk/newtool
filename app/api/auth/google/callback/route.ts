@@ -1,10 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import { GOOGLE_ISSUERS, GOOGLE_JWKS_URL, GOOGLE_TOKEN_URL, SESSION_COOKIE, SESSION_MAX_AGE_S, STATE_COOKIE } from "@/lib/auth/constants";
-import { checkIdTokenClaims } from "@/lib/auth/oidc";
+import { callbackUrl, checkIdTokenClaims, resolveAppOrigin } from "@/lib/auth/oidc";
 import { signSession, verifyState } from "@/lib/auth/tokens";
 import { isAllowedBetaEmail } from "@/lib/beta-allowlist";
-import { accountsConfigured, googleOAuth, sessionSecret } from "@/server/env";
+import { accountsConfigured, configuredSiteUrl, googleOAuth, sessionSecret } from "@/server/env";
 import { withService } from "@/server/db";
 import { AUTH_SQL } from "@/server/db-sql";
 
@@ -35,7 +35,8 @@ export async function GET(request: NextRequest) {
       code,
       client_id: clientId,
       client_secret: clientSecret,
-      redirect_uri: `${request.nextUrl.origin}/api/auth/google/callback`,
+      // Must be byte-for-byte the redirect URI sent in the start step.
+      redirect_uri: callbackUrl(resolveAppOrigin(configuredSiteUrl(), request.nextUrl.origin)),
       grant_type: "authorization_code",
       code_verifier: saved.verifier,
     }),

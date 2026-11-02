@@ -28,3 +28,11 @@ export function databaseUrl(): string | null {
 export function accountsConfigured() {
   return !!(googleOAuth() && sessionSecret() && databaseUrl());
 }
+
+/** Public site URL for sign-in redirects: NEXT_PUBLIC_SITE_URL, else Vercel's production domain. */
+export function configuredSiteUrl(): string | null {
+  const explicit = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+  if (explicit) return explicit;
+  const vercel = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim();
+  return vercel ? `https://${vercel}` : null;
+}

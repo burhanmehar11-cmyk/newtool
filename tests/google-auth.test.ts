@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createHash } from "node:crypto";
-import { buildAuthorizeUrl, checkIdTokenClaims, pkceChallenge, randomToken } from "@/lib/auth/oidc";
+import { buildAuthorizeUrl, callbackUrl, checkIdTokenClaims, pkceChallenge, randomToken, resolveAppOrigin } from "@/lib/auth/oidc";
 import { signSession, signState, verifySession, verifyState } from "@/lib/auth/tokens";
 
 const SECRET = "test-secret-that-is-long-enough-123456";
@@ -53,5 +53,24 @@ describe("signed tokens", () => {
     expect(await verifySession(s, SECRET)).toBeNull();
     const sess = await signSession({ sid: "s1", uid: "u1" }, SECRET);
     expect(await verifyState(sess, SECRET)).toBeNull();
+  });
+});
+
+
+describe("redirect URI", () => {
+  it("uses the configured site URL, ignoring paths and trailing slashes", () => {
+    expect(resolveAppOrigin("https://newtool.vercel.app/", "https://newtool-git-abc.vercel.app")).toBe("https://newtool.vercel.app");
+    expect(resolveAppOrigin(" https://app.example.com/some/path ", "https://x.example")).toBe("https://app.example.com");
+  });
+  it("falls back to the request origin when nothing valid is configured", () => {
+    expect(resolveAppOrigin(null, "https://newtool.vercel.app")).toBe("https://newtool.vercel.app");
+    expect(resolveAppOrigin("not a url", "https://newtool.vercel.app")).toBe("https://newtool.vercel.app");
+    expect(resolveAppOrigin("http://newtool.vercel.app", "https://newtool.vercel.app")).toBe("https://newtool.vercel.app");
+  });
+  it("allows http only for localhost", () => {
+    expect(resolveAppOrigin("http://localhost:3000", "http://localhost:3000")).toBe("http://localhost:3000");
+  });
+  it("builds the exact callback URL", () => {
+    expect(callbackUrl("https://newtool.vercel.app")).toBe("https://newtool.vercel.app/api/auth/google/callback");
   });
 });

@@ -47,3 +47,27 @@ export function checkIdTokenClaims(c: GoogleIdClaims, expectedNonce: string): Cl
   if (c.email_verified !== true && c.email_verified !== "true") return { ok: false, code: "email_not_verified" };
   return { ok: true, subject: `google:${c.sub}`, email: c.email.toLowerCase(), name: typeof c.name === "string" ? c.name.slice(0, 120) : "" };
 }
+
+export const CALLBACK_PATH = "/api/auth/google/callback";
+
+/**
+ * The one origin used for Google sign-in. Google requires the redirect URI to
+ * match a registered one exactly, so we never derive it from whichever host
+ * the visitor happened to use (preview links, www vs bare domain). A
+ * configured site URL wins; trailing slashes and paths are dropped.
+ */
+export function resolveAppOrigin(configured: string | null | undefined, requestOrigin: string): string {
+  if (configured) {
+    try {
+      const u = new URL(configured.trim());
+      if (u.protocol === "https:" || u.hostname === "localhost" || u.hostname === "127.0.0.1") return u.origin;
+    } catch {
+      // fall through to the request origin
+    }
+  }
+  return new URL(requestOrigin).origin;
+}
+
+export function callbackUrl(origin: string): string {
+  return `${origin}${CALLBACK_PATH}`;
+}
