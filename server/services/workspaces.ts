@@ -1,25 +1,38 @@
 import "server-only";
 import type { OfferProfile } from "@/lib/domain/types";
 import { offerProfileSchema, onboardingSchema } from "@/lib/domain/schemas";
-import { createSupabaseServerClient } from "@/server/supabase/server";
+import { withUser } from "@/server/db";
 import { getActiveWorkspace, requireUser, type WorkspaceRef } from "@/server/auth";
 
 export type ServiceResult<T = undefined> = { ok: true; value: T } | { ok: false; error: string; fieldErrors?: Record<string, string> };
 
-const toRow = (o: OfferProfile) => ({
-  service_type: o.serviceType,
-  service: o.service,
-  target_customer: o.targetCustomer,
-  value_prop: o.valueProp,
-  tone: o.tone,
-  sender_name: o.senderName,
-  sender_title: o.senderTitle,
-  company_name: o.companyName,
-  business_address: o.businessAddress,
-  booking_link: o.bookingLink,
-});
+const COLUMNS = "service_type, service, target_customer, value_prop, tone, sender_name, sender_title, company_name, business_address, booking_link";
 
-type OfferRow = ReturnType<typeof toRow>;
+const toParams = (o: OfferProfile) => [
+  o.serviceType,
+  o.service,
+  o.targetCustomer,
+  o.valueProp,
+  o.tone,
+  o.senderName,
+  o.senderTitle,
+  o.companyName,
+  o.businessAddress,
+  o.bookingLink,
+];
+
+type OfferRow = {
+  service_type: OfferProfile["serviceType"];
+  service: string;
+  target_customer: string;
+  value_prop: string;
+  tone: OfferProfile["tone"];
+  sender_name: string;
+  sender_title: string;
+  company_name: string;
+  business_address: string;
+  booking_link: string;
+};
 
 const fromRow = (r: OfferRow): OfferProfile => ({
   serviceType: r.service_type,
@@ -38,36 +51,37 @@ function fieldErrors(issues: { path: PropertyKey[]; message: string }[]) {
   return Object.fromEntries(issues.map((i) => [String(i.path[0]), i.message]));
 }
 
-async function client() {
-  const supabase = await createSupabaseServerClient();
-  if (!supabase) throw new Error("Supabase is not configured");
-  return supabase;
-}
+const UPSERT_OFFER = `insert into public.offer_profiles (workspace_id, ${COLUMNS}, updated_by)
+  values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+  on conflict (workspace_id) do update set
+    service_type = excluded.service_type, service = excluded.service, target_customer = excluded.target_customer,
+    value_prop = excluded.value_prop, tone = excluded.tone, sender_name = excluded.sender_name,
+    sender_title = excluded.sender_title, company_name = excluded.company_name,
+    business_address = excluded.business_address, booking_link = excluded.booking_link, updated_by = excluded.updated_by`;
 
-/** Creates a workspace owned by the caller, plus its offer profile. */
+/** Creates a workspace owned by the caller, plus its offer profile, in one transaction. */
 export async function createWorkspaceWithOffer(input: unknown): Promise<ServiceResult<{ workspaceId: string }>> {
   const user = await requireUser("/app/onboarding");
   const parsed = onboardingSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Check the highlighted fields.", fieldErrors: fieldErrors(parsed.error.issues) };
   const { workspaceName, ...offer } = parsed.data;
-  const supabase = await client();
-
-  const { data: workspaceId, error } = await supabase.rpc("create_workspace", { ws_name: workspaceName });
-  if (error || !workspaceId) return { ok: false, error: `Could not create the workspace: ${error?.message ?? "unknown error"}` };
-
-  const { error: offerError } = await supabase
-    .from("offer_profiles")
-    .insert({ workspace_id: workspaceId, ...toRow(offer), updated_by: user.id });
-  if (offerError) return { ok: false, error: `Workspace created, but the offer profile was not saved: ${offerError.message}` };
-
-  return { ok: true, value: { workspaceId: workspaceId as string } };
+  try {
+    const workspaceId = await withUser(user.id, async (q) => {
+      const ws = await q.query<{ id: string }>("select public.create_workspace($1) as id", [workspaceName]);
+      const id = ws.rows[0].id;
+      await q.query(UPSERT_OFFER, [id, ...toParams(offer), user.id]);
+      return id;
+    });
+    return { ok: true, value: { workspaceId } };
+  } catch {
+    return { ok: false, error: "Could not create the workspace. Nothing was saved. Try again." };
+  }
 }
 
 export async function getOfferProfile(workspace: WorkspaceRef): Promise<OfferProfile | null> {
-  const supabase = await client();
-  const { data, error } = await supabase.from("offer_profiles").select("*").eq("workspace_id", workspace.id).maybeSingle();
-  if (error) throw new Error(`Could not load the offer profile: ${error.message}`);
-  return data ? fromRow(data as OfferRow) : null;
+  const user = await requireUser();
+  const r = await withUser(user.id, (q) => q.query<OfferRow>(`select ${COLUMNS} from public.offer_profiles where workspace_id = $1`, [workspace.id]));
+  return r.rows[0] ? fromRow(r.rows[0]) : null;
 }
 
 export async function saveOfferProfile(input: unknown): Promise<ServiceResult> {
@@ -76,46 +90,45 @@ export async function saveOfferProfile(input: unknown): Promise<ServiceResult> {
   if (!workspace) return { ok: false, error: "No workspace selected." };
   const parsed = offerProfileSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Check the highlighted fields.", fieldErrors: fieldErrors(parsed.error.issues) };
-  const supabase = await client();
-  const { error } = await supabase
-    .from("offer_profiles")
-    .upsert({ workspace_id: workspace.id, ...toRow(parsed.data), updated_by: user.id }, { onConflict: "workspace_id" });
-  if (error) return { ok: false, error: `Could not save: ${error.message}` };
-  return { ok: true, value: undefined };
+  try {
+    await withUser(user.id, (q) => q.query(UPSERT_OFFER, [workspace.id, ...toParams(parsed.data), user.id]));
+    return { ok: true, value: undefined };
+  } catch {
+    return { ok: false, error: "Could not save the offer profile. Try again." };
+  }
 }
 
 export async function renameWorkspace(name: unknown): Promise<ServiceResult> {
-  await requireUser("/app/settings");
+  const user = await requireUser("/app/settings");
   const workspace = await getActiveWorkspace();
   if (!workspace) return { ok: false, error: "No workspace selected." };
   if (!["owner", "admin"].includes(workspace.role)) return { ok: false, error: "Only the workspace owner can rename it." };
   const n = typeof name === "string" ? name.trim() : "";
   if (n.length < 2 || n.length > 80) return { ok: false, error: "Use 2 to 80 characters.", fieldErrors: { name: "Use 2 to 80 characters." } };
-  const supabase = await client();
-  const { error } = await supabase.from("workspaces").update({ name: n }).eq("id", workspace.id);
-  if (error) return { ok: false, error: `Could not rename: ${error.message}` };
-  return { ok: true, value: undefined };
+  const r = await withUser(user.id, (q) => q.query("update public.workspaces set name = $1 where id = $2", [n, workspace.id]));
+  return r.rowCount ? { ok: true, value: undefined } : { ok: false, error: "Could not rename this workspace." };
 }
 
 export type UsageRow = { kind: "discovery" | "verification" | "ai"; allowance: number; used: number; reserved: number };
 
-/** Allowance and committed usage per kind, computed from the ledger the member can read. */
+/** Allowance and committed usage per kind, read from the ledger (members have read-only access). */
 export async function getUsage(workspace: WorkspaceRef): Promise<UsageRow[]> {
-  const supabase = await client();
-  const [{ data: allowances, error: e1 }, { data: ledger, error: e2 }] = await Promise.all([
-    supabase.from("workspace_allowances").select("kind, units").eq("workspace_id", workspace.id),
-    supabase.from("usage_ledger").select("kind, entry_type, units, reservation_key, idempotency_key").eq("workspace_id", workspace.id),
-  ]);
-  if (e1 || e2) throw new Error(`Could not load usage: ${(e1 ?? e2)!.message}`);
+  const user = await requireUser();
+  const [allowances, ledger] = await withUser(user.id, async (q) => [
+    (await q.query<{ kind: string; units: number }>("select kind, units from public.workspace_allowances where workspace_id = $1", [workspace.id])).rows,
+    (
+      await q.query<{ kind: string; entry_type: string; units: number; reservation_key: string | null; idempotency_key: string }>(
+        "select kind, entry_type, units, reservation_key, idempotency_key from public.usage_ledger where workspace_id = $1",
+        [workspace.id],
+      )
+    ).rows,
+  ] as const);
   return (["discovery", "verification", "ai"] as const).map((kind) => {
-    const l = (ledger ?? []).filter((x) => x.kind === kind);
+    const l = ledger.filter((x) => x.kind === kind);
     const sum = (t: string) => l.filter((x) => x.entry_type === t).reduce((a, x) => a + x.units, 0);
     const reserved = l
       .filter((x) => x.entry_type === "reserve")
-      .reduce((a, r) => {
-        const settled = l.filter((x) => x.reservation_key === r.idempotency_key).reduce((s, x) => s + x.units, 0);
-        return a + Math.max(0, r.units - settled);
-      }, 0);
-    return { kind, allowance: allowances?.find((a) => a.kind === kind)?.units ?? 0, used: sum("charge") - sum("refund"), reserved };
+      .reduce((a, r) => a + Math.max(0, r.units - l.filter((x) => x.reservation_key === r.idempotency_key).reduce((s, x) => s + x.units, 0)), 0);
+    return { kind, allowance: allowances.find((a) => a.kind === kind)?.units ?? 0, used: sum("charge") - sum("refund"), reserved };
   });
 }

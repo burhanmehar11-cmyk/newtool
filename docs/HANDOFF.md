@@ -1,6 +1,6 @@
 # Handoff
 
-_Last updated: 2026-11-02. M1 complete; M2 step 1 built._
+_Last updated: 2026-11-02. M1 complete; M2 step 1 built on Google (Firebase Auth + Cloud SQL)._
 
 ## State
 
@@ -23,15 +23,18 @@ BASE_URL=http://localhost:3000 npm run test:e2e
 
 ## M2 step 1: what exists
 
-- Schema and RLS: `database/migrations/0001_foundation.sql`. Tests: `tests/db/`.
-- Auth: `server/supabase/server.ts`, `proxy.ts`, `server/auth.ts` (DAL), `server/actions/auth.ts`, `app/auth/callback/route.ts`, pages under `app/(marketing)/{sign-in,sign-up,forgot-password,reset-password}`.
+- Schema and RLS: `database/migrations/0000_auth.sql` (roles, `auth.users`, `auth.uid()`) and `0001_foundation.sql`. Tests: `tests/db/`.
+- Auth: `lib/firebase/client.ts` (browser, in-memory persistence), `app/api/auth/session/route.ts` (ID token → session cookie), `lib/session-policy.ts`, `server/firebase/admin.ts`, `server/auth.ts` (DAL), `server/actions/auth.ts`, `proxy.ts`, pages under `app/(marketing)/{sign-in,sign-up,forgot-password}`. Password reset uses Firebase's hosted page.
+- Database access: `server/db.ts` (`withUser` runs as `authenticated` with `app.user_id`; `withService` for server bookkeeping), `server/db-sql.ts`.
 - Product: `app/app/*` (overview, onboarding, settings), `server/services/workspaces.ts`, `server/actions/workspace.ts`, `components/app/product-shell.tsx`.
 - Shared UI between demo and product: `features/onboarding/onboarding-wizard.tsx`, `features/settings/offer-profile-form.tsx`, `features/settings/offer-fields.tsx`.
 - Lint rule: production paths cannot import `demo/*` (`eslint.config.mjs`).
 
 ## Not verified
 
-Nothing has run against a live Supabase project yet. When credentials arrive: apply the migration, set env vars, sign up with an allowlisted email, confirm, onboard, then sign in as a second user and confirm the first workspace is invisible.
+Nothing has run against the live Google project yet. Follow `docs/GOOGLE_CLOUD_SETUP.md` (written for Claude Cowork), then: sign up with an allowlisted email, confirm, onboard, sign in as a second user and confirm the first workspace is invisible.
+
+Before launch: dedicated least-privilege database user instead of `postgres`; Workload Identity Federation instead of a key file; real-Postgres CI for lock-contention tests.
 
 ## Next action (M2 step 2)
 

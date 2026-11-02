@@ -17,7 +17,7 @@ Reversible choices made without asking, with the reason. Revisit any of them fre
 | 11 | Added tokens **Fog** `#93A4AD` (secondary text on dark) and **Control border** `#7C8D87` (inputs, 3:1) and a sand **demo** tone | Needed for contrast compliance and to keep demo labels visually distinct from brand mint. |
 | 12 | Legal pages are outlines with [placeholders] and a "Draft, not in effect" banner | No company identity has been provided; no compliance claims are made. |
 | 13 | Sign in page explains that accounts open with the private beta | Avoids a dead CTA and avoids implying signup exists. `SIGNUP_OPEN` flips the header CTA in M2. |
-| 14 | Planned M2 providers: Supabase (auth/DB), Trigger.dev (jobs, pending host compatibility check), Anthropic (AI, model via `ANTHROPIC_MODEL`), Gmail first | Per the brief; no discovery or verification vendor chosen yet: that needs a terms and pricing review. |
+| 14 | Planned M2 providers: ~~Supabase~~ Google Cloud (see #25), Trigger.dev (jobs, pending host compatibility check), Anthropic (AI, model via `ANTHROPIC_MODEL`), Gmail first | Per the brief; no discovery or verification vendor chosen yet: that needs a terms and pricing review. |
 | 15 | No open tracking planned for the beta | Not needed for the core value; avoids privacy and deliverability issues. |
 
 ## Open questions for the owner
@@ -33,10 +33,14 @@ Reversible choices made without asking, with the reason. Revisit any of them fre
 | --- | --- | --- |
 | 16 | Sign-up gated by `BETA_ALLOWED_EMAILS` (emails or @domains); `SIGNUP_OPEN` stays false | Private beta without trial entitlements; the marketing CTA stays "Explore demo". |
 | 17 | Businesses, contacts and evidence are stored **per workspace**, not shared | Provider terms may restrict sharing and retention, and tenants must never see each other's data. Chains are not merged on a shared domain. |
-| 18 | RPC-callable functions (`create_workspace`, `reserve_usage`, `settle_usage`) live in `public`, helpers in `app`; EXECUTE is revoked from `public`/`anon` | Supabase's API exposes only `public`; Postgres grants EXECUTE to everyone by default. |
+| 18 | Callable functions (`create_workspace`, `reserve_usage`, `settle_usage`) live in `public`, helpers in `app`; EXECUTE is revoked from `public`/`anon` | Postgres grants EXECUTE to everyone by default. |
 | 19 | Usage ledger, allowances, audit events and job runs are read-only to members; writes go through SECURITY DEFINER functions or the service role | Clients can't edit what they're charged. |
 | 20 | Mailbox tokens live in `sending_account_secrets` with RLS on and no policies | Only the service role can read them. |
-| 21 | DAL uses `auth.getUser()` (server-verified); `proxy.ts` uses `getClaims()` only to refresh and gate | Cookie contents alone are never trusted for identity. |
+| 21 | Session = Firebase session cookie (5 days, httpOnly), created only from a fresh, email-verified ID token on a same-origin POST; verified with revocation checks on every request; sign-out revokes refresh tokens | Cookie contents are never trusted without verification; the browser keeps no Firebase session (in-memory persistence). |
 | 22 | Active workspace is an httpOnly cookie, always re-validated against memberships | Switching is cheap; a forged cookie gives nothing. |
-| 23 | Database tests use PGlite with a Supabase auth shim | Real Postgres and RLS semantics without a hosted project in CI. Concurrency still needs a real-Postgres job. |
+| 23 | Database tests run the real migrations in PGlite with the server's own user-scoping SQL | Real Postgres and RLS semantics without a hosted project in CI. Concurrency still needs a real-Postgres job. |
 | 24 | Brand renamed to **Locentio** (owner request) | Still provisional; trademark and domain not checked. |
+| 25 | **Google stack instead of Supabase** (owner decision): Firebase Authentication + Cloud SQL for PostgreSQL, hosting stays on Vercel | The owner uses Google Cloud. Keeping Postgres preserved the schema, RLS and tests. |
+| 26 | Cloud SQL reached through `@google-cloud/cloud-sql-connector` (public IP, no authorised networks, mTLS, SSL-only) with a service account holding **Cloud SQL Client** | Works from Vercel's changing IPs without opening the database to the internet. |
+| 27 | Firebase UIDs map to internal UUIDs in `auth.users`; queries run as role `authenticated` with `app.user_id` set per transaction | RLS policies stay database-enforced and independent of the auth provider. |
+| 28 | One service account key (`GOOGLE_SERVICE_ACCOUNT_KEY`) for Firebase Admin and Cloud SQL during the beta | Simplest setup on Vercel. Before launch: dedicated least-privilege DB user and Workload Identity Federation instead of a key. |

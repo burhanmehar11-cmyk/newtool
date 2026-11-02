@@ -137,27 +137,25 @@ describe("usage reservations", () => {
 describe("integrity constraints", () => {
   it("prevents duplicate active outreach to the same contact across campaigns", async () => {
     const { leadId, contactId } = await seedBusinessAndLead(wsA, A, "beta");
-    await as(db, A, async () => {
-      const mk = async (name: string) =>
-        (await db.query<{ id: string }>("insert into campaigns (workspace_id, name, schedule) values ($1, $2, '{}') returning id", [wsA, name])).rows[0].id;
-      const c1 = await mk("One");
-      const c2 = await mk("Two");
-      await db.query("insert into enrollments (workspace_id, campaign_id, lead_id, contact_id) values ($1, $2, $3, $4)", [wsA, c1, leadId, contactId]);
-      await expect(
-        db.query("insert into enrollments (workspace_id, campaign_id, lead_id, contact_id) values ($1, $2, $3, $4)", [wsA, c2, leadId, contactId]),
-      ).rejects.toThrow(/enrollments_one_active_per_contact/);
-      // Once the first is stopped, a new campaign may enrol the contact.
-      await db.query("update enrollments set state = 'stopped' where campaign_id = $1", [c1]);
-      await db.query("insert into enrollments (workspace_id, campaign_id, lead_id, contact_id) values ($1, $2, $3, $4)", [wsA, c2, leadId, contactId]);
-    });
+    const mk = (name: string) =>
+      as(db, A, async () => (await db.query<{ id: string }>("insert into campaigns (workspace_id, name, schedule) values ($1, $2, '{}') returning id", [wsA, name])).rows[0].id);
+    const enrol = (campaignId: string) =>
+      as(db, A, () => db.query("insert into enrollments (workspace_id, campaign_id, lead_id, contact_id) values ($1, $2, $3, $4)", [wsA, campaignId, leadId, contactId]));
+    const c1 = await mk("One");
+    const c2 = await mk("Two");
+    await enrol(c1);
+    await expect(enrol(c2)).rejects.toThrow(/enrollments_one_active_per_contact/);
+    // Once the first is stopped, a new campaign may enrol the contact.
+    await as(db, A, () => db.query("update enrollments set state = 'stopped' where campaign_id = $1", [c1]));
+    await expect(enrol(c2)).resolves.toBeTruthy();
   });
 
   it("keeps suppression entries unique and lower-case per workspace", async () => {
-    await as(db, A, async () => {
-      await db.query("insert into suppression_entries (workspace_id, value, kind, reason) values ($1, 'stop@x.example', 'email', 'unsubscribe')", [wsA]);
-      await expect(db.query("insert into suppression_entries (workspace_id, value, kind, reason) values ($1, 'stop@x.example', 'email', 'manual')", [wsA])).rejects.toThrow();
-      await expect(db.query("insert into suppression_entries (workspace_id, value, kind, reason) values ($1, 'UPPER@x.example', 'email', 'manual')", [wsA])).rejects.toThrow();
-    });
+    const add = (value: string, reason: string) =>
+      as(db, A, () => db.query("insert into suppression_entries (workspace_id, value, kind, reason) values ($1, $2, 'email', $3)", [wsA, value, reason]));
+    await add("stop@x.example", "unsubscribe");
+    await expect(add("stop@x.example", "manual")).rejects.toThrow(/duplicate key/);
+    await expect(add("UPPER@x.example", "manual")).rejects.toThrow(/check constraint/);
   });
 
   it("never records a verified status without a timestamp", async () => {
@@ -170,10 +168,9 @@ describe("integrity constraints", () => {
   });
 
   it("allows one dispatch per enrollment step", async () => {
-    await as(db, A, async () => {
-      const e = await db.query<{ id: string }>("select id from enrollments where workspace_id = $1 limit 1", [wsA]);
-      await db.query("insert into dispatches (workspace_id, enrollment_id, step) values ($1, $2, 1)", [wsA, e.rows[0].id]);
-      await expect(db.query("insert into dispatches (workspace_id, enrollment_id, step) values ($1, $2, 1)", [wsA, e.rows[0].id])).rejects.toThrow();
-    });
+    const e = await as(db, A, () => db.query<{ id: string }>("select id from enrollments where workspace_id = $1 limit 1", [wsA]));
+    const dispatch = () => as(db, A, () => db.query("insert into dispatches (workspace_id, enrollment_id, step) values ($1, $2, 1)", [wsA, e.rows[0].id]));
+    await dispatch();
+    await expect(dispatch()).rejects.toThrow(/duplicate key/);
   });
 });

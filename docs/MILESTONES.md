@@ -21,7 +21,7 @@ Build order: auth and workspaces → one real search-to-saved-lead flow → enri
 
 | Step | Status | Notes |
 | --- | --- | --- |
-| 1. Accounts and workspaces | **Built, tested offline** | Supabase Auth (sign-up by allowlist, sign-in, reset, sign-out), `/app` behind `proxy.ts`, workspace + offer profile onboarding, settings, usage view. Full schema with RLS in `database/migrations/0001_foundation.sql`. Not yet run against a live Supabase project. |
+| 1. Accounts and workspaces | **Built, tested offline** | Firebase Authentication (email/password + Google; sign-up limited by allowlist; verified email required; password reset; sign-out revokes sessions), httpOnly session cookie, `/app` behind `proxy.ts`, workspace + offer profile onboarding, settings, usage view. Cloud SQL schema with RLS in `database/migrations/`. Not yet run against the live Google project; setup guide in `docs/GOOGLE_CLOUD_SETUP.md`. |
 | 2. Search → saved lead | Not started | Needs a discovery provider decision and key. |
 | 3. Enrichment and verification | Not started | Needs a verification provider decision and key; SSRF-safe crawler. |
 | 4. Evidence-based drafts | Not started | Needs `ANTHROPIC_API_KEY` and `ANTHROPIC_MODEL`. |
@@ -31,10 +31,10 @@ Build order: auth and workspaces → one real search-to-saved-lead flow → enri
 **Required M2 tests:**
 
 - Done (PGlite): tenant isolation, anonymous lockout, ledger and secret write protection, idempotent usage reservation, quota refusal, duplicate active enrollment, one dispatch per step.
-- Weak: quota concurrency. PGlite runs queries serially, so this checks the arithmetic, not real lock contention. Add a real-Postgres CI job (Supabase CLI or a Postgres service container).
+- Weak: quota concurrency. PGlite runs queries serially, so this checks the arithmetic, not real lock contention. Add a real-Postgres CI job (a Postgres service container).
 - Still to write, per step: suppression after re-import, stale approvals, pause/reply races, ambiguous send recovery, revoked mailbox, injected research content, and the sandbox end-to-end flow.
 
-**Blockers needing the owner:** a Supabase project; a choice of discovery and verification providers (and their terms); an Anthropic API key and model; a Google Cloud OAuth client (and verification for production scopes); a job-runner account; a test mailbox; the sender identity and business address for the beta; target markets for outreach rules.
+**Blockers needing the owner:** completing `docs/GOOGLE_CLOUD_SETUP.md` (Firebase, Cloud SQL, Vercel variables); a choice of discovery and verification providers (and their terms); an Anthropic API key and model; a Google Cloud OAuth client (and verification for production scopes); a job-runner account; a test mailbox; the sender identity and business address for the beta; target markets for outreach rules.
 
 ## M3: paid launch
 

@@ -1,31 +1,15 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { PGlite } from "@electric-sql/pglite";
+import { USER_SCOPE_SQL } from "@/server/db-sql";
 
 /**
- * Runs the real migrations in PGlite (Postgres compiled to WASM) with a
- * minimal shim of what Supabase provides: the auth schema, auth.uid(), and
- * the anon / authenticated / service_role roles. Lets us test RLS and the
- * SQL functions without a Supabase project.
+ * Runs the real migrations (including 0000_auth.sql) in PGlite, Postgres
+ * compiled to WASM. Queries are scoped to a user with exactly the same SQL
+ * the server uses in withUser(), so RLS is tested as it runs in production.
  */
-const SHIM = `
-create role anon nologin;
-create role authenticated nologin;
-create role service_role nologin bypassrls;
-create schema auth;
-create table auth.users (id uuid primary key, email text, raw_user_meta_data jsonb default '{}');
-create function auth.uid() returns uuid language sql stable as $$
-  select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid
-$$;
-grant usage on schema public, auth to anon, authenticated, service_role;
-grant execute on function auth.uid() to anon, authenticated;
-alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
-alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
-`;
-
 export async function createTestDb() {
   const db = new PGlite();
-  await db.exec(SHIM);
   const dir = join(process.cwd(), "database/migrations");
   for (const f of readdirSync(dir).filter((x) => x.endsWith(".sql")).sort()) {
     await db.exec(readFileSync(join(dir, f), "utf8"));
@@ -34,18 +18,34 @@ export async function createTestDb() {
 }
 
 export async function createUser(db: PGlite, id: string, email: string) {
-  await db.exec("reset role");
-  await db.query("insert into auth.users (id, email) values ($1, $2)", [id, email]);
+  await db.query("insert into auth.users (id, firebase_uid, email) values ($1, $2, $3)", [id, `fb_${id.slice(-6)}`, email]);
 }
 
-/** Run queries as an authenticated user (or anon when id is null), as PostgREST would. */
-export async function as<T>(db: PGlite, userId: string | null, fn: () => Promise<T>): Promise<T> {
-  await db.exec(`set role ${userId ? "authenticated" : "anon"}`);
-  await db.query("select set_config('request.jwt.claim.sub', $1, false)", [userId ?? ""]);
+// PGlite has one connection; production uses one pooled connection per
+// transaction. Serialise scopes so concurrent calls don't interleave.
+let queue: Promise<unknown> = Promise.resolve();
+
+/** Run queries as a signed-in user, or as anon when id is null. */
+export function as<T>(db: PGlite, userId: string | null, fn: () => Promise<T>): Promise<T> {
+  const run = queue.then(() => scoped(db, userId, fn));
+  queue = run.catch(() => undefined);
+  return run;
+}
+
+async function scoped<T>(db: PGlite, userId: string | null, fn: () => Promise<T>): Promise<T> {
+  await db.exec("begin");
   try {
-    return await fn();
-  } finally {
-    await db.exec("reset role");
-    await db.query("select set_config('request.jwt.claim.sub', '', false)");
+    if (userId) {
+      await db.exec(USER_SCOPE_SQL.role);
+      await db.query(USER_SCOPE_SQL.setUser, [userId]);
+    } else {
+      await db.exec("set local role anon");
+    }
+    const r = await fn();
+    await db.exec("commit");
+    return r;
+  } catch (e) {
+    await db.exec("rollback");
+    throw e;
   }
 }

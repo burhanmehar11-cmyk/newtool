@@ -17,15 +17,15 @@ export function AuthCard({ title, description, children }: { title: string; desc
   );
 }
 
-/** Shown when this deployment has no Supabase configuration. Never pretends to sign anyone in. */
+/** Shown when this deployment has no Firebase or Cloud SQL configuration. Never pretends to sign anyone in. */
 export function NotConfigured() {
   return (
     <div className="space-y-4">
       <div className="flex gap-3 rounded-xl bg-warn-bg px-4 py-3 text-sm leading-6 text-warn-fg">
         <Settings2 aria-hidden className="mt-1 size-4 shrink-0" />
         <p>
-          Accounts aren&apos;t configured in this environment. The private beta needs <code className="font-mono text-[13px]">NEXT_PUBLIC_SUPABASE_URL</code> and{" "}
-          <code className="font-mono text-[13px]">NEXT_PUBLIC_SUPABASE_ANON_KEY</code>.
+          Accounts aren&apos;t configured in this environment. The private beta needs the Firebase and Cloud SQL settings described in{" "}
+          <code className="font-mono text-[13px]">docs/GOOGLE_CLOUD_SETUP.md</code>.
         </p>
       </div>
       <p className="text-[15px] leading-7 text-slate">You can still try the full workflow in the interactive demo with sample data.</p>

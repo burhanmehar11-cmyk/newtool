@@ -13,7 +13,7 @@ The demo store already encodes rules M2 must enforce server-side (see `tests/sto
 
 ## M2 plan
 
-**Hosting and jobs.** Vercel (or similar) for the app, Supabase for Auth and Postgres, and a durable job runner (Trigger.dev is the default candidate) for discovery, enrichment, verification, scheduling and mailbox sync. Confirm the runner works with the chosen host before committing. No request-scoped loops or browser timers.
+**Hosting and jobs.** Vercel for the app, Firebase Authentication for sign-in, Cloud SQL for PostgreSQL (via the Cloud SQL connector), and a durable job runner (Trigger.dev is the default candidate) for discovery, enrichment, verification, scheduling and mailbox sync. Confirm the runner works with the chosen host before committing. No request-scoped loops or browser timers.
 
 **Routes.** Authenticated product under `app/(app)/…` reusing `features/*` screens. Screens get data through a thin data-source boundary: the demo store in `/demo`, server actions and queries in the product. Production never silently reads fixtures.
 

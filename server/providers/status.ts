@@ -6,7 +6,7 @@ import "server-only";
  * product runs only the clearly labelled demo.
  */
 export type ProviderStatus = {
-  key: "discovery" | "verification" | "ai" | "mailbox" | "billing" | "database";
+  key: "auth" | "discovery" | "verification" | "ai" | "mailbox" | "billing" | "database";
   label: string;
   configured: boolean;
   envVars: string[];
@@ -17,7 +17,8 @@ const has = (name: string) => typeof process.env[name] === "string" && process.e
 
 export function getProviderStatus(): ProviderStatus[] {
   const rows: Omit<ProviderStatus, "configured">[] = [
-    { key: "database", label: "Database and auth (Supabase)", envVars: ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY", "SUPABASE_SERVICE_ROLE_KEY"], milestone: "M2" },
+    { key: "auth", label: "Accounts (Firebase Authentication)", envVars: ["NEXT_PUBLIC_FIREBASE_API_KEY", "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN", "NEXT_PUBLIC_FIREBASE_PROJECT_ID", "GOOGLE_SERVICE_ACCOUNT_KEY"], milestone: "M2" },
+    { key: "database", label: "Database (Cloud SQL for PostgreSQL)", envVars: ["CLOUD_SQL_INSTANCE", "DB_USER", "DB_PASSWORD", "DB_NAME", "GOOGLE_SERVICE_ACCOUNT_KEY"], milestone: "M2" },
     { key: "discovery", label: "Business discovery", envVars: ["DISCOVERY_PROVIDER", "DISCOVERY_API_KEY"], milestone: "M2" },
     { key: "verification", label: "Email verification", envVars: ["VERIFICATION_PROVIDER", "VERIFICATION_API_KEY"], milestone: "M2" },
     { key: "ai", label: "AI research and drafts (Anthropic)", envVars: ["ANTHROPIC_API_KEY", "ANTHROPIC_MODEL"], milestone: "M2" },

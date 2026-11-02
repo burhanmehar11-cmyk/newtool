@@ -11,7 +11,7 @@ Locentio is a local prospecting and outreach workspace for agencies: discover bu
 | Milestone | Scope | Status |
 | --- | --- | --- |
 | **M1** | Brand, landing page, interactive demo on fixture data | **Complete. Not production-ready.** |
-| M2 | Accounts, persistence, real discovery, research, Gmail sending, reply sync | **In progress.** Step 1 (accounts and workspaces) built; not yet verified against a live Supabase project |
+| M2 | Accounts, persistence, real discovery, research, Gmail sending, reply sync | **In progress.** Step 1 (accounts and workspaces) built on Firebase Authentication + Cloud SQL; not yet verified against the live Google project |
 | M3 | Billing, team roles, public API, webhooks, MCP | Not started |
 
 ### What is simulated in M1
@@ -68,17 +68,21 @@ BASE_URL=http://localhost:3000 npm run test:e2e
 
 Screenshots land in `./screenshots` (git-ignored) at 390, 768 and 1440px.
 
-## M2 setup: accounts and workspaces (Supabase)
+## M2 setup: accounts and workspaces (Google Cloud)
 
-The product lives at `/app` behind sign-in. Without Supabase settings it shows a clear "not configured" state; the demo keeps working.
+Sign-in uses **Firebase Authentication** (email/password and Google), the database is **Cloud SQL for PostgreSQL**, and the app stays on **Vercel**, connecting through Google's Cloud SQL connector. The product lives at `/app`. Without these settings it shows a clear "not configured" state, and the demo keeps working.
 
-1. Create a Supabase project.
-2. Apply the schema: paste `database/migrations/0001_foundation.sql` into the SQL editor and run it (or use the Supabase CLI with this folder as your migrations).
-3. In **Authentication → URL configuration**, set the Site URL to your domain and add `https://YOUR-DOMAIN/auth/callback` as a redirect URL. Keep email confirmation on.
-4. Set environment variables (locally in `.env.local`, and in Vercel): `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SITE_URL`, `BETA_ALLOWED_EMAILS`. Redeploy after changing them.
-5. Sign up at `/sign-up` with an allowlisted email, confirm it, then complete workspace setup.
+**Step-by-step setup, written for Claude Cowork to follow in the browser: [docs/GOOGLE_CLOUD_SETUP.md](docs/GOOGLE_CLOUD_SETUP.md).** In short:
 
-Database tests run the real migration in PGlite (Postgres in WASM) with a Supabase auth shim: `npm test` covers tenant isolation, anonymous lockout, ledger and secret protection, idempotent usage reservations, quota refusal and integrity constraints.
+1. Google Cloud project with billing; enable the Cloud SQL Admin API and Identity Toolkit API.
+2. Firebase on that project: enable Email/Password and Google sign-in, add your domain to authorised domains, register a web app.
+3. Service account key (Firebase Admin SDK account), granted **Cloud SQL Client**.
+4. Cloud SQL PostgreSQL instance with public IP and no authorised networks, plus a `locentio` database; run `database/migrations/0000_auth.sql`, then `0001_foundation.sql`.
+5. Vercel environment variables (see `.env.example`), then redeploy.
+
+How a request is authorised: the browser signs in with Firebase, posts the fresh ID token to `/api/auth/session` (same-origin, verified, recent and email-verified; first sign-in must be on `BETA_ALLOWED_EMAILS`), and receives an httpOnly session cookie. Every product query runs in a transaction as the `authenticated` role with `app.user_id` set, so row-level security limits it to the user's workspaces.
+
+Database tests run the real migrations in PGlite (Postgres in WASM), using exactly the same user-scoping SQL as the server. `npm test` covers tenant isolation, anonymous lockout, ledger and secret protection, idempotent usage reservations, quota refusal and integrity constraints.
 
 ## Deploying to Vercel
 
@@ -99,8 +103,8 @@ Next.js 16 (App Router, Cache Components, Turbopack) · React 19 · TypeScript �
 ```
 app/                     Routes. (marketing) = landing, auth pages, legal drafts, brand guide; demo/ = demo app; app/ = live product (M2)
 database/migrations      SQL schema with row-level security
-proxy.ts                 Session refresh and /app gate (Next 16 "proxy", formerly middleware)
-server/                  Server-only: env, Supabase client, auth (data access layer), services, actions
+proxy.ts                 /app gate on the session cookie (Next 16 "proxy", formerly middleware)
+server/                  Server-only: env, Cloud SQL pool, Firebase Admin, auth (data access layer), services, actions
 components/ui            Primitives (button, dialog/sheet, tabs, fields, toast…)
 components/marketing     Landing page sections
 components/product       Shared product UI (Opportunity Brief, evidence, badges)

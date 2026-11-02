@@ -1,26 +1,55 @@
 import "server-only";
-import { z } from "zod";
 
 /**
- * Server environment, validated once. Missing values produce a clear
- * "not configured" state; nothing silently falls back to demo data.
+ * Server configuration. Missing values produce a clear "not configured"
+ * state; nothing silently falls back to demo data. Values are never logged.
  */
-const schema = z.object({
-  NEXT_PUBLIC_SUPABASE_URL: z.string().url().optional(),
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(20).optional(),
-  BETA_ALLOWED_EMAILS: z.string().optional(),
-});
 
-const parsed = schema.safeParse({
-  NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL || undefined,
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || undefined,
-  BETA_ALLOWED_EMAILS: process.env.BETA_ALLOWED_EMAILS || undefined,
-});
+export type ServiceAccount = { project_id: string; client_email: string; private_key: string };
 
-export const env = parsed.success ? parsed.data : {};
+let cachedSa: ServiceAccount | null | undefined;
 
-export function supabaseConfig(): { url: string; anonKey: string } | null {
-  const url = env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  return url && anonKey ? { url, anonKey } : null;
+/**
+ * GOOGLE_SERVICE_ACCOUNT_KEY holds the service account JSON, either raw or
+ * base64-encoded. One key serves Firebase Admin and the Cloud SQL connector.
+ */
+export function serviceAccount(): ServiceAccount | null {
+  if (cachedSa !== undefined) return cachedSa;
+  const raw = process.env.GOOGLE_SERVICE_ACCOUNT_KEY?.trim();
+  cachedSa = null;
+  if (raw) {
+    try {
+      const json = raw.startsWith("{") ? raw : Buffer.from(raw, "base64").toString("utf8");
+      const sa = JSON.parse(json) as Partial<ServiceAccount>;
+      if (sa.project_id && sa.client_email && sa.private_key) {
+        cachedSa = { project_id: sa.project_id, client_email: sa.client_email, private_key: sa.private_key.replace(/\\n/g, "\n") };
+      }
+    } catch {
+      cachedSa = null;
+    }
+  }
+  return cachedSa;
+}
+
+export type DbConfig =
+  | { kind: "cloudsql"; instance: string; user: string; password: string; database: string }
+  | { kind: "url"; url: string };
+
+/** Cloud SQL via the connector in production; DATABASE_URL for local development. */
+export function dbConfig(): DbConfig | null {
+  const { CLOUD_SQL_INSTANCE, DB_USER, DB_PASSWORD, DB_NAME, DATABASE_URL } = process.env;
+  if (CLOUD_SQL_INSTANCE && DB_USER && DB_PASSWORD && DB_NAME && serviceAccount()) {
+    return { kind: "cloudsql", instance: CLOUD_SQL_INSTANCE, user: DB_USER, password: DB_PASSWORD, database: DB_NAME };
+  }
+  if (DATABASE_URL) return { kind: "url", url: DATABASE_URL };
+  return null;
+}
+
+export function firebaseWebConfigured() {
+  return !!(process.env.NEXT_PUBLIC_FIREBASE_API_KEY && process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN && process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID);
+}
+
+/** Accounts need Firebase (browser + admin) and the database. */
+export function accountsConfigured() {
+  return firebaseWebConfigured() && !!serviceAccount() && !!dbConfig();
 }

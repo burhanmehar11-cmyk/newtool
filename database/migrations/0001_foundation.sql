@@ -1,7 +1,7 @@
 -- Locentio M2 foundation schema.
 --
--- Targets Supabase Postgres (auth.users, auth.uid(), roles anon /
--- authenticated / service_role). Every workspace-owned row carries
+-- Runs on Cloud SQL for PostgreSQL after 0000_auth.sql (auth.users,
+-- auth.uid(), roles anon / authenticated). Every workspace-owned row carries
 -- workspace_id and is protected by row-level security. Operations that must
 -- not be performed directly by clients (creating workspaces, writing the
 -- usage ledger) go through SECURITY DEFINER functions that re-check
@@ -491,6 +491,12 @@ create policy workspace_allowances_member_select on public.workspace_allowances 
 create policy usage_ledger_member_select on public.usage_ledger for select to authenticated using (app.is_member(workspace_id));
 create policy job_runs_member_select on public.job_runs for select to authenticated using (app.is_member(workspace_id));
 create policy audit_events_member_select on public.audit_events for select to authenticated using (app.is_member(workspace_id));
+
+-- Plain Postgres grants nothing by default: give signed-in users table access,
+-- which row-level security then narrows to their own workspaces.
+grant usage on schema public to authenticated;
+grant select, insert, update, delete on all tables in schema public to authenticated;
+grant usage, select on all sequences in schema public to authenticated;
 
 -- Defence in depth: anonymous visitors get nothing, and clients cannot write
 -- ledger, allowance, audit or secret tables directly.
