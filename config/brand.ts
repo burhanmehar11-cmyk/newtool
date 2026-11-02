@@ -16,7 +16,9 @@ export const brand = {
    * Public site URL. Used for canonical URLs, sitemap and social previews.
    * Override with NEXT_PUBLIC_SITE_URL in each environment.
    */
-  siteUrl: process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
+  siteUrl:
+    process.env.NEXT_PUBLIC_SITE_URL ??
+    (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "http://localhost:3000"),
   /** Placeholder support address on a reserved example domain until the owner sets one. */
   supportEmail: "support@locentra.example",
   /** Legal entity is intentionally unset; legal pages show an owner-review notice. */

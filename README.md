@@ -68,6 +68,16 @@ BASE_URL=http://localhost:3000 npm run test:e2e
 
 Screenshots land in `./screenshots` (git-ignored) at 390, 768 and 1440px.
 
+## Deploying to Vercel
+
+`vercel.json` pins the framework to Next.js, so the project's Framework Preset can't fall back to "Other" (which serves Vercel's 404 page for every route). In the Vercel project settings, also check:
+
+- **Root Directory** is empty (the app is at the repository root).
+- **Output Directory** override is off.
+- **Production Branch** matches the branch you deploy.
+
+No environment variables are required for M1. Set `NEXT_PUBLIC_SITE_URL` to your domain for correct canonical and social-image URLs; on Vercel it otherwise falls back to the project's production URL.
+
 ## Stack
 
 Next.js 16 (App Router, Cache Components, Turbopack) · React 19 · TypeScript · Tailwind CSS v4 · Radix primitives in shadcn/ui-style components · React Hook Form + Zod · Lucide icons · Vitest. Fonts (Manrope, Inter) are bundled locally under the SIL OFL (`app/fonts`).

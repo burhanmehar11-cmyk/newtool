@@ -8,11 +8,11 @@ export const alt = `${brand.name}: Find local prospects. Give them a reason to r
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
+// Read at module scope so the image is generated once at build time (static).
+const bold = await readFile(join(process.cwd(), "assets/fonts/Manrope-800.woff"));
+const regular = await readFile(join(process.cwd(), "assets/fonts/Inter-400.woff"));
+
 export default async function OpengraphImage() {
-  const [bold, regular] = await Promise.all([
-    readFile(join(process.cwd(), "assets/fonts/Manrope-800.woff")),
-    readFile(join(process.cwd(), "assets/fonts/Inter-400.woff")),
-  ]);
   return new ImageResponse(
     (
       <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", justifyContent: "space-between", background: "#0B1218", padding: 72, color: "#fff", fontFamily: "Inter" }}>
