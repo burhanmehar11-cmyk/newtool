@@ -5,8 +5,8 @@ import { researchBusiness } from "./research";
 import { generateDraft, defaultFollowUps } from "./drafts";
 import type { Campaign, DemoState, DraftRecord, Enrollment, Thread } from "./types";
 
-export const DEMO_SCHEMA = 3;
-export const DEMO_STORAGE_KEY = "locentra.demo.v1";
+export const DEMO_SCHEMA = 4;
+export const DEMO_STORAGE_KEY = "locentio.demo.v1";
 
 const at = (daysAgo: number, hours = 0) =>
   new Date(Date.parse(DEMO_NOW) - daysAgo * 86_400_000 - hours * 3_600_000).toISOString();

@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /*
- * Locentra design tokens. Contrast for every text pairing is checked in
+ * Locentio design tokens. Contrast for every text pairing is checked in
  * tests/contrast.test.ts. Mint is an accent: never use it as small text on
  * light surfaces (1.36:1 on white).
  */
@@ -193,4 +193,82 @@
 @keyframes sheet-in-left {
   from { transform: translateX(-24px); opacity: 0; }
   to { transform: translateX(0); opacity: 1; }
+}
+
+/* ------------------------------------------------------------------ *
+ * Scroll effects (marketing). Progressive enhancement:
+ * - `html.fx` is set by an inline head script only when motion is allowed.
+ * - `html.fx-ready` is set once <ScrollEffects/> mounts.
+ * - If scripts never run, `.fx` is absent and everything is visible.
+ * - If the effects script fails after `.fx` is set, a CSS failsafe shows
+ *   content after 2.5s.
+ * ------------------------------------------------------------------ */
+.fx [data-reveal]:not([data-shown]) {
+  opacity: 0;
+  transform: translate3d(0, 28px, 0);
+}
+.fx [data-reveal="left"]:not([data-shown]) {
+  transform: translate3d(-36px, 0, 0);
+}
+.fx [data-reveal="right"]:not([data-shown]) {
+  transform: translate3d(36px, 0, 0);
+}
+.fx [data-reveal="scale"]:not([data-shown]) {
+  transform: translate3d(0, 40px, 0) scale(0.96);
+}
+.fx [data-reveal="fade"]:not([data-shown]) {
+  transform: none;
+}
+.fx [data-reveal] {
+  transition:
+    opacity 650ms var(--ease-out-soft) var(--reveal-delay, 0ms),
+    transform 800ms var(--ease-out-soft) var(--reveal-delay, 0ms),
+    translate 300ms ease-out,
+    box-shadow 300ms ease-out;
+}
+.fx:not(.fx-ready) [data-reveal]:not([data-shown]) {
+  animation: reveal-failsafe 1ms 2.5s forwards;
+}
+@keyframes reveal-failsafe {
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Hero canvas: starts tilted back and settles flat as you scroll. */
+[data-tilt] {
+  --tilt: 1;
+  transform-origin: 50% 0%;
+  transform: perspective(1800px) rotateX(calc((1 - var(--tilt)) * 14deg)) scale(calc(0.93 + var(--tilt) * 0.07));
+  will-change: transform;
+}
+[data-parallax] {
+  transform: translate3d(0, var(--py, 0px), 0);
+  will-change: transform;
+}
+[data-draw] {
+  transform-origin: 0 50%;
+  transform: scaleX(var(--draw, 1));
+}
+.fx [data-glow-follow] {
+  transition: background-position 300ms ease-out;
+}
+
+/* Header reacts to scroll. */
+html[data-scrolled] .site-header {
+  box-shadow: 0 10px 30px -12px rgb(0 0 0 / 0.6);
+}
+.scroll-progress {
+  transform-origin: 0 50%;
+  transform: scaleX(var(--scroll-progress, 0));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-tilt],
+  [data-parallax],
+  [data-draw],
+  .scroll-progress {
+    transform: none !important;
+  }
 }

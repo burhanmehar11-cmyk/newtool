@@ -14,7 +14,11 @@ function Status({ k }: { k: FeatureKey }) {
 }
 
 function Card({ className, children }: { className?: string; children: React.ReactNode }) {
-  return <div className={cn("card flex flex-col p-6", className)}>{children}</div>;
+  return (
+    <div data-reveal className={cn("card flex flex-col p-6 transition-[box-shadow,translate] duration-300 hover:-translate-y-0.5 hover:shadow-float", className)}>
+      {children}
+    </div>
+  );
 }
 
 function Head({ icon: Icon, title, k }: { icon: React.ComponentType<{ className?: string }>; title: string; k: FeatureKey }) {
@@ -35,7 +39,7 @@ export function Capabilities() {
   return (
     <section className="bg-canvas py-20 sm:py-28">
       <div className="container-page">
-        <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+        <div data-reveal className="grid gap-6 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
           <div className="max-w-2xl">
             <p className="eyebrow text-green">Capabilities</p>
             <h2 className="display-2 mt-4 text-ink">The controls outreach actually needs.</h2>
@@ -45,7 +49,7 @@ export function Capabilities() {
           </p>
         </div>
 
-        <div className="mt-12 grid gap-4 lg:grid-cols-12">
+        <div className="mt-12 grid gap-4 lg:grid-cols-12" data-stagger="90">
           <Card className="lg:col-span-7">
             <Head icon={SlidersHorizontal} title="Targeting filters" k="discovery" />
             <p className="mt-3 max-w-md text-[15px] leading-7 text-slate">
@@ -131,11 +135,15 @@ export function Capabilities() {
               </div>
               <div className="mt-1.5 flex items-center justify-between">
                 <span className="text-slate">Actually returned</span>
-                <span className="font-medium tabular-nums">18 units</span>
+                <span className="font-medium tabular-nums">
+                  <span data-count="18">18</span> units
+                </span>
               </div>
               <div className="mt-1.5 flex items-center justify-between">
                 <span className="text-slate">Released</span>
-                <span className="font-medium tabular-nums text-green">7 units</span>
+                <span className="font-medium tabular-nums text-green">
+                  <span data-count="7">7</span> units
+                </span>
               </div>
               <p className="mt-2 text-[10px] font-medium uppercase tracking-[0.06em] text-demo-fg">Sample data</p>
             </div>

@@ -1,6 +1,6 @@
 # Brand guide
 
-Working name **Locentra** (provisional; not trademark-checked). A rendered version lives at `/brand` (not indexed).
+Working name **Locentio** (provisional; not trademark-checked). A rendered version lives at `/brand` (not indexed).
 
 ## Mark
 
@@ -15,10 +15,10 @@ Assets (`npm run brand` regenerates them; wordmark text is outlined from Manrope
 
 | File | Use |
 | --- | --- |
-| `public/brand/locentra-icon.svg` | Mark, ink |
-| `public/brand/locentra-icon-mint.svg` / `-green.svg` | Mark on dark / light |
-| `public/brand/locentra-icon-tile.svg`, `app/icon.svg` | Favicon and app tile |
-| `public/brand/locentra-wordmark-on-dark.svg` / `-on-light.svg` / `-mono-black.svg` | Wordmarks |
+| `public/brand/locentio-icon.svg` | Mark, ink |
+| `public/brand/locentio-icon-mint.svg` / `-green.svg` | Mark on dark / light |
+| `public/brand/locentio-icon-tile.svg`, `app/icon.svg` | Favicon and app tile |
+| `public/brand/locentio-wordmark-on-dark.svg` / `-on-light.svg` / `-mono-black.svg` | Wordmarks |
 | `app/opengraph-image.tsx` | 1200×630 social preview |
 
 ## Colour

@@ -31,7 +31,7 @@ export function UseCases() {
   return (
     <section id="agencies" className="border-t border-line bg-surface py-20 sm:py-28">
       <div className="container-page">
-        <div className="max-w-2xl">
+        <div className="max-w-2xl" data-reveal>
           <p className="eyebrow text-green">For agencies</p>
           <h2 className="display-2 mt-4 text-ink">Different offers, different evidence.</h2>
           <p className="mt-5 text-[17px] leading-8 text-slate">
@@ -41,7 +41,7 @@ export function UseCases() {
 
         <div className="mt-12 divide-y divide-line border-y border-line">
           {cases.map(({ icon: Icon, offer, who, evidence, opener, caveat }) => (
-            <article key={offer} className="grid gap-6 py-8 lg:grid-cols-[minmax(0,3fr)_minmax(0,4fr)_minmax(0,5fr)] lg:gap-10">
+            <article key={offer} data-reveal className="grid gap-6 py-8 lg:grid-cols-[minmax(0,3fr)_minmax(0,4fr)_minmax(0,5fr)] lg:gap-10">
               <div>
                 <span className="flex size-10 items-center justify-center rounded-xl bg-midnight text-mint">
                   <Icon aria-hidden className="size-[18px]" />

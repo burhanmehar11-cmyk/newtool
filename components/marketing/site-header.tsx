@@ -21,7 +21,7 @@ export function SiteHeader() {
   React.useLayoutEffect(() => () => setOpen(false), []);
 
   return (
-    <header className="on-dark sticky top-0 z-40 border-b border-white/[0.08] bg-midnight">
+    <header className="site-header on-dark sticky top-0 z-40 border-b border-white/[0.08] bg-midnight transition-shadow duration-300">
       <a
         href="#main"
         className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-3 focus:z-50 focus:rounded-lg focus:bg-mint focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-midnight"
@@ -29,7 +29,7 @@ export function SiteHeader() {
         Skip to content
       </a>
       <div className="container-page flex h-16 items-center gap-6">
-        <Link href="/" className="rounded-md" aria-label="Locentra home">
+        <Link href="/" className="rounded-md" aria-label="Locentio home">
           <Logo tone="dark" />
         </Link>
         <nav aria-label="Main" className="hidden flex-1 items-center gap-1 md:flex">
@@ -79,6 +79,7 @@ export function SiteHeader() {
           </Dialog>
         </div>
       </div>
+      <div aria-hidden className="scroll-progress absolute inset-x-0 -bottom-px h-[2px] bg-gradient-to-r from-mint/0 via-mint to-mint" />
     </header>
   );
 }

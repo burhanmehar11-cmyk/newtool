@@ -71,13 +71,13 @@ const tile = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" vie
 
 await mkdir(join(root, "public/brand"), { recursive: true });
 const out = {
-  "public/brand/locentra-icon.svg": icon(INK),
-  "public/brand/locentra-icon-mint.svg": icon(MINT),
-  "public/brand/locentra-icon-green.svg": icon(DEEP_GREEN),
-  "public/brand/locentra-icon-tile.svg": tile,
-  "public/brand/locentra-wordmark-on-dark.svg": wordmark({ markColor: MINT, textColor: "#FFFFFF" }),
-  "public/brand/locentra-wordmark-on-light.svg": wordmark({ markColor: DEEP_GREEN, textColor: INK }),
-  "public/brand/locentra-wordmark-mono-black.svg": wordmark({ markColor: "#000000", textColor: "#000000" }),
+  "public/brand/locentio-icon.svg": icon(INK),
+  "public/brand/locentio-icon-mint.svg": icon(MINT),
+  "public/brand/locentio-icon-green.svg": icon(DEEP_GREEN),
+  "public/brand/locentio-icon-tile.svg": tile,
+  "public/brand/locentio-wordmark-on-dark.svg": wordmark({ markColor: MINT, textColor: "#FFFFFF" }),
+  "public/brand/locentio-wordmark-on-light.svg": wordmark({ markColor: DEEP_GREEN, textColor: INK }),
+  "public/brand/locentio-wordmark-mono-black.svg": wordmark({ markColor: "#000000", textColor: "#000000" }),
   "app/icon.svg": tile,
 };
 for (const [file, content] of Object.entries(out)) {

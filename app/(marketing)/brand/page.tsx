@@ -68,10 +68,10 @@ export default function BrandPage() {
       </div>
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
         <div className="rounded-[14px] bg-midnight p-8">
-          <Image src={brand.logo.wordmarkDark} alt={`${brand.name} wordmark on dark`} width={175} height={36} unoptimized />
+          <Image src={brand.logo.wordmarkDark} alt={`${brand.name} wordmark on dark`} width={173} height={36} unoptimized />
         </div>
         <div className="rounded-[14px] border border-line bg-surface p-8">
-          <Image src={brand.logo.wordmarkLight} alt={`${brand.name} wordmark on light`} width={175} height={36} unoptimized />
+          <Image src={brand.logo.wordmarkLight} alt={`${brand.name} wordmark on light`} width={173} height={36} unoptimized />
         </div>
       </div>
 

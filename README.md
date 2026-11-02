@@ -1,10 +1,10 @@
-# Locentra
+# Locentio
 
 **Find the right local businesses. Start better conversations.**
 
-Locentra is a local prospecting and outreach workspace for agencies: discover businesses by niche and location, understand why each one may need your service through a source-backed **Opportunity Brief**, and turn that research into personal, reviewed outreach.
+Locentio is a local prospecting and outreach workspace for agencies: discover businesses by niche and location, understand why each one may need your service through a source-backed **Opportunity Brief**, and turn that research into personal, reviewed outreach.
 
-> "Locentra" is a provisional working name. Domain and trademark availability have not been checked. Brand values live in `config/brand.ts`.
+> "Locentio" is a provisional working name. Domain and trademark availability have not been checked. Brand values live in `config/brand.ts`.
 
 ## Milestone status
 
@@ -25,7 +25,7 @@ Everything in the product demo is simulated:
 - **Sending** uses a "demo mailbox" that delivers nothing. Launch is labelled *Simulate launch*.
 - **Replies** are generated locally a few seconds after a simulated launch.
 - **Usage** is a demo allowance. Nothing is billed, and pricing is "coming soon".
-- **Persistence** is `localStorage` in the visitor's browser only (key `locentra.demo.v1`), with *Reset demo*.
+- **Persistence** is `localStorage` in the visitor's browser only (key `locentio.demo.v1`), with *Reset demo*.
 
 No route makes a network request to any provider. The end-to-end smoke test blocks and fails on any request that leaves the local server.
 

@@ -50,7 +50,7 @@ export function ProductTour() {
   return (
     <section id="product" className="border-y border-line bg-surface py-20 sm:py-28">
       <div className="container-page">
-        <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+        <div data-reveal className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
           <div className="max-w-2xl">
             <p className="eyebrow text-green">Product</p>
             <h2 className="display-2 mt-4 text-ink">Try the workflow right here.</h2>
@@ -58,7 +58,7 @@ export function ProductTour() {
           <p className="max-w-sm text-[15px] leading-7 text-slate">Everything below is interactive and uses fictional sample businesses.</p>
         </div>
 
-        <Tabs value={tab} onValueChange={setTab} className="mt-10">
+        <Tabs value={tab} onValueChange={setTab} className="mt-10" data-reveal="scale">
           <div className="-mx-5 overflow-x-auto px-5 pb-1 scrollbar-thin md:mx-0 md:px-0">
             <TabsList aria-label="Product areas">
               {tabs.map(({ value, label, icon: Icon }) => (

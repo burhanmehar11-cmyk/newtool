@@ -1,3 +1,4 @@
+import type * as React from "react";
 import { CircleCheck, FileSearch, Lightbulb, PencilLine, ShieldCheck } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import { featured } from "./sample-data";
@@ -41,15 +42,15 @@ export function Signature() {
     <section className="on-dark relative overflow-hidden bg-midnight py-20 text-white sm:py-28">
       <div aria-hidden className="grid-dots pointer-events-none absolute inset-0 opacity-60 [mask-image:linear-gradient(to_bottom,transparent,black_30%,black_70%,transparent)]" />
       <div className="container-page relative grid gap-12 lg:grid-cols-[minmax(0,4fr)_minmax(0,8fr)] lg:gap-14">
-        <div>
+        <div data-reveal="left">
           <p className="eyebrow text-mint">Opportunity Briefs</p>
           <h2 className="display-2 mt-4 text-white">Know why you&apos;re reaching out.</h2>
           <p className="mt-5 text-[17px] leading-8 text-white/72">
             Before you write a word, see what was observed, where it came from, and how it relates to what you sell. Missing information stays Unknown. It is never treated as a problem.
           </p>
-          <ul className="mt-8 space-y-5">
+          <ul className="mt-8 space-y-5" data-stagger="110">
             {points.map(({ icon: Icon, title, copy }) => (
-              <li key={title} className="flex gap-3.5">
+              <li key={title} data-reveal className="flex gap-3.5">
                 <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-white/[0.06] text-mint">
                   <Icon aria-hidden className="size-[18px]" />
                 </span>
@@ -62,7 +63,7 @@ export function Signature() {
           </ul>
         </div>
 
-        <div className="card-dark min-w-0 self-start overflow-hidden shadow-dark">
+        <div data-reveal="right" className="card-dark min-w-0 self-start overflow-hidden shadow-dark">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line-dark px-5 py-4">
             <div>
               <p className="text-xs uppercase tracking-[0.08em] text-fog">Opportunity Brief · web design offer</p>
@@ -90,9 +91,9 @@ export function Signature() {
                   <th scope="col" className="py-2.5 pr-5 font-medium">Confidence</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody data-stagger="140">
                 {rows.map(({ fact, ev, opp, confidence, why }) => (
-                  <tr key={fact.id} className="border-b border-line-dark align-top last:border-b-0">
+                  <tr key={fact.id} data-reveal="fade" className="border-b border-line-dark align-top last:border-b-0">
                     <td className="px-5 py-3.5">
                       <span className="block font-medium text-white">{ev.label}</span>
                       <span className="mt-0.5 block font-mono text-[11px] text-fog">{new URL(ev.url).pathname === "/" ? "/ (home)" : new URL(ev.url).pathname}</span>
@@ -127,7 +128,7 @@ export function Signature() {
             </table>
           </div>
 
-          <div className="border-t border-line-dark bg-white/[0.02] px-5 py-4">
+          <div data-reveal="fade" style={{ "--reveal-delay": "520ms" } as React.CSSProperties} className="border-t border-line-dark bg-white/[0.02] px-5 py-4">
             <p className="flex items-center gap-2 text-xs font-medium text-fog">
               <Lightbulb aria-hidden className="size-3.5 text-mint" /> Draft sentence, grounded in the first row
             </p>

@@ -99,7 +99,7 @@ export function LeadsView() {
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
     const a = document.createElement("a");
     a.href = url;
-    a.download = "locentra-demo-leads.csv";
+    a.download = "locentio-demo-leads.csv";
     a.click();
     URL.revokeObjectURL(url);
     push({ tone: "success", title: `Exported ${ids.length} lead${ids.length === 1 ? "" : "s"}`, body: "The file was created in your browser. Sample data only." });

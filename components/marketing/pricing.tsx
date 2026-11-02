@@ -9,7 +9,7 @@ export function Pricing() {
   return (
     <section id="pricing" className="bg-canvas py-20 sm:py-28">
       <div className="container-page">
-        <div className="mx-auto max-w-2xl text-center">
+        <div className="mx-auto max-w-2xl text-center" data-reveal>
           <p className="eyebrow text-green">Pricing</p>
           <h2 className="display-2 mt-4 text-ink">Private beta pricing coming soon.</h2>
           <p className="mt-5 text-[17px] leading-8 text-slate">
@@ -17,10 +17,11 @@ export function Pricing() {
           </p>
         </div>
 
-        <div className="mt-12 grid gap-4 lg:grid-cols-3">
+        <div className="mt-12 grid gap-4 lg:grid-cols-3" data-stagger="110">
           {plans.map((p) => (
             <div
               key={p.id}
+              data-reveal
               className={cn(
                 "flex flex-col rounded-[16px] border p-6",
                 p.highlight ? "on-dark border-midnight bg-midnight text-white shadow-float" : "border-line bg-surface shadow-card",

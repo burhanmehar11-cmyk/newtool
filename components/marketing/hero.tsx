@@ -1,3 +1,4 @@
+import type * as React from "react";
 import Link from "next/link";
 import { ArrowRight, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -8,22 +9,24 @@ export function Hero() {
   return (
     <section className="on-dark relative overflow-hidden bg-midnight text-white">
       <div aria-hidden className="grid-dots pointer-events-none absolute inset-0 [mask-image:radial-gradient(ellipse_70%_60%_at_50%_0%,black,transparent)]" />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -top-40 left-1/2 h-[480px] w-[900px] -translate-x-1/2 rounded-full bg-mint/[0.07] blur-3xl"
-      />
+      <div aria-hidden data-parallax="-0.35" className="pointer-events-none absolute inset-x-0 -top-40 flex justify-center">
+        <div className="h-[480px] w-[900px] rounded-full bg-mint/[0.08] blur-3xl" />
+      </div>
       <div className="container-page relative pb-10 pt-16 sm:pt-20 lg:pt-24">
-        <div className="max-w-[1040px]">
-          <p className="eyebrow text-mint">Local prospecting, with context</p>
+        <div className="max-w-[1040px]" data-stagger="90">
+          <p data-reveal className="eyebrow text-mint">Local prospecting, with context</p>
           <h1 className="display-hero mt-5 text-white">
-            Find local prospects.
-            <br />
-            <span className="text-mint">Give them a reason to reply.</span>
+            <span data-reveal className="block">
+              Find local prospects.
+            </span>
+            <span data-reveal className="block text-mint">
+              Give them a reason to reply.
+            </span>
           </h1>
-          <p className="mt-6 max-w-[640px] text-lg leading-8 text-white/72">
+          <p data-reveal className="mt-6 max-w-[640px] text-lg leading-8 text-white/72">
             Discover businesses that fit your offer, understand the opportunity, and turn real research into personal outreach, all in one workspace.
           </p>
-          <div className="mt-8 flex flex-wrap items-center gap-3">
+          <div data-reveal className="mt-8 flex flex-wrap items-center gap-3">
             <Button asChild variant="mint" size="lg">
               <Link href="/demo">
                 Explore demo <ArrowRight aria-hidden />
@@ -35,7 +38,7 @@ export function Hero() {
           </div>
         </div>
 
-        <form action="/demo/discover" method="get" className="mt-10 max-w-[720px]" role="search" aria-label="Try a search in the demo">
+        <form data-reveal style={{ "--reveal-delay": "420ms" } as React.CSSProperties} action="/demo/discover" method="get" className="mt-10 max-w-[720px]" role="search" aria-label="Try a search in the demo">
           <label htmlFor="hero-q" className="text-[13px] font-medium text-white/70">
             Describe who you want to reach
           </label>
@@ -59,7 +62,11 @@ export function Hero() {
       </div>
 
       <div className="container-page relative pb-20 sm:pb-24">
-        <HeroCanvas />
+        <div data-reveal="scale" style={{ "--reveal-delay": "520ms" } as React.CSSProperties}>
+          <div data-tilt="460">
+            <HeroCanvas />
+          </div>
+        </div>
       </div>
     </section>
   );

@@ -123,7 +123,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <>
       <div className="flex h-16 items-center gap-2 px-5">
-        <Link href="/" className="rounded-md" aria-label="Locentra home" onClick={onNavigate}>
+        <Link href="/" className="rounded-md" aria-label="Locentio home" onClick={onNavigate}>
           <Logo />
         </Link>
         <span className="rounded-md bg-demo-bg px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-demo-fg">Demo</span>

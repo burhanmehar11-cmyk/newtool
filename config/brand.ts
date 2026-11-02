@@ -1,12 +1,12 @@
 /**
  * Central brand configuration.
  *
- * "Locentra" is a provisional working name. Domain and trademark availability
+ * "Locentio" is a provisional working name. Domain and trademark availability
  * have NOT been checked. Change the values here and re-run `npm run brand`
  * to regenerate the wordmark SVGs.
  */
 export const brand = {
-  name: "Locentra",
+  name: "Locentio",
   /** Short descriptor used in titles and metadata. */
   category: "Local prospecting and outreach workspace",
   tagline: "Find the right local businesses. Start better conversations.",
@@ -20,16 +20,16 @@ export const brand = {
     process.env.NEXT_PUBLIC_SITE_URL ??
     (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "http://localhost:3000"),
   /** Placeholder support address on a reserved example domain until the owner sets one. */
-  supportEmail: "support@locentra.example",
+  supportEmail: "support@locentio.example",
   /** Legal entity is intentionally unset; legal pages show an owner-review notice. */
   legalEntity: null as string | null,
   /** Static to keep pages prerenderable; update yearly. */
   copyrightYear: 2026,
   logo: {
-    icon: "/brand/locentra-icon.svg",
-    iconTile: "/brand/locentra-icon-tile.svg",
-    wordmarkDark: "/brand/locentra-wordmark-on-dark.svg",
-    wordmarkLight: "/brand/locentra-wordmark-on-light.svg",
+    icon: "/brand/locentio-icon.svg",
+    iconTile: "/brand/locentio-icon-tile.svg",
+    wordmarkDark: "/brand/locentio-wordmark-on-dark.svg",
+    wordmarkLight: "/brand/locentio-wordmark-on-light.svg",
   },
   social: {
     // No social accounts exist yet. Add handles here when they do.

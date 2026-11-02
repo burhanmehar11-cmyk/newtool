@@ -12,9 +12,9 @@ export function AudienceStrip() {
     <section aria-label="Who it's for" className="border-b border-line bg-surface">
       <div className="container-page flex flex-col gap-4 py-7 md:flex-row md:items-center md:justify-between">
         <p className="text-sm font-medium text-slate">Built for agencies and consultants who sell to local businesses</p>
-        <ul className="flex flex-wrap gap-2">
+        <ul className="flex flex-wrap gap-2" data-stagger="70">
           {roles.map(({ icon: Icon, label }) => (
-            <li key={label} className="inline-flex items-center gap-2 rounded-lg border border-line bg-canvas px-3 py-1.5 text-sm font-medium text-ink">
+            <li key={label} data-reveal className="inline-flex items-center gap-2 rounded-lg border border-line bg-canvas px-3 py-1.5 text-sm font-medium text-ink">
               <Icon aria-hidden className="size-4 text-green" />
               {label}
             </li>
@@ -62,20 +62,21 @@ const stages = [
 
 export function Workflow() {
   return (
-    <section id="how-it-works" className="bg-canvas py-20 sm:py-28">
+    <section id="how-it-works" className="overflow-x-clip bg-canvas py-20 sm:py-28">
       <div className="container-page">
         <div className="grid gap-12 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-16">
-          <div>
+          <div data-reveal>
             <p className="eyebrow text-green">The problem</p>
             <h2 className="display-2 mt-4 text-ink">Good outreach takes research. Research takes all afternoon.</h2>
             <p className="mt-5 max-w-md text-[17px] leading-8 text-slate">
               Finding a business is easy. Knowing why it might need you, and saying so in a way that sounds human, is the slow part. It usually happens across five tools.
             </p>
           </div>
-          <ol className="relative space-y-2.5" aria-label="A typical prospecting afternoon">
+          <ol className="relative space-y-2.5" aria-label="A typical prospecting afternoon" data-stagger="90">
             {friction.map(({ icon: Icon, tool, task }, i) => (
               <li
                 key={tool}
+                data-reveal={i % 2 ? "right" : "left"}
                 className="card flex items-center gap-4 px-4 py-3.5"
                 style={{ marginLeft: `${[0, 28, 8, 40, 16][i]}px`, marginRight: `${[32, 0, 24, 4, 20][i]}px` }}
               >
@@ -93,13 +94,16 @@ export function Workflow() {
         </div>
 
         <div className="mt-24">
-          <div className="max-w-2xl">
+          <div className="max-w-2xl" data-reveal>
             <p className="eyebrow text-green">How it works</p>
             <h2 className="display-2 mt-4 text-ink">One workspace, four stages.</h2>
           </div>
-          <ol className="mt-10 grid gap-px overflow-hidden rounded-[16px] border border-line bg-line md:grid-cols-2 lg:grid-cols-4">
+          <div aria-hidden className="relative mt-10 h-[3px] overflow-hidden rounded-full bg-line">
+            <div data-draw className="absolute inset-0 rounded-full bg-gradient-to-r from-green via-green to-mint" />
+          </div>
+          <ol className="mt-4 grid gap-px overflow-hidden rounded-[16px] border border-line bg-line md:grid-cols-2 lg:grid-cols-4" data-stagger="120">
             {stages.map(({ icon: Icon, name, copy, detail }, i) => (
-              <li key={name} className="relative flex flex-col bg-surface p-6">
+              <li key={name} data-reveal className="relative flex flex-col bg-surface p-6">
                 <div className="flex items-center gap-3">
                   <span className="flex size-10 items-center justify-center rounded-xl bg-midnight text-mint">
                     <Icon aria-hidden className="size-[18px]" />

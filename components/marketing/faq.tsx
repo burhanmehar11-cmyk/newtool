@@ -39,16 +39,16 @@ export function Faq() {
   return (
     <section id="faq" className="border-t border-line bg-surface py-20 sm:py-28">
       <div className="container-page grid gap-10 lg:grid-cols-[minmax(0,4fr)_minmax(0,8fr)] lg:gap-16">
-        <div>
+        <div data-reveal>
           <p className="eyebrow text-green">FAQ</p>
           <h2 className="display-2 mt-4 text-ink">Straight answers.</h2>
           <p className="mt-5 text-[15px] leading-7 text-slate">
             Answers describe the product as it stands today: an interactive demo, with the private beta in development.
           </p>
         </div>
-        <div className="divide-y divide-line border-y border-line">
+        <div className="divide-y divide-line border-y border-line" data-stagger="60">
           {faqs.map((f) => (
-            <details key={f.q} className="group py-1">
+            <details key={f.q} data-reveal="fade" className="group py-1">
               <summary className="flex cursor-pointer list-none items-center justify-between gap-4 rounded-lg py-4 text-left text-[17px] font-semibold text-ink [&::-webkit-details-marker]:hidden">
                 {f.q}
                 <ChevronDown aria-hidden className="size-5 shrink-0 text-slate transition-transform duration-200 group-open:rotate-180" />
@@ -65,13 +65,15 @@ export function Faq() {
 export function FinalCta() {
   return (
     <section className="on-dark relative overflow-hidden bg-midnight py-20 text-white sm:py-28">
-      <LogoMark className="pointer-events-none absolute -right-16 -top-10 size-[420px] text-white/[0.03]" />
-      <div className="container-page relative">
-        <h2 className="display-2 max-w-3xl text-white">Your next client starts with the right conversation.</h2>
-        <p className="mt-5 max-w-xl text-[17px] leading-8 text-white/72">
+      <div aria-hidden data-parallax="0.25" className="pointer-events-none absolute -right-16 -top-10">
+        <LogoMark className="size-[420px] text-white/[0.04]" />
+      </div>
+      <div className="container-page relative" data-stagger="100">
+        <h2 data-reveal className="display-2 max-w-3xl text-white">Your next client starts with the right conversation.</h2>
+        <p data-reveal className="mt-5 max-w-xl text-[17px] leading-8 text-white/72">
           Walk through the whole workflow with sample data: search, research, draft, approve and review a reply. No account needed.
         </p>
-        <div className="mt-8 flex flex-wrap gap-3">
+        <div data-reveal className="mt-8 flex flex-wrap gap-3">
           <Button asChild variant="mint" size="lg">
             <Link href="/demo">Explore demo</Link>
           </Button>

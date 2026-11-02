@@ -604,7 +604,7 @@ function SequenceStep({ c, editable }: { c: Campaign; editable: boolean }) {
 
 function MailboxStep({ c, editable }: { c: Campaign; editable: boolean }) {
   return (
-    <SectionCard title="Sending mailbox" description="Messages are sent from a mailbox you connect. Your Locentra sign-in and mailbox access are separate.">
+    <SectionCard title="Sending mailbox" description="Messages are sent from a mailbox you connect. Your Locentio sign-in and mailbox access are separate.">
       <fieldset className="space-y-2">
         <legend className="sr-only">Mailbox</legend>
         <label className={cn("flex cursor-pointer items-start gap-3 rounded-xl border p-4", c.mailboxId === "demo-mailbox" ? "border-green bg-mint-soft/40" : "border-line", !editable && "cursor-not-allowed opacity-70")}>

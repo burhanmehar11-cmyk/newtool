@@ -2,7 +2,7 @@ import mark from "@/lib/brand-mark.json";
 import { brand } from "@/config/brand";
 import { cn } from "@/lib/utils";
 
-/** The Locentra mark. Inherits `currentColor`, so it works in any single color. */
+/** The Locentio mark. Inherits `currentColor`, so it works in any single color. */
 export function LogoMark({ className, title }: { className?: string; title?: string }) {
   return (
     <svg

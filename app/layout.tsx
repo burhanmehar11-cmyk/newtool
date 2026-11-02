@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import { brand } from "@/config/brand";
+import { FX_BOOT_SCRIPT } from "@/lib/fx";
 import "./globals.css";
 
 const manrope = localFont({
@@ -40,7 +41,10 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${manrope.variable} ${inter.variable} antialiased`}>
+    <html lang="en" className={`${manrope.variable} ${inter.variable} antialiased`} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: FX_BOOT_SCRIPT }} />
+      </head>
       <body className="min-h-dvh">{children}</body>
     </html>
   );
