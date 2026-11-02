@@ -20,9 +20,10 @@ export const SIGNUP_OPEN = false;
 export const PRICING_LIVE = false;
 
 export const features = {
-  discovery: { label: "Business discovery", availability: "demo", target: "M2" },
+  discovery: { label: "Business discovery (OpenStreetMap)", availability: "beta", target: "M2" },
+  googleMaps: { label: "Google Maps listings (Places API)", availability: "planned", target: "M2" },
   verification: { label: "Email verification", availability: "demo", target: "M2" },
-  opportunityBrief: { label: "Opportunity Briefs", availability: "demo", target: "M2" },
+  opportunityBrief: { label: "Opportunity Briefs from website research", availability: "beta", target: "M2" },
   drafts: { label: "Evidence-based drafts", availability: "demo", target: "M2" },
   sequences: { label: "Sequences with approval", availability: "demo", target: "M2" },
   gmail: { label: "Gmail sending", availability: "planned", target: "M2" },

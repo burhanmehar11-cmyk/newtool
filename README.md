@@ -11,7 +11,7 @@ Locentio is a local prospecting and outreach workspace for agencies: discover bu
 | Milestone | Scope | Status |
 | --- | --- | --- |
 | **M1** | Brand, landing page, interactive demo on fixture data | **Complete. Not production-ready.** |
-| M2 | Accounts, persistence, real discovery, research, Gmail sending, reply sync | **In progress.** Steps 1–2 built: sign-in (Google or email), workspaces, free OpenStreetMap search and saved leads |
+| M2 | Accounts, persistence, real discovery, research, Gmail sending, reply sync | **In progress.** Steps 1–3 built: sign-in (Google or email), workspaces, free OpenStreetMap search, saved leads, website research with Opportunity Briefs, free DNS email check. Google Maps (Places API) planned |
 | M3 | Billing, team roles, public API, webhooks, MCP | Not started |
 
 ### What is simulated in M1
@@ -75,7 +75,7 @@ Sign-in is **"Continue with Google"** through a Google OAuth client. It's free a
 **Step-by-step setup, written for Claude Cowork to follow in the browser: [docs/GOOGLE_CLOUD_SETUP.md](docs/GOOGLE_CLOUD_SETUP.md).** In short:
 
 1. Free Google Cloud project → consent screen (External, **Testing**, add test users) → OAuth client (Web) with redirect URI `https://YOUR-URL/api/auth/google/callback`.
-2. Vercel → Storage → Neon (Free) → run `database/migrations/0000_auth.sql` then `0001_foundation.sql` in Neon's SQL Editor.
+2. Vercel → Storage → Neon (Free) → run `database/migrations/0000_auth.sql`, `0001_foundation.sql`, `0002_password_and_discovery.sql` and `0003_research.sql`, in order, in Neon's SQL Editor.
 3. Vercel variables: `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `SESSION_SECRET` (32+ characters), `NEXT_PUBLIC_SITE_URL`, `BETA_ALLOWED_EMAILS`; then redeploy.
 4. Optional email + password sign-in: `SMTP_URL` (free with a Gmail App Password) for confirmation and reset emails.
 
@@ -133,7 +133,9 @@ docs/                    PRODUCT, BRAND, ARCHITECTURE, MILESTONES, DECISIONS, HA
 
 ## Known limitations
 
-- No discovery, verification, AI, email or billing provider is connected yet (M2 steps 2–6).
+- Discovery uses OpenStreetMap only; Google Maps (Places API) is planned and not built.
+- Email check is DNS-only and never marks an address valid. No AI, sending or billing provider is connected yet (M2 steps 4–6).
+- Live OpenStreetMap and website fetches haven't been run from this development environment (its network blocks them).
 - Legal pages are drafts marked for owner and legal review.
 - Pricing shows "Private beta pricing coming soon". No prices are set.
 - Demo data is per-browser and can be reset at any time.

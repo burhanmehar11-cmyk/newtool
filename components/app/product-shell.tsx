@@ -36,7 +36,6 @@ export function ProductShell({ workspaceSlot, children }: { workspaceSlot: React
 }
 
 function Sidebar({ workspaceSlot, onNavigate }: { workspaceSlot: React.ReactNode; onNavigate?: () => void }) {
-  const pathname = usePathname();
   return (
     <>
       <div className="flex h-16 items-center gap-2 px-5">
@@ -46,26 +45,10 @@ function Sidebar({ workspaceSlot, onNavigate }: { workspaceSlot: React.ReactNode
         <span className="rounded-md bg-mint-soft px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-green">Beta</span>
       </div>
       <div className="mx-3 mb-3">{workspaceSlot}</div>
-      <nav className="flex-1 space-y-0.5 px-3" aria-label="Product">
-        {nav.map(({ href, label, icon: Icon }) => {
-          const active = href === "/app" ? pathname === "/app" : pathname.startsWith(href);
-          return (
-            <Link
-              key={href}
-              href={href}
-              onClick={onNavigate}
-              aria-current={active ? "page" : undefined}
-              className={cn(
-                "flex items-center gap-3 rounded-[10px] px-3 py-2 text-sm font-medium transition-colors duration-200",
-                active ? "bg-ink text-white" : "text-slate hover:bg-ink/[0.04] hover:text-ink",
-              )}
-            >
-              <Icon aria-hidden className="size-[18px]" />
-              {label}
-            </Link>
-          );
-        })}
-      </nav>
+      {/* The active item depends on the URL, which is request-time data on dynamic routes. */}
+      <React.Suspense fallback={<NavLinks pathname={null} onNavigate={onNavigate} />}>
+        <ActiveNav onNavigate={onNavigate} />
+      </React.Suspense>
       <div className="border-t border-line p-4">
         <form action={signOutAction}>
           <Button type="submit" variant="ghost" size="sm" className="w-full justify-start text-slate">
@@ -74,6 +57,35 @@ function Sidebar({ workspaceSlot, onNavigate }: { workspaceSlot: React.ReactNode
         </form>
       </div>
     </>
+  );
+}
+
+function ActiveNav({ onNavigate }: { onNavigate?: () => void }) {
+  return <NavLinks pathname={usePathname()} onNavigate={onNavigate} />;
+}
+
+function NavLinks({ pathname, onNavigate }: { pathname: string | null; onNavigate?: () => void }) {
+  return (
+    <nav className="flex-1 space-y-0.5 px-3" aria-label="Product">
+      {nav.map(({ href, label, icon: Icon }) => {
+        const active = pathname !== null && (href === "/app" ? pathname === "/app" : pathname.startsWith(href));
+        return (
+          <Link
+            key={href}
+            href={href}
+            onClick={onNavigate}
+            aria-current={active ? "page" : undefined}
+            className={cn(
+              "flex items-center gap-3 rounded-[10px] px-3 py-2 text-sm font-medium transition-colors duration-200",
+              active ? "bg-ink text-white" : "text-slate hover:bg-ink/[0.04] hover:text-ink",
+            )}
+          >
+            <Icon aria-hidden className="size-[18px]" />
+            {label}
+          </Link>
+        );
+      })}
+    </nav>
   );
 }
 

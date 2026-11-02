@@ -1,4 +1,6 @@
-import { Bot, Compass, Inbox, MapPinned, MessageSquareReply, MonitorSmartphone, PenLine, Search, Sheet, TrendingUp, Microscope, Globe } from "lucide-react";
+import type * as React from "react";
+import { Bot, Compass, Globe, Inbox, Mail, MapPinned, MessageSquareReply, Microscope, MonitorSmartphone, PenLine, Send, Sheet, TrendingUp } from "lucide-react";
+import { features, type Availability, type FeatureKey } from "@/config/milestone";
 
 const roles = [
   { icon: MapPinned, label: "Local SEO" },
@@ -31,33 +33,6 @@ const friction = [
   { icon: Sheet, tool: "Spreadsheet", task: "Copy names, emails and notes by hand" },
   { icon: PenLine, tool: "Docs", task: "Rewrite the same email with a new first line" },
   { icon: Inbox, tool: "Inbox", task: "Find replies between everything else" },
-];
-
-const stages = [
-  {
-    icon: Search,
-    name: "Discover",
-    copy: "Describe your ideal customer in plain words. Review the parsed filters, then search by niche and location.",
-    detail: "Dental clinics · Austin · has website · 30+ reviews",
-  },
-  {
-    icon: Compass,
-    name: "Understand",
-    copy: "Each lead gets an Opportunity Brief: what was observed, where, when, and why it may matter for your offer.",
-    detail: "Contact page · “Call to schedule” · collected Oct 27",
-  },
-  {
-    icon: PenLine,
-    name: "Personalize",
-    copy: "Drafts start from the evidence. You edit, approve the exact version, and choose who receives it.",
-    detail: "v3 approved · 12 recipients · 3 excluded",
-  },
-  {
-    icon: MessageSquareReply,
-    name: "Follow up",
-    copy: "Short sequences stop on reply. Replies are classified for you to confirm, and you send every answer.",
-    detail: "Interested · follow-ups stopped",
-  },
 ];
 
 export function Workflow() {
@@ -96,28 +71,89 @@ export function Workflow() {
         <div className="mt-24">
           <div className="max-w-2xl" data-reveal>
             <p className="eyebrow text-green">How it works</p>
-            <h2 className="display-2 mt-4 text-ink">One workspace, four stages.</h2>
+            <h2 className="display-2 mt-4 text-ink">From a map search to a real conversation.</h2>
+            <p className="mt-5 text-[17px] leading-8 text-slate">Five steps, each one reviewed by you. Statuses show what&apos;s live in the private beta today.</p>
           </div>
-          <div aria-hidden className="relative mt-10 h-[3px] overflow-hidden rounded-full bg-line">
-            <div data-draw className="absolute inset-0 rounded-full bg-gradient-to-r from-green via-green to-mint" />
-          </div>
-          <ol className="mt-4 grid gap-px overflow-hidden rounded-[16px] border border-line bg-line md:grid-cols-2 lg:grid-cols-4" data-stagger="120">
-            {stages.map(({ icon: Icon, name, copy, detail }, i) => (
-              <li key={name} data-reveal className="relative flex flex-col bg-surface p-6">
-                <div className="flex items-center gap-3">
-                  <span className="flex size-10 items-center justify-center rounded-xl bg-midnight text-mint">
-                    <Icon aria-hidden className="size-[18px]" />
-                  </span>
-                  <span className="text-xs font-semibold tabular-nums text-slate">0{i + 1}</span>
-                </div>
-                <h3 className="mt-5 text-xl font-bold text-ink">{name}</h3>
-                <p className="mt-2 flex-1 text-[15px] leading-7 text-slate">{copy}</p>
-                <p className="mt-5 rounded-lg bg-canvas px-3 py-2 font-mono text-[11.5px] leading-5 text-ink">{detail}</p>
-              </li>
-            ))}
-          </ol>
+          <HowItWorks />
         </div>
       </div>
     </section>
+  );
+}
+
+const steps: { icon: React.ComponentType<{ className?: string }>; title: string; copy: string; status: FeatureKey[] }[] = [
+  {
+    icon: Mail,
+    title: "Connect your mailbox",
+    copy: "Link the Gmail account you already send from. You set the daily limit and sending hours; messages go out from your own address.",
+    status: ["gmail"],
+  },
+  {
+    icon: MapPinned,
+    title: "Search Google Maps",
+    copy: "Describe who you want to reach, like “dentists in Austin”. Locentio pulls matching local businesses from map listings, then reads their public websites for contact details.",
+    status: ["discovery", "googleMaps"],
+  },
+  {
+    icon: Compass,
+    title: "Research and personalise",
+    copy: "Each lead gets an Opportunity Brief: what its website shows, with sources, and why that matters for your offer. Drafts start from those facts.",
+    status: ["opportunityBrief", "drafts"],
+  },
+  {
+    icon: Send,
+    title: "Approve and launch",
+    copy: "Review the exact recipients and messages, then approve. Emails go out in small, paced batches within your limits.",
+    status: ["sequences"],
+  },
+  {
+    icon: MessageSquareReply,
+    title: "Handle replies",
+    copy: "Replies land in one inbox, sorted as interested, not interested or out of office. Follow-ups stop the moment someone answers.",
+    status: ["replySync"],
+  },
+];
+
+const isLive = (a: Availability) => a === "beta" || a === "live";
+
+function StepStatus({ k }: { k: FeatureKey }) {
+  const f = features[k];
+  const live = isLive(f.availability);
+  return (
+    <span className={live ? "rounded-md bg-mint-soft px-1.5 py-0.5 text-[11px] font-medium text-green" : "rounded-md bg-ink/[0.06] px-1.5 py-0.5 text-[11px] font-medium text-slate"}>
+      {live ? `${f.label}: in private beta` : `${f.label}: coming soon`}
+    </span>
+  );
+}
+
+function HowItWorks() {
+  return (
+    <div className="relative mt-14">
+      {/* Connecting line behind the numbers (desktop), drawn as you scroll. */}
+      <div aria-hidden className="absolute left-[10%] right-[10%] top-8 hidden h-[3px] overflow-hidden rounded-full bg-line lg:block">
+        <div data-draw className="h-full w-full rounded-full bg-gradient-to-r from-green via-green to-mint" />
+      </div>
+      <ol className="relative grid gap-5 sm:grid-cols-2 lg:grid-cols-5" data-stagger="110">
+        {steps.map(({ icon: Icon, title, copy, status }, i) => (
+          <li key={title} data-reveal className="flex flex-col items-center text-center">
+            <span className="relative z-10 flex size-16 items-center justify-center rounded-full border-4 border-canvas bg-midnight font-mono text-lg font-bold text-mint shadow-[0_0_0_1px_rgb(18_99_74/0.25),0_12px_30px_-12px_rgb(11_18_24/0.6)]">
+              {String(i + 1).padStart(2, "0")}
+            </span>
+            <div className="card mt-5 flex w-full flex-1 flex-col items-center p-5 transition-[translate,box-shadow] duration-300 hover:-translate-y-0.5 hover:shadow-float">
+              <span className="flex size-11 items-center justify-center rounded-xl bg-mint-soft text-green">
+                <Icon className="size-5" />
+              </span>
+              <h3 className="mt-4 text-lg font-bold leading-snug text-ink">{title}</h3>
+              <p className="mt-2 flex-1 text-[14px] leading-6 text-slate">{copy}</p>
+              <div className="mt-4 flex flex-wrap justify-center gap-1.5">
+                {status.map((k) => (
+                  <StepStatus key={k} k={k} />
+                ))}
+              </div>
+            </div>
+          </li>
+        ))}
+      </ol>
+    </div>
   );
 }

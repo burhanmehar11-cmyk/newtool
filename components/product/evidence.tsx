@@ -13,11 +13,14 @@ export function EvidenceItem({
   defaultOpen,
   dark,
   onOpen,
+  live,
 }: {
   evidence: Evidence;
   defaultOpen?: boolean;
   dark?: boolean;
   onOpen?: () => void;
+  /** Real source: show a link to the page instead of the sample-data note. */
+  live?: boolean;
 }) {
   const [open, setOpen] = React.useState(!!defaultOpen);
   const Icon = icons[evidence.kind];
@@ -52,7 +55,14 @@ export function EvidenceItem({
           {evidence.excerpt}
         </pre>
         <p className={cn("mt-2 text-[11px]", dark ? "text-fog" : "text-slate")}>
-          Collected {formatDate(evidence.collectedAt)} · Sample source on a reserved example domain. Not a live page.
+          Collected {formatDate(evidence.collectedAt)} ·{" "}
+          {live ? (
+            <a href={evidence.url} target="_blank" rel="noopener noreferrer nofollow" className={cn("font-medium underline-offset-2 hover:underline", dark ? "text-mint" : "text-green")}>
+              Open source page
+            </a>
+          ) : (
+            "Sample source on a reserved example domain. Not a live page."
+          )}
         </p>
       </div>
     </div>

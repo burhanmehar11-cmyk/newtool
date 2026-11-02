@@ -72,7 +72,7 @@ export async function runSearch(input: unknown): Promise<SearchOutcome> {
   if (!found.ok) return fail(found.error.message);
 
   await asQ(user.id, async (q) => {
-    await persistResults(q, workspace.id, jobId, found.value);
+    await persistResults(q, workspace.id, jobId, found.value, f.niche);
     await settle(q, workspace.id, jobId, found.value.length);
     await finishJob(q, jobId, "completed", found.value.length, null);
   });

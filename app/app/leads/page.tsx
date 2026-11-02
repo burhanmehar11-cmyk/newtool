@@ -28,7 +28,7 @@ async function Leads() {
     <div>
       <PageHeader
         title="Leads"
-        description="Businesses you chose to save. Research, verification and drafts arrive in the next beta steps."
+        description="Businesses you chose to save. Open one to research its website and check its email."
         actions={
           <Button asChild>
             <Link href="/app/discover">Find businesses</Link>
@@ -53,7 +53,9 @@ async function Leads() {
                 {leads.map((l) => (
                   <tr key={l.lead_id} className="border-b border-line last:border-b-0">
                     <td className="px-5 py-3">
-                      <span className="font-medium text-ink">{l.name}</span>
+                      <Link href={`/app/leads/${l.lead_id}`} className="font-medium text-ink hover:text-green hover:underline">
+                        {l.name}
+                      </Link>
                       <span className="block text-xs text-slate">{l.address ?? l.city ?? "Address not listed"}</span>
                     </td>
                     <td className="max-w-[200px] truncate py-3 pr-3 font-mono text-xs text-slate">

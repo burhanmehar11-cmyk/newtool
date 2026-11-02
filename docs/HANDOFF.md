@@ -1,6 +1,6 @@
 # Handoff
 
-_Last updated: 2026-11-02. M1 complete; M2 steps 1–2 built: Google + email/password sign-in, workspaces, free OpenStreetMap search, saved leads._
+_Last updated: 2026-11-02. M1 complete; M2 steps 1–3 built: Google + email/password sign-in, workspaces, free OpenStreetMap search, saved leads, website research with Opportunity Briefs, free DNS email check. Landing page has the 5-step "How it works" flow._
 
 ## State
 
@@ -18,7 +18,7 @@ npm run build && npm start
 BASE_URL=http://localhost:3000 npm run test:e2e
 ```
 
-- Lint and typecheck clean; 84 unit and database tests pass; production build succeeds; the smoke test passes (18 checks, 3 widths, no overflow, no console errors, no external requests).
+- Lint and typecheck clean; 179 unit and database tests pass; production build succeeds; the smoke test passes (3 widths, no overflow, no console errors, no external requests).
 - Brand renamed to Locentio. Landing page has scroll effects (`components/marketing/scroll-effects.tsx`, styles at the end of `app/globals.css`).
 
 ## M2 step 1: what exists
@@ -42,9 +42,21 @@ Before launch: a dedicated least-privilege database role for the app; real-Postg
 - Verified against a real Postgres (PGlite socket) in a browser: failed search releases units; results display; saving leads; overview counts; foreign job ids show nothing.
 - Not verified: live OpenStreetMap calls (blocked by this sandbox's network policy). First live check: run a search on the deployed app.
 
-## Next action (M2 step 3: research and verification)
+## M2 step 3: what exists
 
-1. Website research: SSRF-safe fetch of a few public pages per lead (homepage, contact) → evidence and signals, feeding the existing Opportunity Brief rules.
-2. Email verification: choose a provider (free tiers exist; check terms) behind `EmailVerificationProvider`; until then, contacts stay "Unverified" and can't be sent to.
-3. Lead detail drawer in `/app/leads` reusing the demo's brief and evidence components.
+- Migration `database/migrations/0003_research.sql` (research columns on `businesses`, `verification_detail` on `contacts`). **Run it in Neon** after 0002.
+- Pure helpers `lib/research/`: `net-policy.ts` (public-IP check), `robots.ts`, `extract.ts` (HTML → signals, follow-up links, business emails), `aggregate.ts` (pages → signals + evidence), `brief.ts` (Opportunity Brief rules, shared with the demo), `email-check.ts` (DNS result classification).
+- Network: `server/research/fetch.ts` (`safeFetch`: connect-time IP check, manual redirects, size/time limits) and `server/research/email-check.ts` (DNS check with a resolver canary).
+- Persistence `server/research-store.ts`, service `server/services/research.ts`, actions `server/actions/research.ts`, page `app/app/leads/[id]/page.tsx`, buttons `features/product/lead-actions.tsx`.
+- Verified in a browser against a real Postgres: lead page, research failure path (shows the error and keeps Unknowns), notes saved, unknown lead id shows "Lead not found". Not verified: research against live websites (sandbox network blocks outbound fetches).
+
+## Landing page
+
+`components/marketing/audience-workflow.tsx` → `HowItWorks`: 5 steps (connect mailbox, search Google Maps, research and personalise, approve and launch, handle replies). Each step's badge comes from `config/milestone.ts`, so flipping a feature's `availability` updates the page.
+
+## Next actions
+
+1. **Google Maps (Places API).** Owner: allow `developers.google.com`, `cloud.google.com` and `places.googleapis.com` in the environment's network settings so the official docs and terms can be read; create a Google Cloud project with billing enabled (free monthly allowance; stop before any paid plan) and a server-side API key restricted to the Places API. Then: a `server/providers/google-places.ts` adapter next to OSM, storage rules per the terms, attribution in results, and flip `googleMaps` to `beta`.
+2. **M2 step 4: evidence-based drafts.** Needs `ANTHROPIC_API_KEY`; drafts must cite brief facts only.
+3. Mailbox verification provider (optional; the free DNS check stays as the floor).
 4. Add a real-Postgres CI job for concurrency tests.

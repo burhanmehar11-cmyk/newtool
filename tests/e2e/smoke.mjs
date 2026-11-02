@@ -86,7 +86,7 @@ await page.getByRole("button", { name: "Bluebonnet Family Dentistry" }).click();
 const drawer = page.getByRole("dialog");
 await drawer.getByRole("button", { name: /^Research$/ }).click();
 await drawer.getByText("Observed facts").waitFor({ timeout: 10000 });
-await drawer.getByRole("button", { name: /Contact page asks visitors/ }).click();
+await drawer.getByRole("button", { name: /asks visitors to call to schedule/ }).click();
 await drawer.getByText("Collected", { exact: false }).first().waitFor();
 ok("brief generated and evidence inspected");
 await page.screenshot({ path: `${OUT}/demo-lead-brief-1440.png` });

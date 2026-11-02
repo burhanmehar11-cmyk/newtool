@@ -18,12 +18,15 @@ export function OpportunityBriefView({
   stale,
   onEvidenceOpen,
   showRubric = true,
+  live,
 }: {
   brief: OpportunityBrief;
   business: Business;
   stale?: boolean;
   onEvidenceOpen?: () => void;
   showRubric?: boolean;
+  /** Evidence comes from real pages (links open them). */
+  live?: boolean;
 }) {
   const evidenceById = new Map(business.evidence.map((e) => [e.id, e]));
   const [focusFact, setFocusFact] = React.useState<string | null>(null);
@@ -33,7 +36,7 @@ export function OpportunityBriefView({
       <div className="flex flex-wrap items-center gap-1.5">
         <FitBadge level={brief.fit.level} stale={stale} />
         <ConfidenceBadge level={brief.confidence.level} />
-        <span className="text-xs text-slate">Generated {formatDate(brief.generatedAt)} · {brief.generator === "demo-template" ? "demo template, no AI call" : "AI"}</span>
+        <span className="text-xs text-slate">Generated {formatDate(brief.generatedAt)} · {brief.generator === "demo-template" ? "demo template, no AI call" : brief.generator === "template" ? "rule-based, no AI call" : "AI"}</span>
       </div>
 
       <section aria-labelledby={`${brief.id}-facts`}>
@@ -67,7 +70,7 @@ export function OpportunityBriefView({
                   <div className="mb-2 ml-7 mt-1 space-y-1.5">
                     {f.evidenceIds.map((id) => {
                       const e = evidenceById.get(id);
-                      return e ? <EvidenceItem key={id} evidence={e} defaultOpen onOpen={onEvidenceOpen} /> : null;
+                      return e ? <EvidenceItem key={id} evidence={e} defaultOpen onOpen={onEvidenceOpen} live={live} /> : null;
                     })}
                   </div>
                 ) : null}

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 const faqs: { q: string; a: React.ReactNode }[] = [
   {
     q: "Where does lead data come from?",
-    a: "In the private beta, business details will come from one licensed business-data provider, and research from public pages a business publishes about itself, within each source's terms. Every fact shows its source and collection date. Today, the demo uses fictional sample businesses only.",
+    a: "Today, business listings come from OpenStreetMap, free open map data, and Google Maps listings are being added through Google's official Places API rather than scraping. Locentio then reads each business's public website (respecting robots.txt) for contact details and research. Every fact shows its source and the date it was collected.",
   },
   {
     q: "What does email verification mean?",

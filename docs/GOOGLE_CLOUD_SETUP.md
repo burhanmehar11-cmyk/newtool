@@ -92,8 +92,8 @@ Google calls this **Google Auth Platform** (older screens say **OAuth consent sc
 3. When asked which environments to connect, keep **Production** and **Preview** (and **Development** if offered). Vercel adds `DATABASE_URL` and related settings automatically.
 4. Open the database's **Open in Neon** (or **Neon Console**) link → **SQL Editor**.
 5. In another tab, open GitHub → **burhanmehar11-cmyk/newtool** → branch `claude/compassionate-knuth-hewpfn` → `database/migrations/0000_auth.sql` → **Copy raw file** (two-squares icon). Paste into the SQL Editor → **Run**.
-6. Clear the editor. Do the same with `database/migrations/0001_foundation.sql` → **Run**, then `database/migrations/0002_password_and_discovery.sql` → **Run**.
-   - Already ran 0000 and 0001 earlier? Just run **0002**. It only adds things and is safe to run on top.
+6. Clear the editor. Do the same, one file at a time, with `database/migrations/0001_foundation.sql` → **Run**, then `0002_password_and_discovery.sql` → **Run**, then `0003_research.sql` → **Run**.
+   - Already ran some of them earlier? Run only the ones after the last you ran (for example just **0003**). Later files only add things and are safe to run on top.
 7. Check by running:
 
    ```sql
@@ -102,7 +102,7 @@ Google calls this **Google Auth Platform** (older screens say **OAuth consent sc
      (select count(*) from information_schema.tables where table_schema = 'auth') as auth_tables;
    ```
 
-   Expected: `public_tables = 31`, `auth_tables = 4`.
+   Expected: `public_tables = 31`, `auth_tables = 4` (0003 adds columns, not tables, so the counts don't change).
 
 If a migration shows an error, **stop and report the exact message**. Don't run it twice.
 

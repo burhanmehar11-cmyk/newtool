@@ -39,17 +39,18 @@ export async function finishJob(q: Q, jobId: string, status: "completed" | "fail
 }
 
 /** Upserts businesses (deduplicated per workspace and source record), records evidence and public emails, links results. */
-export async function persistResults(q: Q, ws: string, jobId: string, results: OsmBusiness[]): Promise<string[]> {
+export async function persistResults(q: Q, ws: string, jobId: string, results: OsmBusiness[], niche: string | null = null): Promise<string[]> {
   const ids: string[] = [];
   for (const [i, b] of results.entries()) {
     const biz = await q.query<{ id: string }>(
-      `insert into public.businesses (workspace_id, provider, provider_ref, name, category, address, city, region, phone, website, domain_normalized, attribution, collected_at)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, now())
+      `insert into public.businesses (workspace_id, provider, provider_ref, name, category, address, city, region, phone, website, domain_normalized, attribution, niche, collected_at)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, now())
        on conflict (workspace_id, provider, provider_ref) do update set
          name = excluded.name, category = excluded.category, address = excluded.address, city = excluded.city, region = excluded.region,
-         phone = excluded.phone, website = excluded.website, domain_normalized = excluded.domain_normalized, collected_at = now()
+         phone = excluded.phone, website = excluded.website, domain_normalized = excluded.domain_normalized,
+         niche = coalesce(excluded.niche, businesses.niche), collected_at = now()
        returning id`,
-      [ws, PROVIDER, b.ref, b.name, b.category, b.address, b.city, b.region, b.phone, b.website, b.domain, OSM_ATTRIBUTION],
+      [ws, PROVIDER, b.ref, b.name, b.category, b.address, b.city, b.region, b.phone, b.website, b.domain, OSM_ATTRIBUTION, niche],
     );
     const businessId = biz.rows[0].id;
     ids.push(businessId);

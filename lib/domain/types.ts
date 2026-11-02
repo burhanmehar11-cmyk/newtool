@@ -97,7 +97,7 @@ export type OpportunityBrief = {
   businessId: string;
   offerType: OfferType;
   generatedAt: string;
-  generator: "demo-template" | "ai";
+  generator: "demo-template" | "template" | "ai";
   facts: Fact[];
   opportunities: Opportunity[];
   unknowns: string[];

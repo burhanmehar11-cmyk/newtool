@@ -1,5 +1,5 @@
 import type { Business, OfferProfile, OpportunityBrief } from "@/lib/domain/types";
-import { nicheById } from "./fixtures/catalog";
+import { nicheWords } from "@/lib/discovery/niches";
 
 /**
  * Demo-only draft writer. Template-based and deterministic: no model is called.
@@ -10,7 +10,7 @@ import { nicheById } from "./fixtures/catalog";
 type Opening = { line: string; factKey: string; inference?: string };
 
 function openingFor(b: Business, brief: OpportunityBrief): Opening[] {
-  const n = nicheById(b.niche)!;
+  const n = nicheWords(b.niche);
   const s = b.signals;
   const has = (key: string) => brief.facts.some((f) => f.id === `${b.id}_f_${key}`);
   const out: Opening[] = [];
@@ -91,7 +91,7 @@ export function generateDraft(
   const greeting = `Hi ${b.name} team,`;
   const observation = primary
     ? `${primary.line}${primary.inference ? ` ${primary.inference}` : ""} You may already have this covered.`
-    : `I came across ${b.name} while looking at ${nicheById(b.niche)!.plural.toLowerCase()} in ${b.city}.`;
+    : `I came across ${b.name} while looking at ${nicheWords(b.niche).plural.toLowerCase()} in ${b.city}.`;
 
   const offerLine =
     offer.tone === "direct"
