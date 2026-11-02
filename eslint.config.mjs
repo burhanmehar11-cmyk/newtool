@@ -7,7 +7,7 @@ const eslintConfig = defineConfig([
   ...nextTs,
   // Demo fixtures and simulated logic must never leak into production code paths.
   {
-    files: ["server/**", "lib/**", "config/**", "jobs/**", "database/**", "app/app/**", "features/product/**", "features/auth/**", "features/settings/offer-fields.tsx", "features/settings/offer-profile-form.tsx", "features/onboarding/onboarding-wizard.tsx", "proxy.ts", "app/api/**"],
+    files: ["server/**", "lib/**", "config/**", "jobs/**", "database/**", "app/app/**", "features/product/**", "features/auth/**", "features/settings/offer-fields.tsx", "features/settings/offer-profile-form.tsx", "features/onboarding/onboarding-wizard.tsx", "proxy.ts", "app/api/**", "lib/auth/**"],
     rules: {
       "no-restricted-imports": ["error", { patterns: [{ group: ["@/demo/*", "@/demo", "**/demo/*"], message: "Production code must not import demo fixtures or simulations." }] }],
     },

@@ -17,14 +17,14 @@ export function AuthCard({ title, description, children }: { title: string; desc
   );
 }
 
-/** Shown when this deployment has no Firebase or Cloud SQL configuration. Never pretends to sign anyone in. */
+/** Shown when this deployment has no Google OAuth or database configuration. Never pretends to sign anyone in. */
 export function NotConfigured() {
   return (
     <div className="space-y-4">
       <div className="flex gap-3 rounded-xl bg-warn-bg px-4 py-3 text-sm leading-6 text-warn-fg">
         <Settings2 aria-hidden className="mt-1 size-4 shrink-0" />
         <p>
-          Accounts aren&apos;t configured in this environment. The private beta needs the Firebase and Cloud SQL settings described in{" "}
+          Sign-in isn&apos;t configured in this environment. It needs a Google OAuth client and a database, set up as described in{" "}
           <code className="font-mono text-[13px]">docs/GOOGLE_CLOUD_SETUP.md</code>.
         </p>
       </div>

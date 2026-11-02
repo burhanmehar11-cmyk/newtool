@@ -1,6 +1,6 @@
 -- Locentio M2 foundation schema.
 --
--- Runs on Cloud SQL for PostgreSQL after 0000_auth.sql (auth.users,
+-- Runs on PostgreSQL after 0000_auth.sql (auth.users,
 -- auth.uid(), roles anon / authenticated). Every workspace-owned row carries
 -- workspace_id and is protected by row-level security. Operations that must
 -- not be performed directly by clients (creating workspaces, writing the

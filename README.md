@@ -11,7 +11,7 @@ Locentio is a local prospecting and outreach workspace for agencies: discover bu
 | Milestone | Scope | Status |
 | --- | --- | --- |
 | **M1** | Brand, landing page, interactive demo on fixture data | **Complete. Not production-ready.** |
-| M2 | Accounts, persistence, real discovery, research, Gmail sending, reply sync | **In progress.** Step 1 (accounts and workspaces) built on Firebase Authentication + Cloud SQL; not yet verified against the live Google project |
+| M2 | Accounts, persistence, real discovery, research, Gmail sending, reply sync | **In progress.** Step 1 (Sign in with Google + workspaces) built; free setup, not yet verified with the live Google client |
 | M3 | Billing, team roles, public API, webhooks, MCP | Not started |
 
 ### What is simulated in M1
@@ -68,21 +68,24 @@ BASE_URL=http://localhost:3000 npm run test:e2e
 
 Screenshots land in `./screenshots` (git-ignored) at 390, 768 and 1440px.
 
-## M2 setup: accounts and workspaces (Google Cloud)
+## M2 setup: Sign in with Google (free)
 
-Sign-in uses **Firebase Authentication** (email/password and Google), the database is **Cloud SQL for PostgreSQL**, and the app stays on **Vercel**, connecting through Google's Cloud SQL connector. The product lives at `/app`. Without these settings it shows a clear "not configured" state, and the demo keeps working.
+Sign-in is **"Continue with Google"** through a Google OAuth client. It's free and needs no Google billing. Workspaces are stored in Postgres; the free Neon database from Vercel → Storage works. The product lives at `/app`. Without these settings it shows a clear "not configured" state, and the demo keeps working.
 
 **Step-by-step setup, written for Claude Cowork to follow in the browser: [docs/GOOGLE_CLOUD_SETUP.md](docs/GOOGLE_CLOUD_SETUP.md).** In short:
 
-1. Google Cloud project with billing; enable the Cloud SQL Admin API and Identity Toolkit API.
-2. Firebase on that project: enable Email/Password and Google sign-in, add your domain to authorised domains, register a web app.
-3. Service account key (Firebase Admin SDK account), granted **Cloud SQL Client**.
-4. Cloud SQL PostgreSQL instance with public IP and no authorised networks, plus a `locentio` database; run `database/migrations/0000_auth.sql`, then `0001_foundation.sql`.
-5. Vercel environment variables (see `.env.example`), then redeploy.
+1. Free Google Cloud project → consent screen (External, **Testing**, add test users) → OAuth client (Web) with redirect URI `https://YOUR-URL/api/auth/google/callback`.
+2. Vercel → Storage → Neon (Free) → run `database/migrations/0000_auth.sql` then `0001_foundation.sql` in Neon's SQL Editor.
+3. Vercel variables: `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `SESSION_SECRET` (32+ characters), `NEXT_PUBLIC_SITE_URL`, `BETA_ALLOWED_EMAILS`; then redeploy.
 
-How a request is authorised: the browser signs in with Firebase, posts the fresh ID token to `/api/auth/session` (same-origin, verified, recent and email-verified; first sign-in must be on `BETA_ALLOWED_EMAILS`), and receives an httpOnly session cookie. Every product query runs in a transaction as the `authenticated` role with `app.user_id` set, so row-level security limits it to the user's workspaces.
+How sign-in works:
 
-Database tests run the real migrations in PGlite (Postgres in WASM), using exactly the same user-scoping SQL as the server. `npm test` covers tenant isolation, anonymous lockout, ledger and secret protection, idempotent usage reservations, quota refusal and integrity constraints.
+1. `/api/auth/google/start` sends the visitor to Google with PKCE, `state` and `nonce`, requesting only `openid email profile`.
+2. `/api/auth/google/callback` exchanges the code server-side, verifies the ID token against Google's keys (issuer, audience, nonce, verified email), checks `BETA_ALLOWED_EMAILS`, and records the user and a session row.
+3. It then sets an httpOnly cookie holding a signed session id. Every request re-checks that session row, so signing out revokes it.
+4. Product queries run in a transaction as the `authenticated` role with `app.user_id` set, so row-level security limits them to the user's workspaces.
+
+Database tests run the real migrations in PGlite (Postgres in WASM), using exactly the SQL the server runs: user scoping, user and session bookkeeping, tenant isolation, ledger and secret protection, idempotent usage reservations and integrity constraints.
 
 ## Deploying to Vercel
 
@@ -104,7 +107,7 @@ Next.js 16 (App Router, Cache Components, Turbopack) · React 19 · TypeScript �
 app/                     Routes. (marketing) = landing, auth pages, legal drafts, brand guide; demo/ = demo app; app/ = live product (M2)
 database/migrations      SQL schema with row-level security
 proxy.ts                 /app gate on the session cookie (Next 16 "proxy", formerly middleware)
-server/                  Server-only: env, Cloud SQL pool, Firebase Admin, auth (data access layer), services, actions
+server/                  Server-only: env, Postgres pool, auth (data access layer), services, actions
 components/ui            Primitives (button, dialog/sheet, tabs, fields, toast…)
 components/marketing     Landing page sections
 components/product       Shared product UI (Opportunity Brief, evidence, badges)

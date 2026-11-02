@@ -18,7 +18,7 @@ export async function createTestDb() {
 }
 
 export async function createUser(db: PGlite, id: string, email: string) {
-  await db.query("insert into auth.users (id, firebase_uid, email) values ($1, $2, $3)", [id, `fb_${id.slice(-6)}`, email]);
+  await db.query("insert into auth.users (id, auth_subject, email) values ($1, $2, $3)", [id, `google:${id.slice(-6)}`, email]);
 }
 
 // PGlite has one connection; production uses one pooled connection per

@@ -1,41 +1,23 @@
 import "server-only";
 import pg from "pg";
-import { AuthTypes, Connector, GoogleAuth, IpAddressTypes } from "@google-cloud/cloud-sql-connector";
-import { dbConfig, serviceAccount } from "@/server/env";
+import { databaseUrl } from "@/server/env";
 import { USER_SCOPE_SQL } from "@/server/db-sql";
 
 export type Queryable = Pick<pg.PoolClient, "query">;
 
-let poolPromise: Promise<pg.Pool> | null = null;
+let pool: pg.Pool | null = null;
 
-async function createPool(): Promise<pg.Pool> {
-  const cfg = dbConfig();
-  if (!cfg) throw new Error("Database is not configured");
-  if (cfg.kind === "url") return new pg.Pool({ connectionString: cfg.url, max: 5 });
-  const sa = serviceAccount()!;
-  // The connector uses the service account (role: Cloud SQL Client) to open an
-  // mTLS tunnel. No IP allowlist is needed, which suits Vercel's dynamic IPs.
-  const connector = new Connector({
-    auth: new GoogleAuth({
-      credentials: { client_email: sa.client_email, private_key: sa.private_key },
-      projectId: sa.project_id,
-      scopes: ["https://www.googleapis.com/auth/sqlservice.admin"],
-    }),
-  });
-  const opts = await connector.getOptions({ instanceConnectionName: cfg.instance, ipType: IpAddressTypes.PUBLIC, authType: AuthTypes.PASSWORD });
-  return new pg.Pool({ ...opts, user: cfg.user, password: cfg.password, database: cfg.database, max: 5, idleTimeoutMillis: 10_000 });
-}
-
-function pool() {
-  poolPromise ??= createPool().catch((e) => {
-    poolPromise = null;
-    throw e;
-  });
-  return poolPromise;
+function getPool(): pg.Pool {
+  const url = databaseUrl();
+  if (!url) throw new Error("Database is not configured");
+  // Small pool: serverless functions each hold their own. Works with poolers in
+  // transaction mode because all per-user settings are transaction-local.
+  pool ??= new pg.Pool({ connectionString: url, max: 3, idleTimeoutMillis: 10_000 });
+  return pool;
 }
 
 async function transaction<T>(scope: (c: pg.PoolClient) => Promise<void>, fn: (q: Queryable) => Promise<T>): Promise<T> {
-  const client = await (await pool()).connect();
+  const client = await getPool().connect();
   try {
     await client.query("begin");
     await scope(client);
@@ -58,7 +40,7 @@ export function withUser<T>(userId: string, fn: (q: Queryable) => Promise<T>): P
   }, fn);
 }
 
-/** Privileged access for server-only bookkeeping (e.g. mapping Firebase UIDs). Never pass user input as SQL. */
+/** Server-only bookkeeping (users, sessions). Never pass user input as SQL. */
 export function withService<T>(fn: (q: Queryable) => Promise<T>): Promise<T> {
   return transaction(async () => undefined, fn);
 }

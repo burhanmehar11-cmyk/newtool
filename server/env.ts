@@ -3,53 +3,28 @@ import "server-only";
 /**
  * Server configuration. Missing values produce a clear "not configured"
  * state; nothing silently falls back to demo data. Values are never logged.
+ *
+ * Free setup: a Google OAuth client (Google Cloud Console, no billing) and
+ * Vercel's free Postgres (Neon), which sets DATABASE_URL automatically.
  */
 
-export type ServiceAccount = { project_id: string; client_email: string; private_key: string };
-
-let cachedSa: ServiceAccount | null | undefined;
-
-/**
- * GOOGLE_SERVICE_ACCOUNT_KEY holds the service account JSON, either raw or
- * base64-encoded. One key serves Firebase Admin and the Cloud SQL connector.
- */
-export function serviceAccount(): ServiceAccount | null {
-  if (cachedSa !== undefined) return cachedSa;
-  const raw = process.env.GOOGLE_SERVICE_ACCOUNT_KEY?.trim();
-  cachedSa = null;
-  if (raw) {
-    try {
-      const json = raw.startsWith("{") ? raw : Buffer.from(raw, "base64").toString("utf8");
-      const sa = JSON.parse(json) as Partial<ServiceAccount>;
-      if (sa.project_id && sa.client_email && sa.private_key) {
-        cachedSa = { project_id: sa.project_id, client_email: sa.client_email, private_key: sa.private_key.replace(/\\n/g, "\n") };
-      }
-    } catch {
-      cachedSa = null;
-    }
-  }
-  return cachedSa;
+export function googleOAuth(): { clientId: string; clientSecret: string } | null {
+  const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID?.trim();
+  const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET?.trim();
+  return clientId && clientSecret ? { clientId, clientSecret } : null;
 }
 
-export type DbConfig =
-  | { kind: "cloudsql"; instance: string; user: string; password: string; database: string }
-  | { kind: "url"; url: string };
-
-/** Cloud SQL via the connector in production; DATABASE_URL for local development. */
-export function dbConfig(): DbConfig | null {
-  const { CLOUD_SQL_INSTANCE, DB_USER, DB_PASSWORD, DB_NAME, DATABASE_URL } = process.env;
-  if (CLOUD_SQL_INSTANCE && DB_USER && DB_PASSWORD && DB_NAME && serviceAccount()) {
-    return { kind: "cloudsql", instance: CLOUD_SQL_INSTANCE, user: DB_USER, password: DB_PASSWORD, database: DB_NAME };
-  }
-  if (DATABASE_URL) return { kind: "url", url: DATABASE_URL };
-  return null;
+/** At least 32 characters; used to sign session and OAuth-state cookies. */
+export function sessionSecret(): string | null {
+  const s = process.env.SESSION_SECRET?.trim();
+  return s && s.length >= 32 ? s : null;
 }
 
-export function firebaseWebConfigured() {
-  return !!(process.env.NEXT_PUBLIC_FIREBASE_API_KEY && process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN && process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID);
+/** Postgres connection string. Vercel's Neon integration provides DATABASE_URL (and POSTGRES_URL). */
+export function databaseUrl(): string | null {
+  return process.env.DATABASE_URL?.trim() || process.env.POSTGRES_URL?.trim() || null;
 }
 
-/** Accounts need Firebase (browser + admin) and the database. */
 export function accountsConfigured() {
-  return firebaseWebConfigured() && !!serviceAccount() && !!dbConfig();
+  return !!(googleOAuth() && sessionSecret() && databaseUrl());
 }

@@ -36,11 +36,14 @@ Reversible choices made without asking, with the reason. Revisit any of them fre
 | 18 | Callable functions (`create_workspace`, `reserve_usage`, `settle_usage`) live in `public`, helpers in `app`; EXECUTE is revoked from `public`/`anon` | Postgres grants EXECUTE to everyone by default. |
 | 19 | Usage ledger, allowances, audit events and job runs are read-only to members; writes go through SECURITY DEFINER functions or the service role | Clients can't edit what they're charged. |
 | 20 | Mailbox tokens live in `sending_account_secrets` with RLS on and no policies | Only the service role can read them. |
-| 21 | Session = Firebase session cookie (5 days, httpOnly), created only from a fresh, email-verified ID token on a same-origin POST; verified with revocation checks on every request; sign-out revokes refresh tokens | Cookie contents are never trusted without verification; the browser keeps no Firebase session (in-memory persistence). |
+| 21 | Session = httpOnly cookie with an HS256-signed session id (7 days); the `auth.sessions` row is checked on every request; sign-out revokes the row | Cookie contents alone are never trusted, and sessions are revocable server-side. |
 | 22 | Active workspace is an httpOnly cookie, always re-validated against memberships | Switching is cheap; a forged cookie gives nothing. |
 | 23 | Database tests run the real migrations in PGlite with the server's own user-scoping SQL | Real Postgres and RLS semantics without a hosted project in CI. Concurrency still needs a real-Postgres job. |
 | 24 | Brand renamed to **Locentio** (owner request) | Still provisional; trademark and domain not checked. |
-| 25 | **Google stack instead of Supabase** (owner decision): Firebase Authentication + Cloud SQL for PostgreSQL, hosting stays on Vercel | The owner uses Google Cloud. Keeping Postgres preserved the schema, RLS and tests. |
-| 26 | Cloud SQL reached through `@google-cloud/cloud-sql-connector` (public IP, no authorised networks, mTLS, SSL-only) with a service account holding **Cloud SQL Client** | Works from Vercel's changing IPs without opening the database to the internet. |
-| 27 | Firebase UIDs map to internal UUIDs in `auth.users`; queries run as role `authenticated` with `app.user_id` set per transaction | RLS policies stay database-enforced and independent of the auth provider. |
-| 28 | One service account key (`GOOGLE_SERVICE_ACCOUNT_KEY`) for Firebase Admin and Cloud SQL during the beta | Simplest setup on Vercel. Before launch: dedicated least-privilege DB user and Workload Identity Federation instead of a key. |
+| 25 | ~~Firebase Authentication + Cloud SQL~~ superseded by #29 | — |
+| 26 | ~~Cloud SQL connector~~ superseded by #29 | — |
+| 27 | Provider subjects (`google:<sub>`) map to internal UUIDs in `auth.users`; queries run as role `authenticated` with `app.user_id` set per transaction | RLS stays database-enforced and independent of the sign-in provider. |
+| 28 | ~~Service account key~~ no longer needed (#29) | — |
+| 29 | **Free stack (owner decision): Sign in with Google via our own OAuth client, plus Postgres on Vercel's free Neon plan.** No Firebase, no Cloud SQL, no Google billing | The owner wants no paid services. Basic `openid email profile` scopes are free and need no Google verification. Testing mode with test users suits the private beta. The same OAuth client is reused for Gmail sending later. |
+| 30 | OAuth implemented directly (authorization code + PKCE, `state` and `nonce` in a signed 10-minute cookie, ID token verified with `jose` against Google's JWKS) | Small and auditable, with no auth vendor. Email/password accounts are dropped: Google accounts only. |
+| 31 | `BETA_ALLOWED_EMAILS` is checked on **every** sign-in, not only the first | Removing someone from the list takes effect at their next sign-in. |

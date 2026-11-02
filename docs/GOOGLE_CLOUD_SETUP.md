@@ -1,147 +1,99 @@
-# Google Cloud setup for Locentio (guide for Claude Cowork)
+# Free setup: "Sign in with Google" (guide for Claude Cowork)
 
-This guide sets up the private beta's accounts and database on Google:
+This turns on sign-in for Locentio's private beta **without paying for anything**:
 
-- **Firebase Authentication** (Google Identity Platform) for sign-in: email/password and "Continue with Google".
-- **Cloud SQL for PostgreSQL** for the database.
-- **Vercel** keeps hosting the app; it connects to Cloud SQL through Google's Cloud SQL connector.
+- **Google Cloud Console:** create a free project and an OAuth client so people can sign in with their Google (Gmail) account. No billing account is needed.
+- **Vercel:** add the free Postgres database (Neon) so workspaces can be saved, then add a few settings.
 
-It is written so **Claude Cowork can do it in the browser**, step by step, with the account owner nearby for a few approvals. It takes about 45–60 minutes, most of it waiting for the database to be created.
+It's written so **Claude Cowork can do it in your browser**. You step in for two secret values. Expect about 20–30 minutes.
+
+> Why a database at all? Sign-in only proves who someone is. The app still has to remember each person's workspace, offer profile and, later, their leads. Vercel's Neon Postgres has a free plan and needs no card.
 
 ---
 
 ## 1. Prompt to give Claude Cowork
 
-Copy everything in this box into Cowork, then attach or link this guide.
-
 ```
-Please set up Google Cloud for my app "Locentio" by following the guide in
-docs/GOOGLE_CLOUD_SETUP.md of the GitHub repo burhanmehar11-cmyk/newtool
-(branch claude/compassionate-knuth-hewpfn). Work in my browser, in order,
-part by part.
+Please set up free Google sign-in for my app "Locentio" by following
+docs/GOOGLE_CLOUD_SETUP.md in the GitHub repo burhanmehar11-cmyk/newtool
+(branch claude/compassionate-knuth-hewpfn). Work in my browser, part by part.
 
 Rules:
-- Stop and ask me before: linking or enabling billing, creating the Cloud SQL
-  instance, or deleting/changing anything that already existed.
+- Do not add a billing account, start a trial, or choose any paid plan.
+  Always pick the free option. If a page insists on payment, stop and ask me.
 - Never type, paste, read aloud or screenshot secrets in our chat: the
-  service account key file and the database password. When a step needs a
-  secret, stop and ask me to handle it myself.
+  Google client secret and the session secret. When a step needs one,
+  stop and ask me to paste it myself.
+- Don't delete or change anything that already existed without asking.
 - After each part, tell me what you did and the non-secret values you
-  recorded (project ID, Firebase web config, Cloud SQL connection name).
+  recorded (project ID, OAuth client ID).
 - If a page looks different from the guide, describe what you see and ask.
-- If something fails (permissions, organisation policy, quota), stop and
-  report the exact error message.
+  If something fails, stop and report the exact message.
 ```
 
-## 2. What the owner prepares first
+## 2. What the owner prepares
 
-| Item | Example | Notes |
-| --- | --- | --- |
-| Google account with permission to create projects | you@yourcompany.com | Owner or Project Creator in the Google Cloud organisation (if any). |
-| A billing account | — | Cloud SQL is a paid service. Firebase Authentication is free at beta volumes. |
-| Your app's public URL | `https://newtool.vercel.app` | From Vercel → your project → Domains. Add a custom domain too, if you have one. |
-| Invite list | `you@agency.com,@partner.com` | Emails or whole @domains allowed to create accounts during the beta. |
-| Region | `us-central1` or the region closest to your users | Use the same region everywhere. |
-
-Values Cowork will record (none of these are secrets):
-
-```
-PROJECT_ID              =
-FIREBASE apiKey         =   (public identifier, not a secret)
-FIREBASE authDomain     =
-FIREBASE projectId      =
-FIREBASE appId          =
-CLOUD_SQL connection    =   PROJECT_ID:REGION:locentio-db
-```
+| Item | Example |
+| --- | --- |
+| The Google account that will own the setup | you@gmail.com |
+| Your app's public URL (Vercel → project → **Domains**) | `https://newtool.vercel.app` |
+| Who may sign in during the beta (Gmail addresses or whole @domains) | `you@gmail.com,partner@gmail.com,@youragency.com` |
 
 ---
 
-## Part A: Google Cloud project
+## Part A: Free Google Cloud project
 
-1. Open https://console.cloud.google.com/ and make sure the correct Google account is selected (top right).
-2. Click the project picker (top bar) → **New project**.
-   - Project name: `Locentio`
-   - Organisation and location: keep the defaults unless the owner says otherwise.
-   - Click **Create**, wait, then select the new project in the picker.
-3. Record the **Project ID** shown on the dashboard (for example `locentio-482913`). It's often different from the name.
-4. **Billing (owner approval needed).** Go to **Billing** in the left menu. If the project has no billing account, **stop and ask the owner** to link one. Do not create a new billing account without approval.
+1. Open https://console.cloud.google.com/ and check the right Google account is selected (top right).
+   - On a first visit, accept the terms. **Ignore any "Start free trial" or billing offers.** They aren't needed.
+2. Project picker (top bar) → **New project** → name it `Locentio` → **Create**. Select it in the picker.
+3. Record the **Project ID** from the dashboard.
 
-✅ Check: the dashboard shows the Locentio project with a billing account linked.
+✅ Check: the top bar shows the Locentio project. No billing was added.
 
-## Part B: Enable the APIs
+## Part B: Consent screen (what people see when they click "Continue with Google")
 
-1. Go to **APIs & Services → Library**.
-2. Search for and **Enable**:
-   - **Cloud SQL Admin API** (the connector uses it)
-   - **Identity Toolkit API** (Firebase Authentication; Firebase may enable it automatically)
+Google calls this **Google Auth Platform** (older screens say **OAuth consent screen**).
 
-✅ Check: both appear under **APIs & Services → Enabled APIs & services**.
+1. Left menu → **APIs & Services → OAuth consent screen**, or search "Google Auth Platform". Click **Get started** if shown.
+2. **App information:** App name `Locentio`; User support email: the owner's email. **Next.**
+3. **Audience:** choose **External**. **Next.**
+4. **Contact information:** the owner's email. **Next.** Agree to the policy → **Create**.
+5. Open **Audience** (left menu of Google Auth Platform):
+   - Publishing status should be **Testing**. Keep it in Testing for the private beta: only the test users you list can sign in, and Google doesn't need to review the app.
+   - **Test users → Add users:** add every Gmail address from the beta list (max 100). Save.
+6. Open **Data access** (or **Scopes**): you don't need to add anything. The app only asks for `openid`, `email` and `profile`, which are basic and free.
 
-## Part C: Firebase Authentication
+✅ Check: Audience shows **Testing** and lists your test users.
 
-1. Open https://console.firebase.google.com/ → **Create a project** (or **Add project**).
-2. Choose **"Add Firebase to an existing Google Cloud project"** and pick the Locentio project from Part A. Do not create a separate project.
-3. Google Analytics: **turn it off** (not needed). Finish.
-4. Left menu **Build → Authentication → Get started**.
-5. Tab **Sign-in method**:
-   - **Email/Password** → Enable the first switch (Email/Password). Leave "Email link (passwordless sign-in)" **off**. Save.
-   - **Google** → Enable. Set "Support email for project" to the owner's email. Save.
-6. Tab **Settings → Authorized domains** → **Add domain**:
-   - The Vercel domain without `https://`, for example `newtool.vercel.app`
-   - Any custom domain the app uses
-   - `localhost` should already be there; leave it.
-7. Optional: **Templates** tab → edit the email templates so the sender name reads "Locentio".
-8. Gear icon → **Project settings → General → Your apps** → click the **Web (`</>`)** icon.
-   - App nickname: `Locentio web`. Do **not** tick Firebase Hosting. Register.
-   - Firebase shows a `firebaseConfig` snippet. Record `apiKey`, `authDomain`, `projectId` and `appId`. These are public identifiers that ship to the browser, so they are safe to note down.
+## Part C: OAuth client (the app's Google login key)
 
-✅ Check: Authentication → Sign-in method lists Email/Password and Google as **Enabled**.
+1. Google Auth Platform → **Clients** (or **APIs & Services → Credentials → Create credentials → OAuth client ID**).
+2. **Create client** → Application type **Web application** → name `Locentio web`.
+3. **Authorized JavaScript origins → Add URI:**
+   - `https://newtool.vercel.app` (your real URL, no trailing slash)
+   - `http://localhost:3000` (for local development)
+4. **Authorized redirect URIs → Add URI** (must match exactly):
+   - `https://newtool.vercel.app/api/auth/google/callback`
+   - `http://localhost:3000/api/auth/google/callback`
+   - Add the same two lines for any custom domain you use.
+5. **Create.** A dialog shows the **Client ID** and **Client secret**.
+   - Record the **Client ID** (it ends in `.apps.googleusercontent.com`; not secret).
+   - **Stop and ask the owner** to copy the **Client secret** themselves. It goes straight into Vercel in Part E. (It can be viewed again later in the client's details.)
 
-## Part D: Service account key (owner does the secret part)
+✅ Check: Clients lists `Locentio web` with both redirect URIs.
 
-One service account key lets the app verify sign-ins (Firebase Admin) and connect to Cloud SQL.
+## Part D: Free database in Vercel
 
-1. Firebase console → gear → **Project settings → Service accounts**.
-2. Note the service account email shown, like `firebase-adminsdk-xxxxx@PROJECT_ID.iam.gserviceaccount.com`.
-3. **Stop here and ask the owner** to click **Generate new private key** → **Generate key**. A JSON file downloads. The owner keeps it safe and never shares it in chat or email.
-   - If Google shows an error about an organisation policy (`iam.disableServiceAccountKeyCreation`), stop and report it. An organisation admin must allow key creation for this project.
-4. Back in https://console.cloud.google.com/ → **IAM & Admin → IAM**.
-5. Find the `firebase-adminsdk-…` service account → pencil icon (**Edit principal**) → **Add another role** → **Cloud SQL Client** → Save.
-
-✅ Check: the IAM list shows that service account with **Cloud SQL Client**, plus its existing Firebase roles.
-
-## Part E: Cloud SQL for PostgreSQL (owner approval needed)
-
-**Ask the owner before creating the instance.** It is billed by the hour from creation, even when idle.
-
-1. Console → **SQL** → **Create instance** → **Choose PostgreSQL**.
-2. Settings:
-   - **Edition:** Enterprise (not Enterprise Plus).
-   - **Preset:** Sandbox or Development (the cheapest the page offers).
-   - **Database version:** PostgreSQL 16 or newer.
-   - **Instance ID:** `locentio-db`
-   - **Password (postgres user):** click **Generate**. **Ask the owner to copy this password into their password manager now.** It is needed again in Part G. Do not record it in chat.
-   - **Region:** the region chosen in section 2. **Zonal availability:** Single zone (fine for the beta).
-3. Expand **Show configuration options**:
-   - **Machine configuration:** the smallest shared-core option offered. Confirm the monthly estimate on the right with the owner.
-   - **Connections:** **Public IP** checked. Do **not** add any authorised networks. The app connects through the encrypted Cloud SQL connector, so no IP needs to be opened.
-   - **Data protection:** automated backups **on**, deletion protection **on**.
-4. Click **Create instance** and wait (about 5–15 minutes).
-5. When it's ready, on the instance **Overview** page record the **Connection name** (`PROJECT_ID:REGION:locentio-db`).
-6. Left menu of the instance → **Databases** → **Create database** → name `locentio` → Create.
-7. Instance → **Connections → Security**: set SSL mode to **Allow only SSL connections** → Save.
-
-✅ Check: the instance is green (running), and the database `locentio` is listed.
-
-## Part F: Create the tables (run the two migration files)
-
-1. Instance → **Cloud SQL Studio** (left menu).
-2. Sign in: Database `locentio`, user `postgres`, authentication **Built-in database authentication**. **Ask the owner to type the password** from Part E.
-3. Open a new **Editor** tab.
-4. In another browser tab, open the GitHub repo **burhanmehar11-cmyk/newtool**, branch `claude/compassionate-knuth-hewpfn`, file `database/migrations/0000_auth.sql`. Click the **Copy raw file** button (two-squares icon above the code).
-5. Paste it into the Cloud SQL Studio editor and click **Run**. It should finish with no errors.
-6. Clear the editor. Do the same with `database/migrations/0001_foundation.sql`, then **Run**.
-7. Verify by running:
+1. Open https://vercel.com → your project (`newtool`) → **Storage** tab.
+2. **Create Database** → choose **Neon** (Serverless Postgres) → **Continue**.
+   - Plan: **Free**. Do not pick a paid plan.
+   - Region: the one closest to your users (or the default). Name: `locentio-db`.
+   - Accept the integration terms when asked, then **Create**.
+3. When asked which environments to connect, keep **Production** and **Preview** (and **Development** if offered). Vercel adds `DATABASE_URL` and related settings automatically.
+4. Open the database's **Open in Neon** (or **Neon Console**) link → **SQL Editor**.
+5. In another tab, open GitHub → **burhanmehar11-cmyk/newtool** → branch `claude/compassionate-knuth-hewpfn` → `database/migrations/0000_auth.sql` → **Copy raw file** (two-squares icon). Paste into the SQL Editor → **Run**.
+6. Clear the editor. Do the same with `database/migrations/0001_foundation.sql` → **Run**.
+7. Check by running:
 
    ```sql
    select
@@ -149,63 +101,56 @@ One service account key lets the app verify sign-ins (Firebase Admin) and connec
      (select count(*) from information_schema.tables where table_schema = 'auth') as auth_tables;
    ```
 
-   Expected: `public_tables = 30`, `auth_tables = 1`.
+   Expected: `public_tables = 30`, `auth_tables = 2`.
 
-If a migration fails partway, **stop and report the exact error**. Do not run it a second time until we've looked at it: some statements would already exist.
+If a migration shows an error, **stop and report the exact message**. Don't run it twice.
 
-## Part G: Vercel environment variables
+✅ Check: the counts match, and the Vercel project's **Settings → Environment Variables** now includes `DATABASE_URL`.
 
-1. Open https://vercel.com → the Locentio project (`newtool`) → **Settings → Environment Variables**.
-2. Add each variable below for **Production** (and **Preview**, if preview deployments should have sign-in too).
+## Part E: Settings in Vercel
+
+Vercel → project → **Settings → Environment Variables**. Add each one for **Production** (and **Preview**, if you use preview links).
 
 | Name | Value | Who enters it |
 | --- | --- | --- |
-| `NEXT_PUBLIC_SITE_URL` | The public URL, e.g. `https://newtool.vercel.app` | Cowork |
-| `NEXT_PUBLIC_FIREBASE_API_KEY` | `apiKey` from Part C | Cowork |
-| `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` | `authDomain` from Part C | Cowork |
-| `NEXT_PUBLIC_FIREBASE_PROJECT_ID` | `projectId` from Part C | Cowork |
-| `NEXT_PUBLIC_FIREBASE_APP_ID` | `appId` from Part C | Cowork |
-| `CLOUD_SQL_INSTANCE` | Connection name from Part E | Cowork |
-| `DB_USER` | `postgres` | Cowork |
-| `DB_NAME` | `locentio` | Cowork |
-| `BETA_ALLOWED_EMAILS` | The invite list from section 2 | Cowork |
-| `DB_PASSWORD` | The postgres password from Part E. Mark it **Sensitive**. | **Owner** |
-| `GOOGLE_SERVICE_ACCOUNT_KEY` | The **entire contents** of the JSON key file from Part D, pasted as-is (opening `{` to closing `}`). Mark it **Sensitive**. | **Owner** |
+| `NEXT_PUBLIC_SITE_URL` | Your public URL, e.g. `https://newtool.vercel.app` | Cowork |
+| `GOOGLE_OAUTH_CLIENT_ID` | The Client ID from Part C | Cowork |
+| `BETA_ALLOWED_EMAILS` | The beta list from section 2, comma-separated | Cowork |
+| `GOOGLE_OAUTH_CLIENT_SECRET` | The Client secret from Part C. Mark **Sensitive**. | **Owner** |
+| `SESSION_SECRET` | A random string of **at least 32 characters** (a password manager's generator works well; 40+ characters, letters and numbers). Mark **Sensitive**. | **Owner** |
 
-3. **Deployments** → the latest production deployment → **⋯ → Redeploy**. `NEXT_PUBLIC_*` values only take effect after a new build.
+`DATABASE_URL` was added by Part D; leave it as is.
 
-✅ Check: after the redeploy, `https://YOUR-URL/sign-in` shows the sign-in form with "Continue with Google", not "Accounts aren't configured".
+Then **Deployments** → latest production deployment → **⋯ → Redeploy**. Settings only take effect after a new deployment.
 
-## Part H: First sign-in test (owner)
+✅ Check: `https://YOUR-URL/sign-in` shows a **Continue with Google** button instead of "Sign-in isn't configured".
 
-1. Open `/sign-up` and create an account with an email on the invite list. Use a strong password.
-2. Open the confirmation email and click the link. It returns to `/sign-in`.
-3. Sign in. You land on workspace setup. Complete it.
-4. The Overview page shows your workspace name and the usage allowance.
-5. Optional isolation check: sign out, create a second invited account, set up its own workspace, and confirm it can't see the first workspace anywhere.
-6. Optional database check in Cloud SQL Studio: `select email, created_at from auth.users;` lists the accounts.
+## Part F: First sign-in (owner)
+
+1. Open `https://YOUR-URL/sign-in` → **Continue with Google** → pick a Gmail account that is both a **test user** (Part B) and on `BETA_ALLOWED_EMAILS` (Part E).
+2. Google may say "Google hasn't verified this app". That's expected while the app is in Testing. Click **Continue**.
+3. You land on workspace setup. Complete it, and the Overview shows your workspace.
+4. Optional: in Neon's SQL Editor, `select email, created_at from auth.users;` shows the account.
 
 ---
 
 ## Troubleshooting
 
-| Symptom | Likely cause | Fix |
+| Message | Cause | Fix |
 | --- | --- | --- |
-| "Accounts aren't configured in this environment" | A variable is missing or the app wasn't redeployed | Recheck Part G, then redeploy |
-| "This domain isn't authorised for sign-in yet" | Domain missing from Firebase authorised domains | Part C step 6 |
-| "This email isn't on the private-beta list yet" | Email not in `BETA_ALLOWED_EMAILS` | Add the email or `@domain`, then redeploy |
-| "Confirm your email first" | Email/password account not verified | Click the link in the email (check spam), or use "Resend the link" |
-| Sign-in works but the app errors after it | The app can't reach Cloud SQL | Confirm the Cloud SQL Admin API is enabled (Part B), the service account has **Cloud SQL Client** (Part D), `CLOUD_SQL_INSTANCE` is the exact connection name, and the instance is running |
-| Migration error mentioning `grant authenticated to current_user` | Run as a user other than `postgres` | Sign in to Cloud SQL Studio as `postgres` and run it again on a fresh database |
-| Key creation blocked | Organisation policy | An organisation admin must allow service account keys for this project |
+| `Error 400: redirect_uri_mismatch` (from Google) | Redirect URI in Part C doesn't exactly match the site address | Add `https://YOUR-URL/api/auth/google/callback` exactly (https, no trailing slash) |
+| `Error 403: access_denied` / "app is being tested" | The Gmail account isn't a test user | Add it under Audience → Test users (Part B) |
+| "This Google account isn't on the private-beta list yet" | Email missing from `BETA_ALLOWED_EMAILS` | Add it, then redeploy |
+| "Sign-in isn't configured in this environment yet" | A setting is missing, or no redeploy happened | Recheck Part E (`SESSION_SECRET` must be 32+ characters), then redeploy |
+| "That sign-in link expired or was opened in another browser" | Took over 10 minutes, or opened in a different browser | Start again from the sign-in page |
+| Signs in, then an error page | Database not connected or migrations not run | Recheck Part D; `DATABASE_URL` must exist in Vercel |
 
-## Security notes
+## Cost and limits
 
-- Never commit the JSON key or the database password to GitHub. They belong only in Vercel's Sensitive variables and the owner's password manager.
-- If the key is ever exposed, delete it in **IAM & Admin → Service accounts → Keys** and generate a new one.
-- `NEXT_PUBLIC_FIREBASE_*` values are public by design. Access is protected by the authorised domains, the server-side session check and the database's row-level security.
-- Later, for production: consider a dedicated database user with fewer privileges and Workload Identity Federation instead of a key file. Tracked in `docs/HANDOFF.md`.
+- **Google sign-in:** free. No billing account is needed for an OAuth client with basic scopes.
+- **Testing mode:** up to 100 test users. To open sign-in to anyone later, publish the app (Audience → Publish). Basic sign-in scopes don't need Google's review.
+- **Neon via Vercel:** free plan with usage limits, shown on the plan page. Enough for a private beta.
 
-## Coming later (not needed yet)
+## Later: Gmail sending (not needed now)
 
-Gmail sending (M2 step 5) will add one more Google Cloud task: an OAuth consent screen, the Gmail API, and an OAuth client for "Connect Gmail". Gmail sending scopes are restricted, so a public launch needs Google's verification. A separate guide will cover it when that step is built.
+Sending campaign emails from a user's Gmail uses the **same OAuth client**, plus the Gmail API and the `gmail.send` permission. While the app stays in Testing it works for your test users at no cost. A public launch with Gmail sending needs Google's verification for that permission. A separate guide will cover it when that step is built.

@@ -1,6 +1,6 @@
 # Handoff
 
-_Last updated: 2026-11-02. M1 complete; M2 step 1 built on Google (Firebase Auth + Cloud SQL)._
+_Last updated: 2026-11-02. M1 complete; M2 step 1 built with free Sign in with Google + Neon Postgres._
 
 ## State
 
@@ -23,18 +23,18 @@ BASE_URL=http://localhost:3000 npm run test:e2e
 
 ## M2 step 1: what exists
 
-- Schema and RLS: `database/migrations/0000_auth.sql` (roles, `auth.users`, `auth.uid()`) and `0001_foundation.sql`. Tests: `tests/db/`.
-- Auth: `lib/firebase/client.ts` (browser, in-memory persistence), `app/api/auth/session/route.ts` (ID token → session cookie), `lib/session-policy.ts`, `server/firebase/admin.ts`, `server/auth.ts` (DAL), `server/actions/auth.ts`, `proxy.ts`, pages under `app/(marketing)/{sign-in,sign-up,forgot-password}`. Password reset uses Firebase's hosted page.
-- Database access: `server/db.ts` (`withUser` runs as `authenticated` with `app.user_id`; `withService` for server bookkeeping), `server/db-sql.ts`.
+- Schema and RLS: `database/migrations/0000_auth.sql` (roles, `auth.users`, `auth.sessions`, `auth.uid()`) and `0001_foundation.sql`. Tests: `tests/db/`.
+- Auth: `app/api/auth/google/start` and `callback` routes, `lib/auth/` (OIDC helpers, signed tokens, constants), `server/auth.ts` (DAL), `server/actions/auth.ts` (sign-out revokes the session), `proxy.ts`, pages `app/(marketing)/sign-in` and `sign-up`.
+- Database access: `server/db.ts` (`withUser` runs as `authenticated` with `app.user_id`; `withService` for user and session bookkeeping), `server/db-sql.ts` (SQL shared with tests).
 - Product: `app/app/*` (overview, onboarding, settings), `server/services/workspaces.ts`, `server/actions/workspace.ts`, `components/app/product-shell.tsx`.
 - Shared UI between demo and product: `features/onboarding/onboarding-wizard.tsx`, `features/settings/offer-profile-form.tsx`, `features/settings/offer-fields.tsx`.
 - Lint rule: production paths cannot import `demo/*` (`eslint.config.mjs`).
 
 ## Not verified
 
-Nothing has run against the live Google project yet. Follow `docs/GOOGLE_CLOUD_SETUP.md` (written for Claude Cowork), then: sign up with an allowlisted email, confirm, onboard, sign in as a second user and confirm the first workspace is invisible.
+Nothing has run against the live Google OAuth client or Neon yet. Follow `docs/GOOGLE_CLOUD_SETUP.md` (written for Claude Cowork), then sign in with a test-user Gmail account, onboard, sign in as a second user and confirm the first workspace is invisible.
 
-Before launch: dedicated least-privilege database user instead of `postgres`; Workload Identity Federation instead of a key file; real-Postgres CI for lock-contention tests.
+Before launch: a dedicated least-privilege database role for the app; real-Postgres CI for lock-contention tests; publish the OAuth app (Audience → Publish) when opening sign-up.
 
 ## Next action (M2 step 2)
 

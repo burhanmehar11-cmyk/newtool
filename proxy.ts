@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { SESSION_COOKIE } from "@/lib/session-policy";
+import { SESSION_COOKIE } from "@/lib/auth/constants";
 
 /**
  * First gate for the product: no session cookie, no /app. The cookie is

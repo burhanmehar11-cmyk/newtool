@@ -2,10 +2,11 @@ import "server-only";
 import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { SESSION_COOKIE } from "@/lib/session-policy";
-import { adminAuth } from "@/server/firebase/admin";
-import { accountsConfigured } from "@/server/env";
+import { SESSION_COOKIE } from "@/lib/auth/constants";
+import { verifySession } from "@/lib/auth/tokens";
+import { accountsConfigured, sessionSecret } from "@/server/env";
 import { withService, withUser } from "@/server/db";
+import { AUTH_SQL } from "@/server/db-sql";
 
 /**
  * Data access layer for identity and tenancy. Every product server function
@@ -15,21 +16,22 @@ import { withService, withUser } from "@/server/db";
 
 export const ACTIVE_WORKSPACE_COOKIE = "locentio_ws";
 
-export type CurrentUser = { id: string; firebaseUid: string; email: string | null };
+export type CurrentUser = { id: string; sessionId: string; email: string | null };
 export type WorkspaceRef = { id: string; name: string; role: string };
 
 export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   // Read cookies first so callers are always request-time.
-  const session = (await cookies()).get(SESSION_COOKIE)?.value;
-  if (!session || !accountsConfigured()) return null;
-  const auth = adminAuth();
-  if (!auth) return null;
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  if (!token || !accountsConfigured()) return null;
+  const claims = await verifySession(token, sessionSecret()!);
+  if (!claims) return null;
   try {
-    // checkRevoked: signed-out or disabled users lose access immediately.
-    const decoded = await auth.verifySessionCookie(session, true);
-    const row = await withService((q) => q.query<{ id: string }>("select id from auth.users where firebase_uid = $1", [decoded.uid]));
-    const id = row.rows[0]?.id;
-    return id ? { id, firebaseUid: decoded.uid, email: decoded.email ?? null } : null;
+    // The session row must exist, belong to this user, be unexpired and not revoked.
+    const r = await withService((q) =>
+      q.query<{ id: string; email: string | null }>(AUTH_SQL.findSession, [claims.sid, claims.uid]),
+    );
+    const row = r.rows[0];
+    return row ? { id: row.id, sessionId: claims.sid, email: row.email } : null;
   } catch {
     return null;
   }
