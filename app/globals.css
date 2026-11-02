@@ -1,0 +1,196 @@
+@import "tailwindcss";
+
+/*
+ * Locentra design tokens. Contrast for every text pairing is checked in
+ * tests/contrast.test.ts. Mint is an accent: never use it as small text on
+ * light surfaces (1.36:1 on white).
+ */
+@theme {
+  --color-midnight: #0b1218;
+  --color-midnight-2: #13212a; /* elevated dark */
+  --color-midnight-3: #1b2d38; /* hover on dark */
+  --color-mint: #8ff0c0;
+  --color-mint-soft: #d9f8e8; /* tint for light surfaces */
+  --color-mint-strong: #6fe3a9;
+  --color-green: #12634a; /* deep green: accessible actions on light */
+  --color-green-hover: #0e5039;
+  --color-canvas: #f6f7f3; /* warm white */
+  --color-surface: #ffffff;
+  --color-ink: #152129;
+  --color-slate: #52636e;
+  --color-fog: #93a4ad; /* secondary text on dark, 7.3:1 on midnight */
+  --color-line: #dfe6e3; /* decorative separators */
+  --color-line-strong: #7c8d87; /* form-control borders, >= 3:1 on white */
+  --color-line-dark: #26363f;
+
+  --color-warn-bg: #fff3d1;
+  --color-warn-fg: #6b4a00;
+  --color-danger-bg: #fdecea;
+  --color-danger-fg: #a4231a;
+  --color-info-bg: #e7f0fb;
+  --color-info-fg: #1d4f8f;
+  --color-demo-bg: #fff3d1;
+  --color-demo-fg: #5c4300;
+
+  --font-display: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+
+  --radius-card: 14px;
+  --shadow-card: 0 1px 2px rgb(11 18 24 / 0.04), 0 4px 16px -4px rgb(11 18 24 / 0.08);
+  --shadow-float: 0 2px 4px rgb(11 18 24 / 0.06), 0 24px 48px -16px rgb(11 18 24 / 0.22);
+  --shadow-dark: 0 0 0 1px rgb(255 255 255 / 0.04), 0 30px 60px -20px rgb(0 0 0 / 0.6);
+
+  --ease-out-soft: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  --animate-fade-up: fade-up 220ms var(--ease-out-soft) both;
+  --animate-pulse-dot: pulse-dot 1.6s ease-in-out infinite;
+
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes pulse-dot {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.35;
+    }
+  }
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
+    scroll-padding-top: 88px;
+  }
+  body {
+    background: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-feature-settings: "cv11", "ss01";
+    text-rendering: optimizeLegibility;
+  }
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+  }
+  p {
+    text-wrap: pretty;
+  }
+  ::selection {
+    background: var(--color-mint);
+    color: var(--color-midnight);
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-green);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+  .on-dark :focus-visible,
+  .on-dark:focus-visible {
+    outline-color: var(--color-mint);
+  }
+  [hidden] {
+    display: none !important;
+  }
+}
+
+@layer components {
+  .container-page {
+    width: 100%;
+    max-width: 1200px;
+    margin-inline: auto;
+    padding-inline: 20px;
+  }
+  @media (min-width: 768px) {
+    .container-page {
+      padding-inline: 32px;
+    }
+  }
+  .eyebrow {
+    font-family: var(--font-sans);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  .display-hero {
+    font-size: clamp(2.25rem, 1.2rem + 4.4vw, 4.5rem);
+    line-height: 1.04;
+    font-weight: 700;
+    letter-spacing: -0.035em;
+  }
+  .display-2 {
+    font-size: clamp(1.875rem, 1.3rem + 2.2vw, 3rem);
+    line-height: 1.1;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+  }
+  .card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-card);
+  }
+  .card-dark {
+    background: var(--color-midnight-2);
+    border: 1px solid var(--color-line-dark);
+    border-radius: var(--radius-card);
+  }
+  .grid-dots {
+    background-image: radial-gradient(rgb(143 240 192 / 0.12) 1px, transparent 1px);
+    background-size: 22px 22px;
+  }
+  .scrollbar-thin {
+    scrollbar-width: thin;
+  }
+}
+
+/* Respect reduced motion: content stays visible, transitions become instant. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+@keyframes dialog-in {
+  from { opacity: 0; transform: translate(-50%, calc(-50% + 6px)) scale(0.985); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+@keyframes sheet-in-right {
+  from { transform: translateX(24px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+@keyframes sheet-in-left {
+  from { transform: translateX(-24px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}

@@ -1,0 +1,9 @@
+{
+  "viewBox": "0 0 32 32",
+  "description": "Abstract L (the ground and the anchor) with a location point and one signal arc radiating from the corner.",
+  "paths": [
+    { "type": "path", "d": "M7.5 5V24.5H27", "strokeWidth": 4.8 },
+    { "type": "circle", "cx": 14.6, "cy": 17.4, "r": 3.1 },
+    { "type": "path", "d": "M23.36 19.95A16.5 16.5 0 0 0 12.05 8.64", "strokeWidth": 3.6 }
+  ]
+}

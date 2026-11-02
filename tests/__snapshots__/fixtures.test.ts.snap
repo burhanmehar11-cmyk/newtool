@@ -1,0 +1,3 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`demo fixtures are clearly fictional and safe > is deterministic (stable count and featured names) 1`] = `"Oak Hollow HVAC"`;
