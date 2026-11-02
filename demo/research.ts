@@ -248,12 +248,8 @@ function criteria(b: Business, offer: OfferType): Criterion[] {
   }
 }
 
-export const offerTypeLabels: Record<OfferType, string> = {
-  web_design: "Website design",
-  local_seo: "Local SEO",
-  ai_automation: "AI automation",
-  marketing: "Digital marketing",
-};
+import { offerTypeLabels } from "@/lib/domain/labels";
+export { offerTypeLabels };
 
 export function researchBusiness(b: Business, offer: OfferType, generatedAt: string): OpportunityBrief {
   const { facts, unknowns } = collectFacts(b);

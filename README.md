@@ -11,7 +11,7 @@ Locentio is a local prospecting and outreach workspace for agencies: discover bu
 | Milestone | Scope | Status |
 | --- | --- | --- |
 | **M1** | Brand, landing page, interactive demo on fixture data | **Complete. Not production-ready.** |
-| M2 | Accounts, persistence, real discovery, research, Gmail sending, reply sync | Not started |
+| M2 | Accounts, persistence, real discovery, research, Gmail sending, reply sync | **In progress.** Step 1 (accounts and workspaces) built; not yet verified against a live Supabase project |
 | M3 | Billing, team roles, public API, webhooks, MCP | Not started |
 
 ### What is simulated in M1
@@ -68,6 +68,18 @@ BASE_URL=http://localhost:3000 npm run test:e2e
 
 Screenshots land in `./screenshots` (git-ignored) at 390, 768 and 1440px.
 
+## M2 setup: accounts and workspaces (Supabase)
+
+The product lives at `/app` behind sign-in. Without Supabase settings it shows a clear "not configured" state; the demo keeps working.
+
+1. Create a Supabase project.
+2. Apply the schema: paste `database/migrations/0001_foundation.sql` into the SQL editor and run it (or use the Supabase CLI with this folder as your migrations).
+3. In **Authentication → URL configuration**, set the Site URL to your domain and add `https://YOUR-DOMAIN/auth/callback` as a redirect URL. Keep email confirmation on.
+4. Set environment variables (locally in `.env.local`, and in Vercel): `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SITE_URL`, `BETA_ALLOWED_EMAILS`. Redeploy after changing them.
+5. Sign up at `/sign-up` with an allowlisted email, confirm it, then complete workspace setup.
+
+Database tests run the real migration in PGlite (Postgres in WASM) with a Supabase auth shim: `npm test` covers tenant isolation, anonymous lockout, ledger and secret protection, idempotent usage reservations, quota refusal and integrity constraints.
+
 ## Deploying to Vercel
 
 `vercel.json` pins the framework to Next.js, so the project's Framework Preset can't fall back to "Other" (which serves Vercel's 404 page for every route). In the Vercel project settings, also check:
@@ -85,7 +97,10 @@ Next.js 16 (App Router, Cache Components, Turbopack) · React 19 · TypeScript �
 ## Project layout
 
 ```
-app/                     Routes. (marketing) = landing, sign-in, legal drafts, brand guide; demo/ = app
+app/                     Routes. (marketing) = landing, auth pages, legal drafts, brand guide; demo/ = demo app; app/ = live product (M2)
+database/migrations      SQL schema with row-level security
+proxy.ts                 Session refresh and /app gate (Next 16 "proxy", formerly middleware)
+server/                  Server-only: env, Supabase client, auth (data access layer), services, actions
 components/ui            Primitives (button, dialog/sheet, tabs, fields, toast…)
 components/marketing     Landing page sections
 components/product       Shared product UI (Opportunity Brief, evidence, badges)
@@ -108,9 +123,9 @@ docs/                    PRODUCT, BRAND, ARCHITECTURE, MILESTONES, DECISIONS, HA
 - [Decisions](docs/DECISIONS.md): choices and assumptions
 - [Handoff](docs/HANDOFF.md): exact state and next steps
 
-## Known limitations (M1)
+## Known limitations
 
-- Demo only: no accounts, database, providers, email or billing.
+- No discovery, verification, AI, email or billing provider is connected yet (M2 steps 2–6).
 - Legal pages are drafts marked for owner and legal review.
 - Pricing shows "Private beta pricing coming soon". No prices are set.
 - Demo data is per-browser and can be reset at any time.

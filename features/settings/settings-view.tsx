@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useForm, useWatch } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { CircleDashed, FlaskConical, Mail, ShieldBan, Trash2 } from "lucide-react";
@@ -15,11 +15,10 @@ import { useToast } from "@/components/ui/toast";
 import { demo, useDemo } from "@/demo/store";
 import { usageSummary } from "@/demo/selectors";
 import { emptyOfferTemplate } from "@/demo/seed";
-import { offerProfileSchema, type OfferProfileInput } from "@/lib/domain/schemas";
 import { usageUnitDefinitions } from "@/config/plans";
 import { features, availabilityLabel } from "@/config/milestone";
 import { formatDateTime } from "@/lib/utils";
-import { OfferFields } from "./offer-fields";
+import { OfferProfileForm } from "./offer-profile-form";
 
 const TABS = ["organization", "offer", "sending", "suppression", "usage", "connections"] as const;
 type Tab = (typeof TABS)[number];
@@ -124,35 +123,17 @@ function OrganizationTab() {
 
 function OfferTab() {
   const s = useDemo();
-  const { push } = useToast();
-  const form = useForm<OfferProfileInput>({ resolver: zodResolver(offerProfileSchema), values: s.offer ?? emptyOfferTemplate });
-  const watchedType = useWatch({ control: form.control, name: "serviceType" });
-  const typeChanged = s.offer && watchedType !== s.offer.serviceType;
   return (
     <SectionCard title="Offer profile" description="Used to score Opportunity Briefs and write drafts. Changing the offer type marks existing briefs as outdated.">
-      <form
-        onSubmit={form.handleSubmit((v) => {
+      <OfferProfileForm
+        key={s.offer ? "saved" : "new"}
+        defaultValues={s.offer ?? emptyOfferTemplate}
+        savedType={s.offer?.serviceType ?? null}
+        onSave={async (v) => {
           demo.updateOffer(v);
-          push({ tone: "success", title: "Offer profile saved" });
-        })}
-        className="space-y-5"
-        noValidate
-      >
-        <OfferFields
-          register={form.register}
-          errors={form.formState.errors}
-          fields={["serviceType", "service", "targetCustomer", "valueProp", "tone", "senderName", "senderTitle", "companyName", "businessAddress", "bookingLink"]}
-        />
-        {typeChanged ? <Callout tone="warn">Briefs already generated will be marked outdated until you research again.</Callout> : null}
-        <div className="flex gap-2">
-          <Button type="submit" disabled={!form.formState.isDirty}>
-            Save offer profile
-          </Button>
-          <Button type="button" variant="secondary" disabled={!form.formState.isDirty} onClick={() => form.reset()}>
-            Discard changes
-          </Button>
-        </div>
-      </form>
+          return { ok: true };
+        }}
+      />
     </SectionCard>
   );
 }

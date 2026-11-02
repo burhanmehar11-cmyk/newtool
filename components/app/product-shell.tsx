@@ -1,0 +1,101 @@
+"use client";
+
+import * as React from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { LayoutDashboard, LogOut, Menu, Settings } from "lucide-react";
+import { Logo } from "@/components/brand/logo";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogTrigger, SheetCloseButton, SheetContent } from "@/components/ui/sheet";
+import { cn } from "@/lib/utils";
+import { signOutAction } from "@/server/actions/auth";
+
+/**
+ * Shell for the live product. Only shipped areas appear in the navigation;
+ * Discover, Leads, Campaigns and Inbox are added as each M2 step lands.
+ */
+const nav = [
+  { href: "/app", label: "Overview", icon: LayoutDashboard },
+  { href: "/app/settings", label: "Settings", icon: Settings },
+] as const;
+
+export function ProductShell({ workspaceSlot, children }: { workspaceSlot: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <div className="min-h-dvh bg-canvas lg:pl-[240px]">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[240px] flex-col border-r border-line bg-surface lg:flex" aria-label="Workspace navigation">
+        <Sidebar workspaceSlot={workspaceSlot} />
+      </aside>
+      <MobileBar workspaceSlot={workspaceSlot} />
+      <main id="main" className="mx-auto w-full max-w-[1280px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+        {children}
+      </main>
+    </div>
+  );
+}
+
+function Sidebar({ workspaceSlot, onNavigate }: { workspaceSlot: React.ReactNode; onNavigate?: () => void }) {
+  const pathname = usePathname();
+  return (
+    <>
+      <div className="flex h-16 items-center gap-2 px-5">
+        <Link href="/app" className="rounded-md" aria-label="Locentio workspace home" onClick={onNavigate}>
+          <Logo />
+        </Link>
+        <span className="rounded-md bg-mint-soft px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-green">Beta</span>
+      </div>
+      <div className="mx-3 mb-3">{workspaceSlot}</div>
+      <nav className="flex-1 space-y-0.5 px-3" aria-label="Product">
+        {nav.map(({ href, label, icon: Icon }) => {
+          const active = href === "/app" ? pathname === "/app" : pathname.startsWith(href);
+          return (
+            <Link
+              key={href}
+              href={href}
+              onClick={onNavigate}
+              aria-current={active ? "page" : undefined}
+              className={cn(
+                "flex items-center gap-3 rounded-[10px] px-3 py-2 text-sm font-medium transition-colors duration-200",
+                active ? "bg-ink text-white" : "text-slate hover:bg-ink/[0.04] hover:text-ink",
+              )}
+            >
+              <Icon aria-hidden className="size-[18px]" />
+              {label}
+            </Link>
+          );
+        })}
+      </nav>
+      <div className="border-t border-line p-4">
+        <form action={signOutAction}>
+          <Button type="submit" variant="ghost" size="sm" className="w-full justify-start text-slate">
+            <LogOut aria-hidden /> Sign out
+          </Button>
+        </form>
+      </div>
+    </>
+  );
+}
+
+function MobileBar({ workspaceSlot }: { workspaceSlot: React.ReactNode }) {
+  const [open, setOpen] = React.useState(false);
+  React.useLayoutEffect(() => () => setOpen(false), []);
+  return (
+    <div className="flex h-14 items-center gap-3 border-b border-line bg-surface px-4 lg:hidden">
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogTrigger asChild>
+          <Button variant="ghost" size="icon" aria-label="Open navigation">
+            <Menu aria-hidden className="size-5" />
+          </Button>
+        </DialogTrigger>
+        <SheetContent title="Navigation" side="left" className="max-w-[280px]">
+          <div className="absolute right-3 top-3.5">
+            <SheetCloseButton />
+          </div>
+          <div className="flex h-full flex-col overflow-y-auto">
+            <Sidebar workspaceSlot={workspaceSlot} onNavigate={() => setOpen(false)} />
+          </div>
+        </SheetContent>
+      </Dialog>
+      <Logo />
+    </div>
+  );
+}

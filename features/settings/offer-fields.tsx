@@ -3,7 +3,7 @@
 import type { FieldErrors, UseFormRegister } from "react-hook-form";
 import { FieldError, FieldHint, Input, Label, Select, Textarea } from "@/components/ui/field";
 import type { OfferProfileInput } from "@/lib/domain/schemas";
-import { offerTypeLabels } from "@/demo/research";
+import { offerTypeLabels } from "@/lib/domain/labels";
 
 export type OfferFieldName = keyof OfferProfileInput;
 

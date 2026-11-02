@@ -1,10 +1,10 @@
 # Handoff
 
-_Last updated: 2026-11-02, end of M1._
+_Last updated: 2026-11-02. M1 complete; M2 step 1 built._
 
 ## State
 
-M1 is complete on branch `claude/compassionate-knuth-hewpfn`. All checks pass:
+Branch `claude/compassionate-knuth-hewpfn`. Checks:
 
 ```bash
 npm run check
@@ -18,26 +18,24 @@ npm run build && npm start
 BASE_URL=http://localhost:3000 npm run test:e2e
 ```
 
-- `npm run check`: lint clean, typecheck clean, 57 unit tests pass, production build succeeds.
-- `npm run test:e2e`: 18 checks, full guided flow, 3 widths, no overflow, no console errors, no external requests.
+- Lint and typecheck clean; 84 unit and database tests pass; production build succeeds; the smoke test passes (18 checks, 3 widths, no overflow, no console errors, no external requests).
+- Brand renamed to Locentio. Landing page has scroll effects (`components/marketing/scroll-effects.tsx`, styles at the end of `app/globals.css`).
 
-## Where things are
+## M2 step 1: what exists
 
-- Landing: `app/(marketing)/page.tsx` → `components/marketing/*`
-- Demo shell: `components/app/demo-shell.tsx`; screens: `features/*`; routes: `app/demo/*`
-- Demo logic: `demo/store.ts` (actions), `demo/selectors.ts` (eligibility, usage, metrics), `demo/seed.ts`
-- Contracts for M2: `lib/domain/*`, `server/providers/*`
-- Flags: `config/milestone.ts` (`SIGNUP_OPEN`, `PRICING_LIVE`, feature availability), `config/plans.ts`, `config/brand.ts`
+- Schema and RLS: `database/migrations/0001_foundation.sql`. Tests: `tests/db/`.
+- Auth: `server/supabase/server.ts`, `proxy.ts`, `server/auth.ts` (DAL), `server/actions/auth.ts`, `app/auth/callback/route.ts`, pages under `app/(marketing)/{sign-in,sign-up,forgot-password,reset-password}`.
+- Product: `app/app/*` (overview, onboarding, settings), `server/services/workspaces.ts`, `server/actions/workspace.ts`, `components/app/product-shell.tsx`.
+- Shared UI between demo and product: `features/onboarding/onboarding-wizard.tsx`, `features/settings/offer-profile-form.tsx`, `features/settings/offer-fields.tsx`.
+- Lint rule: production paths cannot import `demo/*` (`eslint.config.mjs`).
 
-## Known issues and notes
+## Not verified
 
-- Screenshots in the smoke test capture the menu after a 400ms wait; animations are 160–240ms.
-- `next dev` rewrites `AGENTS.md` (managed Next.js block). Committing it keeps the tree clean.
-- No Lighthouse or Core Web Vitals measurements have been taken yet.
+Nothing has run against a live Supabase project yet. When credentials arrive: apply the migration, set env vars, sign up with an allowlisted email, confirm, onboard, then sign in as a second user and confirm the first workspace is invisible.
 
-## Next action (M2, step 1)
+## Next action (M2 step 2)
 
-1. Owner provides: Supabase project, Anthropic key, Google OAuth client, choice of discovery and verification providers, job-runner account.
-2. Add Supabase Auth and the `profiles`, `workspaces`, `memberships` migrations with RLS, then protected `app/(app)` routes reusing `features/*` through a data-source boundary.
-3. Keep the existing lint rule (`eslint.config.mjs`) that forbids importing `demo/*` from `server/`, `lib/`, `config/`, `jobs/` and `database/`; extend it to the new `app/(app)` routes.
-4. Flip `SIGNUP_OPEN` only when trial entitlements work.
+1. Owner picks a discovery provider; check its current docs, terms, storable fields, attribution and pricing units, then implement `BusinessDiscoveryProvider`.
+2. Durable job (Trigger.dev or equivalent, after a host-compatibility check) that reserves usage, pages through results, upserts `businesses`, and settles usage.
+3. `/app/discover` and `/app/leads` reusing the demo screens through a data-source boundary.
+4. Add a real-Postgres CI job for concurrency tests.

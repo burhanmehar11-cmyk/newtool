@@ -26,3 +26,17 @@ Reversible choices made without asking, with the reason. Revisit any of them fre
 - Which discovery and verification providers to evaluate first (budget, markets).
 - Target markets for outreach (affects sender identity, address and opt-out requirements).
 - Support email and legal entity details for the footer and legal pages.
+
+## M2 decisions
+
+| # | Decision | Why |
+| --- | --- | --- |
+| 16 | Sign-up gated by `BETA_ALLOWED_EMAILS` (emails or @domains); `SIGNUP_OPEN` stays false | Private beta without trial entitlements; the marketing CTA stays "Explore demo". |
+| 17 | Businesses, contacts and evidence are stored **per workspace**, not shared | Provider terms may restrict sharing and retention, and tenants must never see each other's data. Chains are not merged on a shared domain. |
+| 18 | RPC-callable functions (`create_workspace`, `reserve_usage`, `settle_usage`) live in `public`, helpers in `app`; EXECUTE is revoked from `public`/`anon` | Supabase's API exposes only `public`; Postgres grants EXECUTE to everyone by default. |
+| 19 | Usage ledger, allowances, audit events and job runs are read-only to members; writes go through SECURITY DEFINER functions or the service role | Clients can't edit what they're charged. |
+| 20 | Mailbox tokens live in `sending_account_secrets` with RLS on and no policies | Only the service role can read them. |
+| 21 | DAL uses `auth.getUser()` (server-verified); `proxy.ts` uses `getClaims()` only to refresh and gate | Cookie contents alone are never trusted for identity. |
+| 22 | Active workspace is an httpOnly cookie, always re-validated against memberships | Switching is cheap; a forged cookie gives nothing. |
+| 23 | Database tests use PGlite with a Supabase auth shim | Real Postgres and RLS semantics without a hosted project in CI. Concurrency still needs a real-Postgres job. |
+| 24 | Brand renamed to **Locentio** (owner request) | Still provisional; trademark and domain not checked. |

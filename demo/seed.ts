@@ -24,18 +24,7 @@ export const sampleOffer: OfferProfile = {
   bookingLink: "https://calendar.example/northline/intro",
 };
 
-export const emptyOfferTemplate: OfferProfile = {
-  serviceType: "web_design",
-  service: "",
-  targetCustomer: "",
-  valueProp: "",
-  tone: "friendly",
-  senderName: "",
-  senderTitle: "",
-  companyName: "",
-  businessAddress: "",
-  bookingLink: "",
-};
+export { emptyOfferProfile as emptyOfferTemplate } from "@/lib/domain/defaults";
 
 function base(): DemoState {
   return {
