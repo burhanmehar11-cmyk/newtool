@@ -44,9 +44,9 @@ export function PageHero({
       {stats?.length ? (
         <dl className={cn("relative grid border-t border-line", stats.length >= 4 ? "grid-cols-2 lg:grid-cols-4" : stats.length === 3 ? "grid-cols-1 sm:grid-cols-3" : "grid-cols-2")}>
           {stats.map((s, i) => (
-            <div key={s.label} className={cn("px-6 py-4 sm:px-7", i > 0 && "border-l border-line", stats.length >= 4 && i === 2 && "max-lg:border-l-0", stats.length >= 4 && i >= 2 && "max-lg:border-t")}>
+            <div key={s.label} className={cn("min-w-0 px-6 py-4 sm:px-7", i > 0 && "border-l border-line", stats.length >= 4 && i === 2 && "max-lg:border-l-0", stats.length >= 4 && i >= 2 && "max-lg:border-t")}>
               <dt className="text-xs font-medium text-slate">{s.label}</dt>
-              <dd className="mt-0.5 font-display text-2xl font-semibold tabular-nums text-ink">{s.value}</dd>
+              <dd className="mt-0.5 truncate font-display text-2xl font-semibold tabular-nums text-ink" title={s.value}>{s.value}</dd>
               {s.hint ? <dd className="text-xs text-slate">{s.hint}</dd> : null}
             </div>
           ))}

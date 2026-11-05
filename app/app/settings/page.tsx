@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { CircleCheck, CircleDashed } from "lucide-react";
-import { PageHeader, SectionCard } from "@/components/app/page-header";
+import { CircleCheck, CircleDashed, Settings as SettingsIcon } from "lucide-react";
+import { SectionCard } from "@/components/app/page-header";
+import { PageHero } from "@/components/app/page-hero";
 import { PageLoading } from "@/features/product/page-loading";
 import { ProductOfferForm, RenameWorkspaceForm } from "@/features/product/product-forms";
 import { emptyOfferProfile } from "@/lib/domain/defaults";
@@ -27,9 +28,21 @@ async function Settings({ searchParams }: { searchParams: PageProps<"/app/settin
   await searchParams;
   const [offer, mailboxes] = await Promise.all([getOfferProfile(workspace), getMailboxes()]);
   const providers = getProviderStatus();
+  const connected = mailboxes.filter((m) => m.status === "connected").length;
   return (
     <div>
-      <PageHeader title="Settings" description="Workspace, offer profile and connection status." />
+      <PageHero
+        icon={SettingsIcon}
+        eyebrow="Workspace"
+        title="Settings"
+        description="Your workspace, the offer Locenti writes about, appearance and connection status."
+        stats={[
+          { label: "Workspace", value: workspace.name, hint: `Your role: ${workspace.role}` },
+          { label: "Offer profile", value: offer?.serviceType ? "Set" : "Not set", hint: offer?.serviceType ? "used for research and drafts" : "add it to write better emails" },
+          { label: "Mailboxes connected", value: String(connected) },
+          { label: "Connections", value: `${providers.filter((p) => p.configured).length} of ${providers.length}`, hint: "configured on this deployment" },
+        ]}
+      />
       <div className="grid gap-5 xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
         <div className="space-y-5">
           <SectionCard title="Workspace">
@@ -52,7 +65,7 @@ async function Settings({ searchParams }: { searchParams: PageProps<"/app/settin
           </SectionCard>
           <SectionCard title="Sending mailboxes" description="Gmail accounts campaigns send from.">
             <p className="text-sm text-slate">
-              {mailboxes.filter((m) => m.status === "connected").length} connected. <Link href="/app/mailboxes">Manage mailboxes</Link>
+              {connected} connected. <Link href="/app/mailboxes">Manage mailboxes</Link>
             </p>
           </SectionCard>
           <SectionCard title="Connections" description="Provider configuration for this deployment. Values are never shown." bodyClassName="p-0">

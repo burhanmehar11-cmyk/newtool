@@ -123,7 +123,7 @@ function MailboxItem({ m, canEdit }: { m: MailboxRow; canEdit: boolean }) {
             <Label htmlFor={`cap-${m.id}`}>Daily limit</Label>
             <Input id={`cap-${m.id}`} type="number" min={1} max={200} value={cap} onChange={(e) => setCap(e.target.value)} />
           </div>
-          <FieldHint className="sm:col-span-2">Keep new mailboxes low (10–25 a day) and raise slowly. Campaigns (the next step) will never send more than this per day from this address.</FieldHint>
+          <FieldHint className="sm:col-span-2">Keep new mailboxes low (10–25 a day) and raise slowly. Campaigns never send more than this per day from this address.</FieldHint>
         </div>
       ) : null}
 

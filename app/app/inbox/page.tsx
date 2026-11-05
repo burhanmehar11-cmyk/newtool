@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import { Inbox as InboxIcon } from "lucide-react";
-import { PageHeader } from "@/components/app/page-header";
+import { PageHero } from "@/components/app/page-hero";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/misc";
@@ -33,10 +33,27 @@ async function Inbox({ searchParams }: { searchParams: PageProps<"/app/inbox">["
   const sp = await searchParams;
   const { threads, counts, filter, trackingOn } = await getInbox(typeof sp.filter === "string" ? sp.filter : "all");
   const total = counts.reduce((a, c) => a + c.n, 0);
+  const count = (k: string) => counts.find((c) => c.classification === k)?.n ?? 0;
   const tabs = [["all", "All", total] as const, ...Object.entries(kindMeta).map(([k, m]) => [k, m.label, counts.find((c) => c.classification === k)?.n ?? 0] as const)];
   return (
     <div>
-      <PageHeader title="Inbox" description="Replies to your campaign emails, sorted for you. Labels are suggestions; change any of them." actions={trackingOn ? <CheckRepliesButton /> : null} />
+      <PageHero
+        icon={InboxIcon}
+        eyebrow="Replies"
+        title="Inbox"
+        description="Replies to your campaign emails, sorted for you. Labels are suggestions; change any of them. Someone who replies, bounces or opts out gets no more emails from that campaign."
+        actions={trackingOn ? <CheckRepliesButton /> : null}
+        stats={
+          trackingOn
+            ? [
+                { label: "Replies", value: String(total) },
+                { label: "Interested", value: String(count("interested")) },
+                { label: "Needs a look", value: String(count("unclassified")) },
+                { label: "Bounced", value: String(count("bounce")) },
+              ]
+            : undefined
+        }
+      />
       {!trackingOn ? (
         <EmptyState icon={<InboxIcon />} title="Reply tracking is off" action={<Button asChild><Link href="/app/mailboxes">Turn it on</Link></Button>}>
           Turn on reply tracking for your mailbox so Locenti can read replies to campaign emails, sort them, and stop emailing people who say no or whose address bounced. It only reads threads that Locenti started.

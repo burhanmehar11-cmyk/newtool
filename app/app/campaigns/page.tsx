@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import { Plus, Send } from "lucide-react";
-import { PageHeader, SectionCard } from "@/components/app/page-header";
+import { SectionCard } from "@/components/app/page-header";
+import { PageHero, StepGuide } from "@/components/app/page-hero";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/misc";
@@ -28,11 +29,22 @@ async function Campaigns() {
   const { workspace } = await requireWorkspace("/app/campaigns");
   const { campaigns, suppressions } = await getCampaignsOverview();
   const canManage = ["owner", "admin"].includes(workspace.role);
+  const sum = (k: "sent" | "replied" | "interested") => campaigns.reduce((a, c) => a + Number(c[k] ?? 0), 0);
+  const sent = sum("sent");
+  const replied = sum("replied");
   return (
     <div>
-      <PageHeader
+      <PageHero
+        icon={Send}
+        eyebrow="Outreach"
         title="Campaigns"
-        description="Personal first emails to researched leads, sent from your Gmail after you approve them."
+        description="Personal first emails to your leads, sent from your Gmail only after you approve them. Sending is paced, stays inside your sending window, and stops the moment someone replies."
+        stats={[
+          { label: "Running", value: String(campaigns.filter((c) => c.status === "running").length), hint: `${campaigns.length} campaign${campaigns.length === 1 ? "" : "s"} in total` },
+          { label: "Emails sent", value: sent.toLocaleString("en-US") },
+          { label: "Replies", value: replied.toLocaleString("en-US"), hint: sent ? `${((replied / sent) * 100).toFixed(1)}% reply rate` : undefined },
+          { label: "Interested", value: sum("interested").toLocaleString("en-US") },
+        ]}
         actions={
           canManage ? (
             <Button asChild>
@@ -43,6 +55,17 @@ async function Campaigns() {
           ) : null
         }
       />
+      {!campaigns.length ? (
+        <div className="mb-5">
+          <StepGuide
+            steps={[
+              { title: "Pick your leads", text: "Leads with a public email can join a campaign." },
+              { title: "Review every email", text: "Each lead gets a first email written from its website. Edit any of them." },
+              { title: "Approve and send", text: "Emails go out from your Gmail, paced and inside your sending window." },
+            ]}
+          />
+        </div>
+      ) : null}
       <div className="grid gap-5 xl:grid-cols-[minmax(0,8fr)_minmax(0,4fr)]">
         {campaigns.length ? (
           <div className="card overflow-hidden">

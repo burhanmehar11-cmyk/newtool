@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
-import { Search } from "lucide-react";
-import { PageHeader, SectionCard } from "@/components/app/page-header";
+import { MapPinned, Search } from "lucide-react";
+import { SectionCard } from "@/components/app/page-header";
+import { PageHero, StepGuide } from "@/components/app/page-hero";
 import { Badge } from "@/components/ui/badge";
 import { Callout, EmptyState } from "@/components/ui/misc";
 import { PageLoading } from "@/features/product/page-loading";
@@ -33,10 +34,32 @@ async function Discover({ searchParams }: { searchParams: PageProps<"/app/discov
   const [usage, recent, search, google] = await Promise.all([getUsage(workspace), getRecentSearches(), jobId ? getSearch(jobId) : Promise.resolve(null), googleStatus()]);
   const discovery = usage.find((u) => u.kind === "discovery")!;
   const available = Math.max(0, discovery.allowance - discovery.used - discovery.reserved);
+  const found = recent.reduce((a, j) => a + (j.status === "completed" || j.status === "partial" ? j.charged_units : 0), 0);
 
   return (
     <div>
-      <PageHeader title="Discover" description="Find local businesses on Google Maps or OpenStreetMap, then save the ones worth researching. Nothing is contacted from here." />
+      <PageHero
+        icon={MapPinned}
+        eyebrow="Find leads"
+        title="Discover"
+        description="Search Google Maps for local businesses by type, country, state and city. Public emails are picked up from each website, and you save the ones worth contacting. Nothing is sent from here."
+        stats={[
+          { label: "Google Maps searches left today", value: google.configured ? (google.remainingToday == null ? "—" : String(google.remainingToday)) : "Not set up" },
+          { label: "Discovery units available", value: available.toLocaleString("en-US") },
+          { label: "Businesses found recently", value: found.toLocaleString("en-US"), hint: recent.length ? `in your last ${recent.length} search${recent.length === 1 ? "" : "es"}` : "no searches yet" },
+        ]}
+      />
+      {!recent.length && !jobId ? (
+        <div className="mb-5">
+          <StepGuide
+            steps={[
+              { title: "Describe the business", text: "Type any business type, like dentists, roofers or yoga studios." },
+              { title: "Pick the area", text: "Choose a country, then a state and a city or area." },
+              { title: "Save the good ones", text: "Up to 20 businesses per search, with website, rating and public email." },
+            ]}
+          />
+        </div>
+      ) : null}
       <DiscoverPanel
         available={available}
         google={google}

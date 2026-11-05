@@ -1,6 +1,6 @@
 # Handoff
 
-_Last updated: 2026-11-05. M1 complete; M2 steps 1–3 built, plus Google Maps search: Google + email/password sign-in, workspaces, free OpenStreetMap search, saved leads, website research with Opportunity Briefs, free DNS email check. Landing page has the 5-step "How it works" flow._
+_Last updated: 2026-11-05. M1 and M2 complete in code (see `docs/MILESTONES.md` for the live checks only the owner can run). Locenti finds local businesses on Google Maps, reads their websites for public emails and opportunities, writes personal first emails (built-in Gemini or your own agent over MCP), sends approved campaigns from Gmail, and sorts replies. Next: M3._
 
 ## State
 
@@ -18,7 +18,7 @@ npm run build && npm start
 BASE_URL=http://localhost:3000 npm run test:e2e
 ```
 
-- Lint and typecheck clean; 192 unit and database tests pass; production build succeeds; the smoke test passes (3 widths, no overflow, no console errors, no external requests).
+- Lint and typecheck clean; 273 unit and database tests pass (including the sending pass in `tests/db/dispatch.test.ts`); production build succeeds; the smoke test passes (3 widths, no overflow, no console errors, no external requests).
 - Brand renamed to Locenti. Landing page has scroll effects (`components/marketing/scroll-effects.tsx`, styles at the end of `app/globals.css`).
 
 ## M2 step 1: what exists
@@ -88,13 +88,11 @@ Before launch: a dedicated least-privilege database role for the app; real-Postg
 
 ## Landing page
 
-`components/marketing/audience-workflow.tsx` → `HowItWorks`: 5 steps (connect mailbox, search Google Maps, research and personalise, approve and launch, handle replies). Each step's badge comes from `config/milestone.ts`, so flipping a feature's `availability` updates the page.
+Order: hero with self-playing product preview (`live-demo.tsx`, ~13 s loop, pauses off-screen), sample campaign card (`proof-band.tsx` + `drafting-card.tsx`; example figures from a fictional campaign, labelled), audience strip, 5-step How it works (`audience-workflow.tsx`), AI section, product tour, reply-handling diagram (`reply-flow.tsx`), capabilities, use cases, pricing, FAQ, final CTA. App pages share `components/app/page-hero.tsx` (header with live stats) and `StepGuide`.
 
 ## Next actions
 
-1. **Google Maps** is live in production (owner confirmed 2026-11-05). Make sure the key pasted in chat during development was rotated.
-2. **Gmail live check:** owner completes setup guide Part G and runs migration 0005, then Connect Gmail and send the test email.
-3. **Campaigns live check:** owner runs migrations 0006–0007, then creates a small campaign to their own second address and approves it with Locenti open (scheduler optional, skipped for now).
-4. **M2 step 4: evidence-based drafts.** Needs `ANTHROPIC_API_KEY`; drafts must cite brief facts only.
-5. Mailbox verification provider (optional; the free DNS check stays as the floor).
-6. Add a real-Postgres CI job for concurrency tests.
+1. **Owner live checks** (listed at the end of the M2 section in `docs/MILESTONES.md`): a small real campaign, reply tracking, optional Gemini key, Google app verification, rotating the Places key.
+2. **M3** (see `docs/MILESTONES.md`): team invites and roles, follow-up emails, public API and webhooks, real-Postgres CI job; billing only after the owner approves prices and a provider.
+3. Decide when to open sign-up (`BETA_ALLOWED_EMAILS` keeps it invite-only; the Google Maps and Gemini allowances are shared).
+4. Remove the old demo code under `demo/` and the `features/*-view.tsx` demo views once nothing links to them (the marketing page still uses `demo/fixtures` for its fictional sample data).
