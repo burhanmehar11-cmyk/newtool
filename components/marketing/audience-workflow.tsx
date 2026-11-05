@@ -85,7 +85,7 @@ const steps: { icon: React.ComponentType<{ className?: string }>; title: string;
   {
     icon: Mail,
     title: "Connect your mailbox",
-    copy: "Link the Gmail account you already send from. You set the daily limit and sending hours; messages go out from your own address.",
+    copy: "Link the Gmail account you already send from, with send-only access: Locentio can't read your inbox. You set the daily limit, and messages go out from your own address.",
     status: ["gmail"],
   },
   {

@@ -19,7 +19,7 @@ const faqs: { q: string; a: React.ReactNode }[] = [
   },
   {
     q: "Do I connect my own mailbox?",
-    a: "Yes. The private beta starts with Gmail, connected separately from your sign-in with the narrowest access needed. Daily sending caps and business-hours schedules apply per mailbox. The demo has no mailbox and never sends anything.",
+    a: "Yes. The private beta starts with Gmail, connected separately from your sign-in with send-only access: Locentio can send from your address but can't read your inbox. Each mailbox has its own daily limit. Approved campaigns are next; business-hours schedules come with them. The demo has no mailbox and never sends anything.",
   },
   {
     q: "How is usage charged?",

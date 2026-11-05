@@ -56,13 +56,21 @@ Before launch: a dedicated least-privilege database role for the app; real-Postg
 - Storage rule (DECISIONS #43): Google results are never stored. Saved Google leads hold the place ID and website only.
 - Verified live on 2026-11-05 with a real key: search (20 Austin dentists, rating filter), save 2 leads, leads list, live details on the lead page, saved-search view, 390px layout. Website research on those leads wasn't run here (this sandbox blocks outbound website fetches).
 
+## Gmail connection (M2 step 5a)
+
+- Helpers `lib/gmail/oauth.ts` (consent URL, scope check) and `lib/gmail/mime.ts` (RFC 5322 message, header-injection safe, base64url raw); `server/gmail/crypto.ts` (AES-256-GCM), `server/gmail/google.ts` (token exchange/refresh, `users.messages.send`, revoke); store `server/mailbox-store.ts`; service `server/services/mailboxes.ts`; routes `app/api/gmail/start` and `app/api/gmail/callback`; UI `features/settings/mailboxes-card.tsx` (Settings → Sending mailboxes); migration `0005_mailboxes.sql`.
+- Verified locally: start redirect parameters, signed-out redirect, forged/denied callbacks, settings save, unreadable token → "Needs reconnecting", disconnect deletes the token, 390px layout. **Not verified:** the real Google consent, token exchange and Gmail send (needs the deployed app with Part G done). First live check: Connect Gmail → Send test email to myself.
+- Logo for Google's Branding page: `public/brand/locentio-logo-120.png`.
+
 ## Landing page
 
 `components/marketing/audience-workflow.tsx` → `HowItWorks`: 5 steps (connect mailbox, search Google Maps, research and personalise, approve and launch, handle replies). Each step's badge comes from `config/milestone.ts`, so flipping a feature's `availability` updates the page.
 
 ## Next actions
 
-1. **Google Maps in production:** owner follows `docs/GOOGLE_CLOUD_SETUP.md` Part E3 (billing linked, Places API (New), per-day quota 30, restricted key in Vercel, migration 0004). Rotate the key that was pasted in chat during development.
-2. **M2 step 4: evidence-based drafts.** Needs `ANTHROPIC_API_KEY`; drafts must cite brief facts only.
-3. Mailbox verification provider (optional; the free DNS check stays as the floor).
-4. Add a real-Postgres CI job for concurrency tests.
+1. **Google Maps** is live in production (owner confirmed 2026-11-05). Make sure the key pasted in chat during development was rotated.
+2. **Gmail live check:** owner completes setup guide Part G and runs migration 0005, then Connect Gmail and send the test email.
+3. **M2 step 5b: approved campaigns** (recipients + messages approval, suppression, unsubscribe, pacing via Vercel Cron).
+4. **M2 step 4: evidence-based drafts.** Needs `ANTHROPIC_API_KEY`; drafts must cite brief facts only.
+5. Mailbox verification provider (optional; the free DNS check stays as the floor).
+6. Add a real-Postgres CI job for concurrency tests.

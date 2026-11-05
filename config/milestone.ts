@@ -26,7 +26,7 @@ export const features = {
   opportunityBrief: { label: "Opportunity Briefs from website research", availability: "beta", target: "M2" },
   drafts: { label: "Evidence-based drafts", availability: "demo", target: "M2" },
   sequences: { label: "Sequences with approval", availability: "demo", target: "M2" },
-  gmail: { label: "Gmail sending", availability: "planned", target: "M2" },
+  gmail: { label: "Gmail connection (send-only)", availability: "beta", target: "M2" },
   replySync: { label: "Reply sync and classification", availability: "demo", target: "M2" },
   csv: { label: "CSV import and export", availability: "demo", target: "M2" },
   usage: { label: "Usage ledger", availability: "demo", target: "M2" },

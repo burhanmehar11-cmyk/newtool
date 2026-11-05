@@ -92,7 +92,7 @@ Google calls this **Google Auth Platform** (older screens say **OAuth consent sc
 3. When asked which environments to connect, keep **Production** and **Preview** (and **Development** if offered). Vercel adds `DATABASE_URL` and related settings automatically.
 4. Open the database's **Open in Neon** (or **Neon Console**) link → **SQL Editor**.
 5. In another tab, open GitHub → **burhanmehar11-cmyk/newtool** → branch `claude/compassionate-knuth-hewpfn` → `database/migrations/0000_auth.sql` → **Copy raw file** (two-squares icon). Paste into the SQL Editor → **Run**.
-6. Clear the editor. Do the same, one file at a time, with `database/migrations/0001_foundation.sql` → **Run**, then `0002_password_and_discovery.sql` → **Run**, then `0003_research.sql` → **Run**, then `0004_google_places.sql` → **Run**.
+6. Clear the editor. Do the same, one file at a time, with `database/migrations/0001_foundation.sql` → **Run**, then `0002_password_and_discovery.sql` → **Run**, then `0003_research.sql` → **Run**, then `0004_google_places.sql` → **Run**, then `0005_mailboxes.sql` → **Run**.
    - Already ran some of them earlier? Run only the ones after the last you ran (for example just **0003**). Later files only add things and are safe to run on top.
 7. Check by running:
 
@@ -155,6 +155,24 @@ Google Maps search uses the official **Places API (New)**. Google requires a bil
 6. Run `database/migrations/0004_google_places.sql` in Neon's SQL Editor (adds the daily call counter).
 
 Check: in the app, **Discover** shows a **Google Maps** / **OpenStreetMap** switch and "N left today".
+
+## Part G: Gmail sending (free)
+
+Uses the **same OAuth client** as sign-in. No new credential is needed. Locentio asks for Gmail access only when someone clicks **Connect Gmail**, and only for the `gmail.send` permission (send, not read).
+
+1. **APIs & Services → Library → Gmail API → Enable** (done if you already enabled it).
+2. **Google Auth Platform → Branding** (or "OAuth consent screen"):
+   - App name `Locentio`, user support email, developer contact email.
+   - **App logo (optional):** upload `public/brand/locentio-logo-120.png` from the repository (120×120 PNG). Google may ask for brand verification before it shows a logo to everyone; while the app is in **Testing**, that doesn't block anything. If it asks for verification and you'd rather avoid it, leave the logo empty.
+   - App home page: `https://YOUR-URL`. Privacy policy: `https://YOUR-URL/legal/privacy`. Terms: `https://YOUR-URL/legal/terms`.
+   - Authorised domains: your domain (for example `your-app.vercel.app`).
+3. **Data Access → Add or remove scopes** → search `gmail.send` → tick `https://www.googleapis.com/auth/gmail.send` → **Update** → **Save**. It appears under sensitive scopes. Don't add read or modify scopes.
+4. **Clients → (your existing Web client)** → **Authorized redirect URIs → Add URI** → `https://YOUR-URL/api/gmail/callback` → **Save**. Keep the existing `/api/auth/google/callback` URI.
+5. **Audience → Test users**: add every Gmail address that will be connected for sending. Keep the app in **Testing**; publishing with Gmail access needs Google's verification review.
+6. Neon SQL Editor: run `database/migrations/0005_mailboxes.sql`.
+7. Optional: `TOKEN_ENCRYPTION_KEY` in Vercel (32 random bytes, base64). Without it, the key is derived from `SESSION_SECRET`. Changing either later means mailboxes must be reconnected.
+
+Check: in the app, **Settings → Sending mailboxes → Connect Gmail**. On Google's screen, leave "Send email on your behalf" ticked. You'll see "This app isn't verified" in Testing; choose **Continue**. Then click **Send test email to myself**; it arrives in that inbox.
 
 ## Part F: First sign-in (owner)
 

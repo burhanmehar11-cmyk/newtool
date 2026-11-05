@@ -8,20 +8,27 @@ import { emptyOfferProfile } from "@/lib/domain/defaults";
 import { requireWorkspace } from "@/server/auth";
 import { getOfferProfile } from "@/server/services/workspaces";
 import { getProviderStatus } from "@/server/providers/status";
+import { MailboxesCard } from "@/features/settings/mailboxes-card";
+import { getMailboxes } from "@/server/services/mailboxes";
 
 export const metadata: Metadata = { title: "Settings" };
 
-export default function ProductSettingsPage() {
+export default function ProductSettingsPage({ searchParams }: PageProps<"/app/settings">) {
   return (
     <Suspense fallback={<PageLoading />}>
-      <Settings />
+      <Settings searchParams={searchParams} />
     </Suspense>
   );
 }
 
-async function Settings() {
+async function Settings({ searchParams }: { searchParams: PageProps<"/app/settings">["searchParams"] }) {
   const { user, workspace } = await requireWorkspace("/app/settings");
-  const offer = await getOfferProfile(workspace);
+  const sp = await searchParams;
+  const [offer, mailboxes] = await Promise.all([getOfferProfile(workspace), getMailboxes()]);
+  const notice = {
+    connected: sp.mailbox === "connected" && typeof sp.email === "string" ? sp.email.slice(0, 254) : undefined,
+    error: typeof sp.mailbox_error === "string" ? sp.mailbox_error.slice(0, 40) : undefined,
+  };
   const providers = getProviderStatus();
   return (
     <div>
@@ -43,6 +50,11 @@ async function Settings() {
               </div>
             </dl>
           </SectionCard>
+          <section id="mailboxes" className="scroll-mt-6">
+            <SectionCard title="Sending mailboxes" description="Gmail accounts campaigns send from.">
+              <MailboxesCard mailboxes={mailboxes} canEdit={["owner", "admin"].includes(workspace.role)} notice={notice} />
+            </SectionCard>
+          </section>
           <SectionCard title="Connections" description="Provider configuration for this deployment. Values are never shown." bodyClassName="p-0">
             <ul className="divide-y divide-line">
               {providers.map((p) => (
