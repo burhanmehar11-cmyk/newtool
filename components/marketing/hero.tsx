@@ -1,71 +1,63 @@
 import type * as React from "react";
 import Link from "next/link";
-import { ArrowRight, Search } from "lucide-react";
+import { ArrowRight, MailCheck, MapPinned, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { HeroCanvas } from "./hero-canvas";
-import { heroQuery } from "./sample-data";
+import { LiveDemo } from "./live-demo";
 
 export function Hero() {
   return (
     <section className="on-dark relative overflow-hidden bg-midnight text-white">
-      <div aria-hidden className="grid-dots pointer-events-none absolute inset-0 [mask-image:radial-gradient(ellipse_70%_60%_at_50%_0%,black,transparent)]" />
-      <div aria-hidden data-parallax="-0.35" className="pointer-events-none absolute inset-x-0 -top-40 flex justify-center">
-        <div className="h-[480px] w-[900px] rounded-full bg-mint/[0.08] blur-3xl" />
-      </div>
-      <div className="container-page relative pb-10 pt-16 sm:pt-20 lg:pt-24">
-        <div className="max-w-[1040px]" data-stagger="90">
-          <p data-reveal className="eyebrow text-mint">Local prospecting, with context</p>
-          <h1 className="display-hero mt-5 text-white">
-            <span data-reveal className="block">
-              Find local prospects.
+      <div aria-hidden className="hero-aurora pointer-events-none absolute -inset-[10%]" />
+      <div aria-hidden className="grid-dots pointer-events-none absolute inset-0 [mask-image:radial-gradient(ellipse_70%_55%_at_50%_0%,black,transparent)]" />
+
+      <div className="container-page relative pb-12 pt-16 text-center sm:pt-20 lg:pt-24">
+        <div className="mx-auto max-w-[980px]" data-stagger="90">
+          <p data-reveal className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/[0.04] px-3 py-1 text-[12.5px] font-medium text-white/80">
+            <span className="relative flex size-2">
+              <span className="absolute inline-flex size-full animate-ping rounded-full bg-mint opacity-60 motion-reduce:hidden" />
+              <span className="relative inline-flex size-2 rounded-full bg-mint" />
             </span>
-            <span data-reveal className="block text-mint">
-              Give them a reason to reply.
+            Private beta · Google Maps search and Gmail sending are live
+          </p>
+          <h1 className="display-hero mt-6 text-white">
+            <span data-reveal className="block">
+              From a map search
+            </span>
+            <span data-reveal className="text-shine block">
+              to booked conversations.
             </span>
           </h1>
-          <p data-reveal className="mt-6 max-w-[640px] text-lg leading-8 text-white/72">
-            Discover businesses that fit your offer, understand the opportunity, and turn real research into personal outreach, all in one workspace.
+          <p data-reveal className="mx-auto mt-6 max-w-[660px] text-lg leading-8 text-white/72">
+            Find local businesses on Google Maps, see what their websites actually show, and send personal emails from your own Gmail, each one reviewed and approved by you.
           </p>
-          <div data-reveal className="mt-8 flex flex-wrap items-center gap-3">
+          <div data-reveal className="mt-8 flex flex-wrap items-center justify-center gap-3">
             <Button asChild variant="mint" size="lg">
               <Link href="/demo">
-                Explore demo <ArrowRight aria-hidden />
+                Explore the demo <ArrowRight aria-hidden />
               </Link>
             </Button>
             <Button asChild variant="outline-dark" size="lg">
-              <Link href="#how-it-works">See the workflow</Link>
+              <Link href="#how-it-works">How it works</Link>
             </Button>
           </div>
+          <ul data-reveal className="mt-7 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[13px] text-white/60">
+            <li className="inline-flex items-center gap-1.5">
+              <MapPinned aria-hidden className="size-4 text-mint" /> Official Google Maps data
+            </li>
+            <li className="inline-flex items-center gap-1.5">
+              <MailCheck aria-hidden className="size-4 text-mint" /> Sends from your Gmail
+            </li>
+            <li className="inline-flex items-center gap-1.5">
+              <ShieldCheck aria-hidden className="size-4 text-mint" /> Nothing sends without approval
+            </li>
+          </ul>
         </div>
-
-        <form data-reveal style={{ "--reveal-delay": "420ms" } as React.CSSProperties} action="/demo/discover" method="get" className="mt-10 max-w-[720px]" role="search" aria-label="Try a search in the demo">
-          <label htmlFor="hero-q" className="text-[13px] font-medium text-white/70">
-            Describe who you want to reach
-          </label>
-          <div className="mt-2 flex flex-col gap-2 rounded-[14px] border border-white/12 bg-white/[0.04] p-2 backdrop-blur-sm transition-colors duration-200 focus-within:border-mint/60 sm:flex-row sm:items-center">
-            <div className="flex min-w-0 flex-1 items-center gap-2.5 px-2">
-              <Search aria-hidden className="size-4 shrink-0 text-mint" />
-              <input
-                id="hero-q"
-                name="q"
-                defaultValue={heroQuery}
-                className="h-10 min-w-0 flex-1 bg-transparent text-[15px] text-white placeholder:text-white/40 focus:outline-none"
-                autoComplete="off"
-              />
-            </div>
-            <Button type="submit" variant="mint" className="h-10 shrink-0">
-              Try it in the demo
-            </Button>
-          </div>
-          <p className="mt-2 text-xs text-fog">Runs against fictional sample data. Nothing is searched, sent or charged.</p>
-        </form>
       </div>
 
       <div className="container-page relative pb-20 sm:pb-24">
-        <div data-reveal="scale" style={{ "--reveal-delay": "520ms" } as React.CSSProperties}>
-          <div data-tilt="460">
-            <HeroCanvas />
-          </div>
+        <div data-reveal="scale" style={{ "--reveal-delay": "380ms" } as React.CSSProperties} className="mx-auto max-w-[1120px]">
+          <LiveDemo />
+          <p className="mt-3 text-center text-xs text-fog">Self-playing demo with fictional businesses and sample numbers. Hover to pause; click a step to jump.</p>
         </div>
       </div>
     </section>

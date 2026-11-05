@@ -272,3 +272,120 @@ html[data-scrolled] .site-header {
     transform: none !important;
   }
 }
+
+/* ------------------------------------------------ landing: live demo & hero */
+
+.scrollbar-none {
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+@property --demo-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+/* Slowly rotating gradient edge around the demo window. */
+.demo-glow {
+  background: conic-gradient(from var(--demo-angle), transparent 0deg, rgb(143 240 192 / 0.55) 60deg, transparent 140deg, transparent 220deg, rgb(18 99 74 / 0.6) 290deg, transparent 360deg);
+  filter: blur(14px);
+  opacity: 0.7;
+  animation: demo-spin 9s linear infinite;
+}
+@keyframes demo-spin {
+  to {
+    --demo-angle: 360deg;
+  }
+}
+.demo-caret {
+  animation: demo-blink 1s steps(2, start) infinite;
+}
+@keyframes demo-blink {
+  to {
+    visibility: hidden;
+  }
+}
+.demo-scan {
+  width: 40%;
+  animation: demo-scan 1.1s ease-in-out infinite;
+}
+@keyframes demo-scan {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(260%);
+  }
+}
+.demo-panel {
+  animation: demo-panel-in 500ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes demo-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+/* Soft moving light behind the hero. */
+.hero-aurora {
+  background:
+    radial-gradient(40% 50% at 20% 30%, rgb(143 240 192 / 0.16), transparent 70%),
+    radial-gradient(35% 45% at 80% 20%, rgb(18 99 74 / 0.35), transparent 70%),
+    radial-gradient(45% 55% at 60% 80%, rgb(143 240 192 / 0.08), transparent 70%);
+  animation: aurora-drift 18s ease-in-out infinite alternate;
+}
+@keyframes aurora-drift {
+  to {
+    transform: translate3d(3%, -2%, 0) scale(1.08);
+  }
+}
+.text-shine {
+  background: linear-gradient(100deg, #8ff0c0 20%, #ffffff 45%, #8ff0c0 70%);
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: text-shine 6s ease-in-out infinite;
+}
+@keyframes text-shine {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -120% 0;
+  }
+}
+
+/* Endless strip of business types. */
+.marquee {
+  mask-image: linear-gradient(90deg, transparent, black 10%, black 90%, transparent);
+}
+.marquee-track {
+  animation: marquee 38s linear infinite;
+}
+.marquee:hover .marquee-track {
+  animation-play-state: paused;
+}
+@keyframes marquee {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .demo-glow,
+  .demo-caret,
+  .demo-scan,
+  .demo-panel,
+  .hero-aurora,
+  .text-shine,
+  .marquee-track {
+    animation: none !important;
+  }
+  .text-shine {
+    color: #8ff0c0;
+  }
+}

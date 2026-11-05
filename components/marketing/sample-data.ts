@@ -19,4 +19,3 @@ export function draftFor(index: number, tone: Tone, variant: number) {
   return generateDraft(f.business, f.brief, { ...sampleOffer, tone }, variant);
 }
 
-export const heroQuery = "Find dental clinics in Austin with a website and 30+ reviews.";
