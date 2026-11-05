@@ -31,7 +31,7 @@ export const PROVIDER = "openstreetmap";
 
 export type SearchFilters = { niche: string; place: string; radiusKm: number; website: "any" | "has" | "none"; maxResults: number };
 
-export type GoogleSearchFilters = { source: "google"; niche: string; place: string; minRating: number; website: "any" | "has" | "none"; maxResults: number };
+export type GoogleSearchFilters = { source: "google"; niche: string | null; businessType: string; country: string | null; state: string | null; place: string; minRating: number; website: "any" | "has" | "none"; maxResults: number };
 
 export async function createJob(q: Q, ws: string, userId: string, query: string, filters: SearchFilters | GoogleSearchFilters, provider: string = PROVIDER): Promise<string> {
   const r = await q.query<{ id: string }>(

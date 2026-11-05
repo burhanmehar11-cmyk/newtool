@@ -41,7 +41,9 @@ async function Discover({ searchParams }: { searchParams: PageProps<"/app/discov
         available={available}
         google={google}
         prefill={{
-          niche: typeof sp.niche === "string" ? sp.niche.slice(0, 40) : undefined,
+          niche: typeof sp.type === "string" ? sp.type.slice(0, 80) : typeof sp.niche === "string" ? sp.niche.slice(0, 40) : undefined,
+          country: typeof sp.country === "string" && /^[A-Za-z]{2}$/.test(sp.country) ? sp.country.toUpperCase() : undefined,
+          state: typeof sp.state === "string" ? sp.state.slice(0, 60) : undefined,
           place: typeof sp.place === "string" ? sp.place.slice(0, 100) : undefined,
           runId: typeof sp.run === "string" && /^[0-9a-z]{1,20}$/i.test(sp.run) ? sp.run : undefined,
         }}

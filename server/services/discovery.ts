@@ -7,6 +7,14 @@ import type { Q } from "@/server/auth-store";
 import { geocode, searchBusinesses } from "@/server/providers/osm";
 import { googlePlacesConfigured, placeDetails, remainingToday, textSearch } from "@/server/providers/google-places";
 import { GOOGLE_PROVIDER, MIN_RATINGS, PLACE_ID, type GooglePlace } from "@/lib/discovery/google-places";
+import { isCountryCode, placeLabel } from "@/lib/geo/regions";
+
+/** Maps free text like "dentists" or "Dental clinics" to a preset business type, when one fits. */
+export function matchNiche(text: string): string | null {
+  const t = text.trim().toLowerCase();
+  const n = discoveryNiches.find((x) => [x.id, x.label, x.singular, x.plural].some((v) => v.toLowerCase() === t));
+  return n?.id ?? null;
+}
 import {
   createJob,
   finishJob,
@@ -26,7 +34,9 @@ import {
 
 export const searchSchema = z.object({
   niche: z.enum(discoveryNiches.map((n) => n.id) as [string, ...string[]]),
-  place: z.string().trim().min(2, "Enter a city or area, like “Austin, TX”.").max(100),
+  place: z.string().trim().min(2, "Enter a city or area, like “Austin”.").max(100),
+  country: z.string().trim().toUpperCase().refine((v) => !v || isCountryCode(v), "Choose a country.").optional(),
+  state: z.string().trim().max(60).optional(),
   radiusKm: z.coerce.number().refine((v) => [2, 5, 10, 25].includes(v), "Choose a radius."),
   website: z.enum(["any", "has", "none"]),
   maxResults: z.coerce.number().refine((v) => [10, 25, 50].includes(v), "Choose a maximum."),
@@ -45,7 +55,8 @@ export async function runSearch(input: unknown): Promise<SearchOutcome> {
   const { user, workspace } = await requireWorkspace("/app/discover");
   const parsed = searchSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Check the highlighted fields.", fieldErrors: Object.fromEntries(parsed.error.issues.map((i) => [String(i.path[0]), i.message])) };
-  const f = parsed.data as SearchFilters;
+  const { country, state, ...rest } = parsed.data;
+  const f = { ...rest, place: placeLabel({ city: rest.place, state, country }) } as SearchFilters;
   const query = `${nicheLabel(f.niche)} near ${f.place}`;
 
   const jobId = await asQ(user.id, (q) => createJob(q, workspace.id, user.id, query, f));
@@ -113,8 +124,16 @@ export async function getLeads() {
 /* ------------------------------------------------------------ Google Maps */
 
 export const googleSearchSchema = z.object({
-  niche: z.enum(discoveryNiches.map((n) => n.id) as [string, ...string[]]),
-  place: z.string().trim().min(2, "Enter a city or area, like “Austin, TX”.").max(100),
+  // Any business type: free text, or a preset's id or label.
+  businessType: z.string().trim().min(2, "Describe the type of business, like “dentists” or “wedding photographers”.").max(80),
+  country: z
+    .string()
+    .trim()
+    .transform((v) => v.toUpperCase())
+    .refine((v) => !v || isCountryCode(v), "Choose a country.")
+    .optional(),
+  state: z.string().trim().max(60).optional(),
+  place: z.string().trim().min(2, "Enter a city or area, like “Austin”.").max(100),
   minRating: z.coerce.number().refine((v) => (MIN_RATINGS as readonly number[]).includes(v), "Choose a rating."),
   website: z.enum(["any", "has", "none"]),
   maxResults: z.coerce.number().refine((v) => [20, 40, 60].includes(v), "Choose a maximum."),
@@ -122,7 +141,7 @@ export const googleSearchSchema = z.object({
 
 export type GoogleResult = GooglePlace & { saved: boolean };
 export type GoogleSearchOutcome =
-  | { ok: true; jobId: string; query: string; results: GoogleResult[]; filteredOut: number; requests: number }
+  | { ok: true; jobId: string; query: string; niche: string | null; results: GoogleResult[]; filteredOut: number; requests: number }
   | { ok: false; error: string; fieldErrors?: Record<string, string> };
 
 export async function googleStatus() {
@@ -144,8 +163,20 @@ export async function runGoogleSearch(input: unknown): Promise<GoogleSearchOutco
 export async function runGoogleSearchAs({ user, workspace }: Ctx, input: unknown): Promise<GoogleSearchOutcome> {
   const parsed = googleSearchSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Check the highlighted fields.", fieldErrors: Object.fromEntries(parsed.error.issues.map((i) => [String(i.path[0]), i.message])) };
-  const f: GoogleSearchFilters = { source: "google", ...(parsed.data as Omit<GoogleSearchFilters, "source">) };
-  const query = `${nicheLabel(f.niche)} in ${f.place}`;
+  const d = parsed.data;
+  const preset = matchNiche(d.businessType);
+  const f: GoogleSearchFilters = {
+    source: "google",
+    niche: preset,
+    businessType: preset ? nicheLabel(preset) : d.businessType,
+    country: d.country || null,
+    state: d.state || null,
+    place: d.place,
+    minRating: d.minRating,
+    website: d.website,
+    maxResults: d.maxResults,
+  };
+  const query = `${f.businessType} in ${placeLabel({ city: f.place, state: f.state, country: f.country })}`;
 
   const jobId = await asQ(user.id, (q) => createJob(q, workspace.id, user.id, query, f, GOOGLE_PROVIDER));
   try {
@@ -156,7 +187,7 @@ export async function runGoogleSearchAs({ user, workspace }: Ctx, input: unknown
     return { ok: false, error: quota ? "This search could use more discovery units than you have left. Lower the maximum results." : "Couldn't start the search. Try again." };
   }
 
-  const found = await textSearch({ query, maxResults: f.maxResults, minRating: f.minRating });
+  const found = await textSearch({ query, maxResults: f.maxResults, minRating: f.minRating, regionCode: f.country });
   if (!found.ok) {
     await asQ(user.id, async (q) => {
       await settle(q, workspace.id, jobId, 0);
@@ -175,6 +206,7 @@ export async function runGoogleSearchAs({ user, workspace }: Ctx, input: unknown
     ok: true,
     jobId,
     query,
+    niche: f.niche,
     results: kept.map((p) => ({ ...p, saved: saved.has(p.placeId) })),
     filteredOut: found.value.places.length - kept.length,
     requests: found.value.requests,

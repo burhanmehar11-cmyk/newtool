@@ -95,7 +95,7 @@ async function call(url: string, init: RequestInit & { fieldMask: string }): Pro
  * Up to `maxResults` places (pages of 20; one API request per page). Results
  * are returned for display only and must not be stored.
  */
-export async function textSearch(p: { query: string; maxResults: number; minRating?: number | null }): Promise<Result<{ places: GooglePlace[]; requests: number }>> {
+export async function textSearch(p: { query: string; maxResults: number; minRating?: number | null; regionCode?: string | null }): Promise<Result<{ places: GooglePlace[]; requests: number }>> {
   if (!placesApiKey()) return err("not_configured", "Google Maps search isn't set up. Add GOOGLE_PLACES_API_KEY on the server.", false);
   const pages = Math.max(1, Math.ceil(p.maxResults / 20));
   const places: GooglePlace[] = [];
@@ -110,7 +110,7 @@ export async function textSearch(p: { query: string; maxResults: number; minRati
     const r = await call(`${BASE}/places:searchText`, {
       method: "POST",
       fieldMask: TEXT_SEARCH_FIELD_MASK,
-      body: JSON.stringify(buildTextSearchBody({ query: p.query, pageToken: token, minRating: p.minRating })),
+      body: JSON.stringify(buildTextSearchBody({ query: p.query, pageToken: token, minRating: p.minRating, regionCode: p.regionCode })),
     });
     if (!r.ok) {
       if (places.length) break;

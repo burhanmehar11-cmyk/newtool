@@ -4,10 +4,11 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { FieldError, FieldHint, Input, Label, Select } from "@/components/ui/field";
+import { FieldHint, Label, Select } from "@/components/ui/field";
 import { Callout } from "@/components/ui/misc";
 import { discoveryNiches } from "@/lib/discovery/niches";
 import { runSearchAction } from "@/server/actions/discovery";
+import { LocationFields } from "@/features/product/google-search";
 
 export function DiscoverForm({ available }: { available: number }) {
   const router = useRouter();
@@ -48,11 +49,7 @@ export function DiscoverForm({ available }: { available: number }) {
             ))}
           </Select>
         </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="d-place">City or area</Label>
-          <Input id="d-place" name="place" placeholder="e.g. Austin, TX" autoComplete="off" aria-invalid={!!fieldErrors.place} required />
-          {fieldErrors.place ? <FieldError>{fieldErrors.place}</FieldError> : <FieldHint>Worldwide. Add the region for common names.</FieldHint>}
-        </div>
+        <LocationFields idPrefix="d" placeError={fieldErrors.place} />
         <div className="space-y-1.5">
           <Label htmlFor="d-radius">Radius</Label>
           <Select id="d-radius" name="radiusKm" defaultValue="5">

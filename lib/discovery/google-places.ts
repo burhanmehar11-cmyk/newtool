@@ -41,12 +41,15 @@ export type TextSearchRequest = {
   pageSize: number;
   pageToken?: string;
   minRating?: number;
+  /** Two-letter country code: biases results to that country. */
+  regionCode?: string;
 };
 
-export function buildTextSearchBody(p: { query: string; pageToken?: string | null; minRating?: number | null }): TextSearchRequest {
+export function buildTextSearchBody(p: { query: string; pageToken?: string | null; minRating?: number | null; regionCode?: string | null }): TextSearchRequest {
   const body: TextSearchRequest = { textQuery: p.query.trim().slice(0, 200), pageSize: PAGE_SIZE };
   if (p.pageToken) body.pageToken = p.pageToken;
   if (p.minRating && p.minRating > 0) body.minRating = p.minRating;
+  if (p.regionCode && /^[A-Z]{2}$/.test(p.regionCode)) body.regionCode = p.regionCode;
   return body;
 }
 

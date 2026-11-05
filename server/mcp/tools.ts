@@ -62,12 +62,14 @@ export const mcpTools: ToolDef<McpCtx>[] = [
   },
   {
     name: "search_google_maps",
-    description: "Search Google Maps for local businesses (e.g. dentists in Austin, TX). Up to 20 results per Google request. Results are live and not stored; call save_google_leads with the ones worth working on.",
+    description: "Search Google Maps for local businesses of any type (e.g. 'wedding photographers' in Lahore, Punjab, PK). Up to 20 results per Google request. Results are live and not stored; call save_google_leads with the ones worth working on.",
     inputSchema: {
       type: "object",
       properties: {
-        business_type: { type: "string", enum: nicheIds, description: "Business type id from get_workspace." },
-        place: { type: "string", description: "City or area, e.g. 'Austin, TX'." },
+        business_type: { type: "string", description: "Any business type in plain words (e.g. 'dentists', 'solar installers'), or a preset id from get_workspace." },
+        place: { type: "string", description: "City or area, e.g. 'Austin'." },
+        state: { type: "string", description: "State or province (optional), e.g. 'Texas'." },
+        country: { type: "string", description: "Two-letter country code (optional), e.g. 'US', 'PK', 'GB'. Biases results to that country." },
         min_rating: { type: "number", enum: [0, 3.5, 4, 4.5], default: 0 },
         website: { type: "string", enum: ["has", "any", "none"], default: "has", description: "'has' keeps businesses with a website (needed for research and emails)." },
         max_results: { type: "number", enum: [20, 40, 60], default: 20 },
@@ -78,10 +80,19 @@ export const mcpTools: ToolDef<McpCtx>[] = [
     annotations: { readOnlyHint: true, openWorldHint: true },
     run: async (args, ctx) => {
       const a = parse(
-        z.object({ business_type: z.enum(nicheIds), place: z.string().min(2).max(100), min_rating: z.number().default(0), website: z.enum(["has", "any", "none"]).default("has"), max_results: z.number().default(20) }),
+        z.object({
+          business_type: z.string().min(2).max(80),
+          place: z.string().min(2).max(100),
+          state: z.string().max(60).optional(),
+          country: z.string().length(2).optional(),
+          min_rating: z.number().default(0),
+          website: z.enum(["has", "any", "none"]).default("has"),
+          max_results: z.number().default(20),
+        }),
         args,
       );
-      const r = await runGoogleSearchAs(ctx, { niche: a.business_type, place: a.place, minRating: a.min_rating, website: a.website, maxResults: a.max_results });
+      const preset = discoveryNiches.find((n) => n.id === a.business_type);
+      const r = await runGoogleSearchAs(ctx, { businessType: preset ? preset.label : a.business_type, place: a.place, state: a.state, country: a.country, minRating: a.min_rating, website: a.website, maxResults: a.max_results });
       if (!r.ok) throw new ToolError(r.error);
       return {
         query: r.query,
@@ -97,14 +108,14 @@ export const mcpTools: ToolDef<McpCtx>[] = [
       type: "object",
       properties: {
         items: { type: "array", minItems: 1, maxItems: 60, items: { type: "object", properties: { place_id: { type: "string" }, website: { type: "string" } }, required: ["place_id", "website"], additionalProperties: false } },
-        business_type: { type: "string", enum: nicheIds },
+        business_type: { type: "string", description: "Preset id from get_workspace, if one fits (optional)." },
       },
       required: ["items"],
       additionalProperties: false,
     },
     run: async (args, ctx) => {
-      const a = parse(z.object({ items: z.array(z.object({ place_id: z.string().regex(PLACE_ID), website: z.string().url() })).min(1).max(60), business_type: z.enum(nicheIds).optional() }), args);
-      const r = await saveGoogleSearchLeadsAs(ctx, { niche: a.business_type ?? null, items: a.items.map((i) => ({ placeId: i.place_id, website: i.website })) });
+      const a = parse(z.object({ items: z.array(z.object({ place_id: z.string().regex(PLACE_ID), website: z.string().url() })).min(1).max(60), business_type: z.string().max(80).optional() }), args);
+      const r = await saveGoogleSearchLeadsAs(ctx, { niche: a.business_type && nicheIds.includes(a.business_type) ? a.business_type : null, items: a.items.map((i) => ({ placeId: i.place_id, website: i.website })) });
       if (!r.ok) throw new ToolError(r.error);
       return { added: r.added, skipped: r.skipped };
     },

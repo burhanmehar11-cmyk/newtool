@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox, FieldError, FieldHint, Input, Label, Select } from "@/components/ui/field";
 import { Callout, EmptyState } from "@/components/ui/misc";
 import { discoveryNiches } from "@/lib/discovery/niches";
+import { countries, STATES } from "@/lib/geo/regions";
 import { googleMapsLink } from "@/lib/discovery/google-places";
 import { googleDetailsAction, runGoogleSearchAction, saveGoogleLeadsAction } from "@/server/actions/discovery";
 import { findEmailsForResultsAction } from "@/server/actions/emails";
@@ -30,7 +31,7 @@ export function GoogleCredit() {
   );
 }
 
-export type SearchPrefill = { niche?: string; place?: string; runId?: string };
+export type SearchPrefill = { niche?: string; place?: string; country?: string; state?: string; runId?: string };
 
 export function GoogleSearchForm({ available, remainingToday, onResult, prefill }: { available: number; remainingToday: number | null; onResult: (r: Done | null) => void; prefill?: SearchPrefill }) {
   const formRef = React.useRef<HTMLFormElement>(null);
@@ -70,7 +71,7 @@ export function GoogleSearchForm({ available, remainingToday, onResult, prefill 
         setFieldErrors({});
         start(async () => {
           const r = await runGoogleSearchAction(values);
-          if (r.ok) onResult({ ...r, niche: String(values.niche) });
+          if (r.ok) onResult({ ...r, niche: r.niche ?? "" });
           else {
             setError(r.error);
             setFieldErrors(r.fieldErrors ?? {});
@@ -81,21 +82,26 @@ export function GoogleSearchForm({ available, remainingToday, onResult, prefill 
       }}
     >
       <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-1.5">
-          <Label htmlFor="g-niche">Business type</Label>
-          <Select id="g-niche" name="niche" defaultValue={prefill?.niche ?? "dental"}>
+        <div className="space-y-1.5 sm:col-span-2">
+          <Label htmlFor="g-type">Business type</Label>
+          <Input
+            id="g-type"
+            name="businessType"
+            list="g-type-list"
+            defaultValue={prefill?.niche ? (discoveryNiches.find((n) => n.id === prefill.niche)?.label ?? prefill.niche) : ""}
+            placeholder="Anything: dentists, wedding photographers, solar installers…"
+            autoComplete="off"
+            aria-invalid={!!fieldErrors.businessType}
+            required
+          />
+          <datalist id="g-type-list">
             {discoveryNiches.map((n) => (
-              <option key={n.id} value={n.id}>
-                {n.label}
-              </option>
+              <option key={n.id} value={n.label} />
             ))}
-          </Select>
+          </datalist>
+          {fieldErrors.businessType ? <FieldError>{fieldErrors.businessType}</FieldError> : <FieldHint>Type any kind of business, or pick a suggestion.</FieldHint>}
         </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="g-place">City or area</Label>
-          <Input id="g-place" name="place" defaultValue={prefill?.place} placeholder="e.g. Austin, TX" autoComplete="off" aria-invalid={!!fieldErrors.place} required />
-          {fieldErrors.place ? <FieldError>{fieldErrors.place}</FieldError> : <FieldHint>Searched like you would on Google Maps: “dentists in Austin, TX”.</FieldHint>}
-        </div>
+        <LocationFields prefillPlace={prefill?.place} prefillCountry={prefill?.country} prefillState={prefill?.state} placeError={fieldErrors.place} />
         <div className="space-y-1.5">
           <Label htmlFor="g-rating">Google rating</Label>
           <Select id="g-rating" name="minRating" defaultValue="0">
@@ -406,4 +412,43 @@ function EmailCell({ r, l }: { r: GoogleResult; l: Lookup | undefined }) {
       </span>
     );
   return <span className="text-slate" title={l.note}>{l.status === "blocked" ? "Site blocks tools" : l.status === "failed" ? "Couldn't read site" : "None shown"}</span>;
+}
+
+/** Country, then state/province (suggestions for common countries), then city or area. */
+export function LocationFields({ prefillPlace, prefillCountry, prefillState, placeError, idPrefix = "g" }: { prefillPlace?: string; prefillCountry?: string; prefillState?: string; placeError?: string; idPrefix?: string }) {
+  const all = React.useMemo(() => countries(), []);
+  const [country, setCountry] = React.useState((prefillCountry ?? "US").toUpperCase());
+  const states = STATES[country] ?? [];
+  return (
+    <>
+      <div className="space-y-1.5">
+        <Label htmlFor={`${idPrefix}-country`}>Country</Label>
+        <Select id={`${idPrefix}-country`} name="country" value={country} onChange={(e) => setCountry(e.target.value)}>
+          {all.map((c) => (
+            <option key={c.code} value={c.code}>
+              {c.name}
+            </option>
+          ))}
+        </Select>
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor={`${idPrefix}-state`}>
+          State or province <span className="font-normal text-slate">(optional)</span>
+        </Label>
+        <Input id={`${idPrefix}-state`} name="state" list={states.length ? `${idPrefix}-state-list` : undefined} defaultValue={prefillState} placeholder={states[0] ? `e.g. ${states[0]}` : "e.g. the region"} autoComplete="off" maxLength={60} />
+        {states.length ? (
+          <datalist id={`${idPrefix}-state-list`}>
+            {states.map((s) => (
+              <option key={s} value={s} />
+            ))}
+          </datalist>
+        ) : null}
+      </div>
+      <div className="space-y-1.5 sm:col-span-2">
+        <Label htmlFor={`${idPrefix}-place`}>City or area</Label>
+        <Input id={`${idPrefix}-place`} name="place" defaultValue={prefillPlace} placeholder="e.g. Austin, or a neighbourhood like Brooklyn" autoComplete="off" aria-invalid={!!placeError} required />
+        {placeError ? <FieldError>{placeError}</FieldError> : <FieldHint>Searched like on Google Maps: “dentists in Austin, Texas, United States”.</FieldHint>}
+      </div>
+    </>
+  );
 }
