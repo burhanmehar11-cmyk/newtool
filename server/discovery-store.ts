@@ -1,6 +1,23 @@
 import type { OsmBusiness } from "@/lib/discovery/osm";
 import { normalizeWebsite, OSM_ATTRIBUTION } from "@/lib/discovery/osm";
 import { GOOGLE_PROVIDER, PLACE_ID } from "@/lib/discovery/google-places";
+import { storeFoundEmails, type StoredEmail } from "@/server/email-store";
+import { businessEmails } from "@/lib/research/extract";
+
+/** Keeps only emails that came from a page on the business's own site and pass the same rule the finder uses. */
+export function trustedEmails(emails: StoredEmail[], domain: string): StoredEmail[] {
+  const allowed = new Set(businessEmails(emails.map((e) => e.email.toLowerCase()), domain).map((e) => e.email));
+  return emails
+    .filter((e) => {
+      try {
+        const host = new URL(e.url).hostname.toLowerCase().replace(/^www\./, "");
+        return allowed.has(e.email.toLowerCase()) && (host === domain || host.endsWith(`.${domain}`));
+      } catch {
+        return false;
+      }
+    })
+    .slice(0, 5);
+}
 import type { Q } from "@/server/auth-store";
 
 /**
@@ -160,7 +177,7 @@ export async function listLeads(q: Q, ws: string): Promise<LeadRow[]> {
   ).rows;
 }
 
-export type GoogleSaveItem = { placeId: string; website: string };
+export type GoogleSaveItem = { placeId: string; website: string; siteName?: string | null; emails?: { email: string; kind: "role" | "named"; url: string }[] };
 
 /**
  * Saves Google Maps results as leads without copying Google content. Stored:
@@ -183,8 +200,9 @@ export async function saveGoogleLeads(q: Q, ws: string, userId: string, items: G
        values ($1, $2, $3, $4, $5, $6, 'Found on Google Maps', $7, now())
        on conflict (workspace_id, provider, provider_ref) do update set website = excluded.website, domain_normalized = excluded.domain_normalized
        returning id`,
-      [ws, GOOGLE_PROVIDER, it.placeId, site.domain, site.website, site.domain, niche],
+      [ws, GOOGLE_PROVIDER, it.placeId, it.siteName?.trim().slice(0, 120) || site.domain, site.website, site.domain, niche],
     );
+    if (it.emails?.length) await storeFoundEmails(q, ws, biz.rows[0].id, trustedEmails(it.emails, site.domain));
     const lead = await q.query(
       `insert into public.leads (workspace_id, business_id, source, saved_by) values ($1, $2, 'search', $3)
        on conflict (workspace_id, business_id) do nothing returning id`,

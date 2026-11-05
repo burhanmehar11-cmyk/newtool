@@ -1,9 +1,10 @@
 "use client";
 
 import { writeDraftAction } from "@/server/actions/ai";
+import { findMissingLeadEmailsAction } from "@/server/actions/emails";
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { FileSearch, Loader2, MailCheck, Sparkles } from "lucide-react";
+import { FileSearch, Loader2, Mail, MailCheck, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Callout } from "@/components/ui/misc";
 import { Textarea } from "@/components/ui/field";
@@ -128,6 +129,38 @@ export function WriteWithAiButton({ leadId, hasDraft, disabledReason }: { leadId
       {disabledReason ? <p className="text-xs text-slate">{disabledReason}</p> : null}
       {msg ? (
         <Callout tone={msg.tone} className="py-2">
+          <span role="status">{msg.text}</span>
+        </Callout>
+      ) : null}
+    </div>
+  );
+}
+
+/** Reads saved leads' websites for public emails they don't have yet (15 per click). */
+export function FindEmailsButton() {
+  const router = useRouter();
+  const [pending, start] = React.useTransition();
+  const [msg, setMsg] = React.useState<{ tone: "green" | "danger" | "info"; text: string } | null>(null);
+  return (
+    <div className="flex flex-col items-end gap-2">
+      <Button
+        variant="secondary"
+        disabled={pending}
+        onClick={() =>
+          start(async () => {
+            setMsg(null);
+            const r = await findMissingLeadEmailsAction();
+            if (!r.ok) setMsg({ tone: "danger", text: r.error });
+            else if (!r.checked) setMsg({ tone: "info", text: "Every lead with a website already has an email, or was checked recently." });
+            else setMsg({ tone: r.found ? "green" : "info", text: `Checked ${r.checked} website${r.checked === 1 ? "" : "s"}: found emails for ${r.found}.${r.remaining ? " Click again for more." : ""}` });
+            router.refresh();
+          })
+        }
+      >
+        {pending ? <Loader2 aria-hidden className="animate-spin" /> : <Mail aria-hidden />} {pending ? "Reading websites…" : "Find missing emails"}
+      </Button>
+      {msg ? (
+        <Callout tone={msg.tone} className="py-1.5">
           <span role="status">{msg.text}</span>
         </Callout>
       ) : null}

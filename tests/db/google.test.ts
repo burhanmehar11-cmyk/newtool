@@ -69,6 +69,38 @@ describe("Google Maps leads store no Google content", () => {
   });
 });
 
+describe("saving with emails found on the website", () => {
+  it("stores the site's own name and trusted emails with their source page", async () => {
+    const r = await as(db, A, () =>
+      saveGoogleLeads(
+        q,
+        wsA,
+        A,
+        [
+          {
+            placeId: "ChIJ_fictional_place_0042",
+            website: "https://www.cedar.example/",
+            siteName: "Cedar Dental",
+            emails: [
+              { email: "hello@cedar.example", kind: "role", url: "https://www.cedar.example/contact" },
+              { email: "x@elsewhere.example", kind: "named", url: "https://www.cedar.example/" },
+            ],
+          },
+        ],
+        "dental",
+      ),
+    );
+    expect(r.added).toBe(1);
+    const rows = (
+      await db.query<{ name: string; email_normalized: string; label: string; url: string; kind: string }>(
+        `select b.name, c.email_normalized, e.label, e.url, e.kind from public.businesses b
+         join public.contacts c on c.business_id = b.id join public.evidence e on e.id = c.source_evidence_id where b.provider_ref = 'ChIJ_fictional_place_0042'`,
+      )
+    ).rows;
+    expect(rows).toEqual([{ name: "Cedar Dental", email_normalized: "hello@cedar.example", label: "Email shown on the website", url: "https://www.cedar.example/contact", kind: "contact_page" }]);
+  });
+});
+
 describe("global daily Google call limit", () => {
   it("hands out slots until the limit, then refuses", async () => {
     const take = async (limit: number) => (await db.query(TAKE_SLOT_SQL, ["google_places_test", limit])).rows.length;

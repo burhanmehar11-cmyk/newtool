@@ -183,7 +183,18 @@ export async function runGoogleSearchAs({ user, workspace }: Ctx, input: unknown
 
 const googleSaveSchema = z.object({
   niche: z.string().max(40).nullable(),
-  items: z.array(z.object({ placeId: z.string().regex(PLACE_ID), website: z.string().url().max(500) })).min(1).max(60),
+  items: z
+    .array(
+      z.object({
+        placeId: z.string().regex(PLACE_ID),
+        website: z.string().url().max(500),
+        siteName: z.string().max(120).nullish(),
+        // Emails found on the business's own website (from the live lookup), with the page they were on.
+        emails: z.array(z.object({ email: z.string().email().max(254), kind: z.enum(["role", "named"]), url: z.string().url().max(500) })).max(5).optional(),
+      }),
+    )
+    .min(1)
+    .max(60),
 });
 
 export async function saveGoogleSearchLeads(input: unknown): Promise<{ ok: true; added: number; skipped: number } | { ok: false; error: string }> {

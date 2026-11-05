@@ -9,6 +9,7 @@ import { EmailStatusBadge, NoEmailBadge } from "@/components/product/badges";
 import { PageLoading } from "@/features/product/page-loading";
 import { OsmCredit } from "@/features/product/osm-credit";
 import { googleMapsLink } from "@/lib/discovery/google-places";
+import { FindEmailsButton } from "@/features/product/lead-actions";
 import { getLeads } from "@/server/services/discovery";
 import type { EmailStatus } from "@/lib/domain/types";
 import { formatDate } from "@/lib/utils";
@@ -31,9 +32,12 @@ async function Leads() {
         title="Leads"
         description="Businesses you chose to save. Open one to research its website and check its email."
         actions={
-          <Button asChild>
-            <Link href="/app/discover">Find businesses</Link>
-          </Button>
+          <div className="flex flex-wrap items-start gap-2">
+            <FindEmailsButton />
+            <Button asChild>
+              <Link href="/app/discover">Find businesses</Link>
+            </Button>
+          </div>
         }
       />
       {leads.length ? (

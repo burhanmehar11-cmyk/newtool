@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ExternalLink, Loader2, MapPinned, Star } from "lucide-react";
+import { ExternalLink, Loader2, Mail, MapPinned, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox, FieldError, FieldHint, Input, Label, Select } from "@/components/ui/field";
@@ -11,6 +11,7 @@ import { Callout, EmptyState } from "@/components/ui/misc";
 import { discoveryNiches } from "@/lib/discovery/niches";
 import { googleMapsLink } from "@/lib/discovery/google-places";
 import { googleDetailsAction, runGoogleSearchAction, saveGoogleLeadsAction } from "@/server/actions/discovery";
+import { findEmailsForResultsAction } from "@/server/actions/emails";
 import type { GoogleResult, GoogleSearchOutcome } from "@/server/services/discovery";
 import { cn } from "@/lib/utils";
 
@@ -138,10 +139,48 @@ export function GoogleSearchForm({ available, remainingToday, onResult, prefill 
   );
 }
 
+type Lookup = { status: "waiting" | "checking" | "found" | "none" | "blocked" | "failed"; emails: { email: string; kind: "role" | "named"; url: string }[]; siteName: string | null; note?: string };
+
+/** Reads each result's website (5 at a time) for a public email, as soon as results appear. */
+function useEmailLookups(rows: GoogleResult[]) {
+  const [map, setMap] = React.useState<Record<string, Lookup>>(() =>
+    Object.fromEntries(rows.filter((r) => r.website && !r.saved).map((r) => [r.placeId, { status: "waiting", emails: [], siteName: null } as Lookup])),
+  );
+  const [error, setError] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    let cancelled = false;
+    const queue = rows.filter((r) => r.website && !r.saved).map((r) => ({ placeId: r.placeId, website: r.website! }));
+    (async () => {
+      for (let i = 0; i < queue.length && !cancelled; i += 5) {
+        const batch = queue.slice(i, i + 5);
+        setMap((m) => ({ ...m, ...Object.fromEntries(batch.map((b) => [b.placeId, { ...m[b.placeId], status: "checking" as const }])) }));
+        const r = await findEmailsForResultsAction(batch).catch(() => null);
+        if (cancelled) return;
+        if (!r || !r.ok) {
+          setError(r && !r.ok ? r.error : "Email lookup stopped. Try again later.");
+          setMap((m) => ({ ...m, ...Object.fromEntries(queue.slice(i).map((b) => [b.placeId, { ...m[b.placeId], status: "failed" as const }])) }));
+          return;
+        }
+        setMap((m) => ({ ...m, ...Object.fromEntries(r.results.map((x) => [x.placeId, { status: x.status, emails: x.emails, siteName: x.siteName, note: x.note } as Lookup])) }));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [rows]);
+  return { map, error };
+}
+
 export function GoogleResults({ result }: { result: Done }) {
   const router = useRouter();
   const [rows, setRows] = React.useState<GoogleResult[]>(result.results);
-  const selectable = rows.filter((r) => !r.saved && r.website).map((r) => r.placeId);
+  const [initialRows] = React.useState(result.results);
+  const { map: lookups, error: lookupError } = useEmailLookups(initialRows);
+  const [onlyEmail, setOnlyEmail] = React.useState(false);
+  const shown = onlyEmail ? rows.filter((r) => (lookups[r.placeId]?.emails.length ?? 0) > 0) : rows;
+  const checking = Object.values(lookups).filter((l) => l.status === "waiting" || l.status === "checking").length;
+  const withEmail = Object.values(lookups).filter((l) => l.emails.length).length;
+  const selectable = shown.filter((r) => !r.saved && r.website).map((r) => r.placeId);
   const [selected, setSelected] = React.useState<string[]>([]);
   const [pending, start] = React.useTransition();
   const [status, setStatus] = React.useState<{ tone: "green" | "danger"; text: string } | null>(null);
@@ -157,6 +196,19 @@ export function GoogleResults({ result }: { result: Done }) {
 
   return (
     <div>
+      <div className="flex flex-wrap items-center gap-3 border-b border-line px-5 py-2.5 text-sm">
+        <span className="inline-flex items-center gap-2 text-slate">
+          {checking ? <Loader2 aria-hidden className="size-3.5 animate-spin text-green" /> : <Mail aria-hidden className="size-3.5 text-green" />}
+          <span>
+            <span className="font-medium tabular-nums text-ink">{withEmail}</span> of {Object.keys(lookups).length} websites show a public email
+            {checking ? ` · checking ${checking}…` : ""}
+          </span>
+        </span>
+        <label className="ml-auto inline-flex cursor-pointer items-center gap-2 text-slate">
+          <Checkbox checked={onlyEmail} onChange={(e) => setOnlyEmail(e.target.checked)} /> Only with email
+        </label>
+      </div>
+      {lookupError ? <p className="border-b border-line px-5 py-2 text-xs text-danger-fg">{lookupError}</p> : null}
       {selected.length || status ? (
         <div className="flex flex-wrap items-center gap-3 border-b border-line bg-mint-soft/40 px-5 py-2.5">
           {selected.length ? (
@@ -167,7 +219,9 @@ export function GoogleResults({ result }: { result: Done }) {
                 disabled={pending}
                 onClick={() =>
                   start(async () => {
-                    const items = rows.filter((r) => selected.includes(r.placeId) && r.website).map((r) => ({ placeId: r.placeId, website: r.website! }));
+                    const items = rows
+                      .filter((r) => selected.includes(r.placeId) && r.website)
+                      .map((r) => ({ placeId: r.placeId, website: r.website!, siteName: lookups[r.placeId]?.siteName ?? null, emails: lookups[r.placeId]?.emails ?? [] }));
                     const r = await saveGoogleLeadsAction({ niche: result.niche, items });
                     if (r.ok) {
                       setRows((xs) => xs.map((x) => (selected.includes(x.placeId) ? { ...x, saved: true } : x)));
@@ -192,7 +246,7 @@ export function GoogleResults({ result }: { result: Done }) {
         </div>
       ) : null}
       <div className="overflow-x-auto scrollbar-thin">
-        <table className="w-full min-w-[820px] text-left text-sm">
+        <table className="w-full min-w-[1020px] text-left text-sm">
           <caption className="sr-only">Google Maps results</caption>
           <thead className="border-b border-line bg-canvas/60 text-xs text-slate">
             <tr>
@@ -207,12 +261,13 @@ export function GoogleResults({ result }: { result: Done }) {
               <th scope="col" className="py-2.5 pr-3 font-medium">Business</th>
               <th scope="col" className="py-2.5 pr-3 font-medium">Rating</th>
               <th scope="col" className="py-2.5 pr-3 font-medium">Website</th>
+              <th scope="col" className="py-2.5 pr-3 font-medium">Email</th>
               <th scope="col" className="py-2.5 pr-3 font-medium">Phone</th>
               <th scope="col" className="py-2.5 pr-5 text-right font-medium">Status</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((r) => {
+            {shown.map((r) => {
               const on = selected.includes(r.placeId);
               return (
                 <tr key={r.placeId} className={cn("border-b border-line last:border-b-0", on && "bg-mint-soft/30")}>
@@ -252,6 +307,9 @@ export function GoogleResults({ result }: { result: Done }) {
                     ) : (
                       "Not listed"
                     )}
+                  </td>
+                  <td className="max-w-[230px] py-3 pr-3 text-xs">
+                    <EmailCell r={r} l={lookups[r.placeId]} />
                   </td>
                   <td className="whitespace-nowrap py-3 pr-3 text-xs text-slate">{r.phone ?? "Not listed"}</td>
                   <td className="py-3 pr-5 text-right">
@@ -324,4 +382,28 @@ export function GoogleDetails({ placeId, label }: { placeId: string; label: stri
       {d ? <GoogleCredit /> : null}
     </div>
   );
+}
+
+function EmailCell({ r, l }: { r: GoogleResult; l: Lookup | undefined }) {
+  if (!r.website) return <span className="text-slate">No website</span>;
+  if (r.saved && !l) return <span className="text-slate">In leads</span>;
+  if (!l || l.status === "waiting") return <span className="text-slate">Waiting…</span>;
+  if (l.status === "checking")
+    return (
+      <span className="inline-flex items-center gap-1.5 text-slate">
+        <Loader2 aria-hidden className="size-3 animate-spin" /> Reading website…
+      </span>
+    );
+  if (l.emails.length)
+    return (
+      <span className="block">
+        <a href={l.emails[0].url} target="_blank" rel="noopener noreferrer nofollow" title={`Shown on ${l.emails[0].url}`} className="block truncate font-mono text-ink hover:text-green hover:underline">
+          {l.emails[0].email}
+        </a>
+        <span className="text-[11px] text-slate">
+          From its website{l.emails.length > 1 ? ` · +${l.emails.length - 1} more` : ""} · unverified
+        </span>
+      </span>
+    );
+  return <span className="text-slate" title={l.note}>{l.status === "blocked" ? "Site blocks tools" : l.status === "failed" ? "Couldn't read site" : "None shown"}</span>;
 }
