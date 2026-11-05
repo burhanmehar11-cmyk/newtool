@@ -56,11 +56,6 @@ async function Billing() {
           {b.enforce ? "Searches, research, AI writing and sending are paused until you choose a plan. Everything you saved is still here." : "Choose a plan to keep going. Nothing is locked yet."}
         </Callout>
       ) : null}
-      {!b.checkout ? (
-        <Callout tone="info" title="Payments aren't set up yet" className="mb-5">
-          The owner of this Locenti installation still needs to connect Paddle. Until then your workspace keeps working as it does today.
-        </Callout>
-      ) : null}
 
       <div className="grid gap-4 lg:grid-cols-3">
         {plans.map((p) => {
