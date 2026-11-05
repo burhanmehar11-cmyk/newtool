@@ -24,7 +24,7 @@ export const features = {
   googleMaps: { label: "Google Maps search (Places API)", availability: "beta", target: "M2" },
   verification: { label: "Email verification", availability: "demo", target: "M2" },
   opportunityBrief: { label: "Opportunity Briefs from website research", availability: "beta", target: "M2" },
-  drafts: { label: "Evidence-based drafts", availability: "demo", target: "M2" },
+  drafts: { label: "AI-written emails", availability: "beta", target: "M2" },
   sequences: { label: "Approved campaigns (first email)", availability: "beta", target: "M2" },
   gmail: { label: "Gmail connection (send-only)", availability: "beta", target: "M2" },
   replySync: { label: "Reply sync and classification", availability: "demo", target: "M2" },
@@ -34,7 +34,7 @@ export const features = {
   roles: { label: "Team roles and permissions", availability: "planned", target: "M3" },
   billing: { label: "Billing", availability: "planned", target: "M3" },
   api: { label: "REST API and webhooks", availability: "planned", target: "M3" },
-  mcp: { label: "MCP integration", availability: "planned", target: "M3" },
+  mcp: { label: "Your own AI agent (MCP)", availability: "beta", target: "M3" },
 } as const satisfies Record<
   string,
   { label: string; availability: Availability; target: "M2" | "M3" }

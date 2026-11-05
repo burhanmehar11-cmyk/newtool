@@ -6,6 +6,10 @@ import { Button } from "@/components/ui/button";
 
 const faqs: { q: string; a: React.ReactNode }[] = [
   {
+    q: "Does AI write the emails?",
+    a: "Yes, two ways. The built-in AI writer drafts each first email from the lead's research and your pitch. Or connect your own AI agent (Claude, Cursor or any MCP client) and it can search, research and write inside your workspace using your own AI account. Either way, every email is based on facts with sources, and nothing is sent until you approve it.",
+  },
+  {
     q: "Where does lead data come from?",
     a: "Business listings come from Google Maps, through Google's official Places API (never scraping), or from OpenStreetMap's free open map data. Google results are shown live and not stored, as Google's terms require. Locentio then reads each business's public website (respecting robots.txt) for contact details and research. Every fact shows its source and the date it was collected.",
   },

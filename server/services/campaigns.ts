@@ -26,6 +26,7 @@ import { listMailboxes } from "@/server/mailbox-store";
 import { leadDetail, toBusiness } from "@/server/research-store";
 import { runDispatch } from "@/server/services/dispatch";
 import { getOfferProfile } from "@/server/services/workspaces";
+import { aiWriterStatus } from "@/server/services/ai-writer";
 
 const asQ = <T,>(userId: string, fn: (q: Q) => Promise<T>) => withUser(userId, (q) => fn(q as unknown as Q));
 const uuid = z.string().uuid();
@@ -86,6 +87,7 @@ export async function getCampaignDetail(id: string) {
       mailboxes,
       recipients: recipients.map((r) => ({ ...r, decision: classifyRecipient(r, campaign.policy) })),
       canManage: canManage(workspace.role),
+      aiConfigured: aiWriterStatus().configured,
     };
   });
 }

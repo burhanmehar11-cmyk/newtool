@@ -2,12 +2,13 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, Loader2, Pause, Play, Send, Trash2, X } from "lucide-react";
+import { ChevronDown, Loader2, Pause, Play, Send, Sparkles, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox, FieldHint, Input, Label, Select, Textarea } from "@/components/ui/field";
 import { Callout } from "@/components/ui/misc";
 import { describeSchedule, TIMEZONES } from "@/lib/campaigns/schedule";
+import { writeCampaignDraftsAction, writeDraftAction } from "@/server/actions/ai";
 import { approveAction, campaignStatusAction, dropRecipientAction, editDraftAction, saveCampaignSettingsAction, sendDueNowAction } from "@/server/actions/campaigns";
 import type { CampaignRow, RecipientRow } from "@/server/campaign-store";
 import type { MailboxRow } from "@/server/mailbox-store";
@@ -18,9 +19,9 @@ type Msg = { tone: "green" | "danger" | "info"; text: string } | null;
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-export function CampaignView({ campaign, recipients, mailboxes, canManage }: { campaign: CampaignRow; recipients: Recipient[]; mailboxes: MailboxRow[]; canManage: boolean }) {
+export function CampaignView({ campaign, recipients, mailboxes, canManage, aiConfigured }: { campaign: CampaignRow; recipients: Recipient[]; mailboxes: MailboxRow[]; canManage: boolean; aiConfigured: boolean }) {
   return campaign.status === "draft" ? (
-    <DraftCampaign campaign={campaign} recipients={recipients} mailboxes={mailboxes} canManage={canManage} />
+    <DraftCampaign campaign={campaign} recipients={recipients} mailboxes={mailboxes} canManage={canManage} aiConfigured={aiConfigured} />
   ) : (
     <LiveCampaign campaign={campaign} recipients={recipients} mailboxes={mailboxes} canManage={canManage} />
   );
@@ -42,18 +43,43 @@ function useAction() {
 
 /* ------------------------------------------------------------------ draft */
 
-function DraftCampaign({ campaign, recipients, mailboxes, canManage }: { campaign: CampaignRow; recipients: Recipient[]; mailboxes: MailboxRow[]; canManage: boolean }) {
+function DraftCampaign({ campaign, recipients, mailboxes, canManage, aiConfigured }: { campaign: CampaignRow; recipients: Recipient[]; mailboxes: MailboxRow[]; canManage: boolean; aiConfigured: boolean }) {
   const willSend = recipients.filter((r) => r.decision.send);
+  const ai = useAction();
   return (
     <div className="grid gap-5 xl:grid-cols-[minmax(0,8fr)_minmax(0,4fr)]">
       <section className="card">
-        <div className="border-b border-line px-5 py-4">
-          <h2 className="font-display text-base font-semibold text-ink">Recipients and messages</h2>
-          <p className="mt-0.5 text-[13px] text-slate">Open each one to read and edit the exact email. {willSend.length} of {recipients.length} will be sent.</p>
+        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-line px-5 py-4">
+          <div className="min-w-0">
+            <h2 className="font-display text-base font-semibold text-ink">Recipients and messages</h2>
+            <p className="mt-0.5 text-[13px] text-slate">Open each one to read and edit the exact email. {willSend.length} of {recipients.length} will be sent.</p>
+          </div>
+          {canManage && aiConfigured ? (
+            <Button
+              size="sm"
+              variant="secondary"
+              disabled={ai.pending}
+              onClick={() =>
+                ai.run(
+                  () => writeCampaignDraftsAction(campaign.id),
+                  (r) => `AI wrote ${r.written} email${r.written === 1 ? "" : "s"}${r.failed ? `; ${r.failed} failed (${r.firstError})` : ""}. Read them before approving.`,
+                )
+              }
+            >
+              {ai.pending ? <Loader2 aria-hidden className="animate-spin" /> : <Sparkles aria-hidden />} {ai.pending ? "Writing…" : "Write all with AI"}
+            </Button>
+          ) : null}
         </div>
+        {ai.msg ? (
+          <div className="border-b border-line px-5 py-2.5">
+            <Callout tone={ai.msg.tone === "info" ? "info" : ai.msg.tone} className="py-1.5">
+              <span role="status">{ai.msg.text}</span>
+            </Callout>
+          </div>
+        ) : null}
         <ul className="divide-y divide-line">
           {recipients.map((r) => (
-            <RecipientItem key={r.lead_id} r={r} campaignId={campaign.id} editable={canManage} />
+            <RecipientItem key={`${r.lead_id}-${r.draft_version ?? 0}`} r={r} campaignId={campaign.id} editable={canManage} aiConfigured={aiConfigured} />
           ))}
         </ul>
       </section>
@@ -65,7 +91,7 @@ function DraftCampaign({ campaign, recipients, mailboxes, canManage }: { campaig
   );
 }
 
-function RecipientItem({ r, campaignId, editable }: { r: Recipient; campaignId: string; editable: boolean }) {
+function RecipientItem({ r, campaignId, editable, aiConfigured }: { r: Recipient; campaignId: string; editable: boolean; aiConfigured: boolean }) {
   const [open, setOpen] = React.useState(false);
   const [subject, setSubject] = React.useState(r.subject ?? "");
   const [body, setBody] = React.useState(r.body ?? "");
@@ -82,7 +108,7 @@ function RecipientItem({ r, campaignId, editable }: { r: Recipient; campaignId: 
           </span>
         </span>
         {r.decision.send ? <Badge tone="green">Will send</Badge> : <Badge tone="neutral">{r.decision.reason}</Badge>}
-        {r.draft_origin === "edited" ? <Badge tone="outline">Edited</Badge> : null}
+        {r.draft_origin === "edited" ? <Badge tone="outline">Edited</Badge> : r.draft_origin === "ai" ? <Badge tone="info">AI</Badge> : r.draft_origin === "agent" ? <Badge tone="info">Agent</Badge> : null}
         <ChevronDown aria-hidden className={cn("size-4 shrink-0 text-slate transition-transform", open && "rotate-180")} />
       </button>
       {open ? (
@@ -106,6 +132,11 @@ function RecipientItem({ r, campaignId, editable }: { r: Recipient; campaignId: 
               <Button size="sm" disabled={!dirty || pending} onClick={() => run(() => editDraftAction(campaignId, r.lead_id, { subject, body }), "Saved. Approve the campaign again to include this change.")}>
                 {pending ? <Loader2 aria-hidden className="animate-spin" /> : null} Save message
               </Button>
+              {aiConfigured && r.has_brief ? (
+                <Button size="sm" variant="secondary" disabled={pending} onClick={() => run(() => writeDraftAction(r.lead_id), "Rewritten by AI. Read it before approving.")}>
+                  <Sparkles aria-hidden /> Rewrite with AI
+                </Button>
+              ) : null}
               <Button size="sm" variant="ghost" disabled={pending} onClick={() => run(() => dropRecipientAction(campaignId, r.lead_id), "Removed.")}>
                 <X aria-hidden /> Remove from campaign
               </Button>

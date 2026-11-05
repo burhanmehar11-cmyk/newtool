@@ -72,6 +72,10 @@ Before launch: a dedicated least-privilege database role for the app; real-Postg
 - `lib/mcp/protocol.ts` (JSON-RPC core), `server/mcp/tools.ts` (10 tools), `app/api/mcp/route.ts`, tokens in `server/token-store.ts` / `server/services/tokens.ts`, UI `features/settings/agents-card.tsx` (Settings → AI agents), migration `0007_agents.sql`. Services gained "as user" variants (`runGoogleSearchAs`, `saveGoogleSearchLeadsAs`, `researchLeadAs`, `getOfferProfileFor`).
 - Verified with the official MCP SDK client against the running app (401 without token, all tools, live Google search, draft + campaign creation, errors).
 
+## Built-in AI writer (Gemini)
+
+- `lib/ai/draft-prompt.ts` (prompt + output checks, tested), `server/ai/gemini.ts`, `server/services/ai-writer.ts`, actions `server/actions/ai.ts`; UI: lead page "First email" card, campaign "Write all with AI" and per-recipient rewrite; Agent page (`app/app/agent`). Needs `GEMINI_API_KEY` (setup guide Part I). Not yet called with a real key from here.
+
 ## Landing page
 
 `components/marketing/audience-workflow.tsx` → `HowItWorks`: 5 steps (connect mailbox, search Google Maps, research and personalise, approve and launch, handle replies). Each step's badge comes from `config/milestone.ts`, so flipping a feature's `availability` updates the page.

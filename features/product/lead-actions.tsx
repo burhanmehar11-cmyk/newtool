@@ -1,8 +1,9 @@
 "use client";
 
+import { writeDraftAction } from "@/server/actions/ai";
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { FileSearch, Loader2, MailCheck } from "lucide-react";
+import { FileSearch, Loader2, MailCheck, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Callout } from "@/components/ui/misc";
 import { Textarea } from "@/components/ui/field";
@@ -96,6 +97,40 @@ export function NotesEditor({ leadId, initial }: { leadId: string; initial: stri
       <p className="text-xs text-slate" aria-live="polite">
         {value !== saved ? "Saves when you leave the field." : status ?? ""}
       </p>
+    </div>
+  );
+}
+
+/** Writes (or rewrites) this lead's first email with the built-in AI. */
+export function WriteWithAiButton({ leadId, hasDraft, disabledReason }: { leadId: string; hasDraft: boolean; disabledReason: string | null }) {
+  const router = useRouter();
+  const [pending, start] = React.useTransition();
+  const [msg, setMsg] = React.useState<{ tone: "green" | "danger"; text: string } | null>(null);
+  return (
+    <div className="space-y-2">
+      <Button
+        size="sm"
+        variant={hasDraft ? "secondary" : "primary"}
+        disabled={pending || !!disabledReason}
+        title={disabledReason ?? undefined}
+        onClick={() =>
+          start(async () => {
+            setMsg(null);
+            const r = await writeDraftAction(leadId);
+            setMsg(r.ok ? { tone: "green", text: "Draft written. Read it before using it in a campaign." } : { tone: "danger", text: r.error });
+            if (r.ok) router.refresh();
+          })
+        }
+      >
+        {pending ? <Loader2 aria-hidden className="animate-spin" /> : <Sparkles aria-hidden />}
+        {pending ? "Writing…" : hasDraft ? "Rewrite with AI" : "Write with AI"}
+      </Button>
+      {disabledReason ? <p className="text-xs text-slate">{disabledReason}</p> : null}
+      {msg ? (
+        <Callout tone={msg.tone} className="py-2">
+          <span role="status">{msg.text}</span>
+        </Callout>
+      ) : null}
     </div>
   );
 }

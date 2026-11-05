@@ -11,14 +11,15 @@ import { OpportunityBriefView } from "@/components/product/opportunity-brief";
 import { PageLoading } from "@/features/product/page-loading";
 import { OsmCredit } from "@/features/product/osm-credit";
 import { GoogleDetails } from "@/features/product/google-search";
-import { CheckEmailButton, NotesEditor, ResearchButton } from "@/features/product/lead-actions";
+import { CheckEmailButton, NotesEditor, ResearchButton, WriteWithAiButton } from "@/features/product/lead-actions";
+import { aiWriterStatus } from "@/server/services/ai-writer";
 import { nicheWords } from "@/lib/discovery/niches";
 import { offerTypeLabels } from "@/lib/domain/labels";
 import type { EmailStatus, Evidence } from "@/lib/domain/types";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import { requireWorkspace } from "@/server/auth";
 import { toBusiness } from "@/server/research-store";
-import { getLeadDetail } from "@/server/services/research";
+import { getLatestDraft, getLeadDetail } from "@/server/services/research";
 import { getOfferProfile } from "@/server/services/workspaces";
 
 export const metadata: Metadata = { title: "Lead" };
@@ -42,7 +43,8 @@ const researchLabel: Record<string, { tone: "green" | "warn" | "danger" | "neutr
 async function Lead({ params }: { params: PageProps<"/app/leads/[id]">["params"] }) {
   const { id } = await params;
   const { workspace } = await requireWorkspace(`/app/leads/${id}`);
-  const [d, offer] = await Promise.all([getLeadDetail(id), getOfferProfile(workspace)]);
+  const [d, offer, draft] = await Promise.all([getLeadDetail(id), getOfferProfile(workspace), getLatestDraft(id)]);
+  const ai = aiWriterStatus();
   if (!d) {
     return (
       <div>
@@ -127,6 +129,21 @@ async function Lead({ params }: { params: PageProps<"/app/leads/[id]">["params"]
         </SectionCard>
 
         <div className="space-y-5">
+          <SectionCard title="First email" description={draft ? `Version ${draft.version} · ${draft.origin === "ai" ? "written by AI" : draft.origin === "agent" ? "written by your agent" : draft.origin === "edited" ? "edited by you" : "from the brief template"}` : "Not written yet."}>
+            {draft ? (
+              <div className="mb-4 rounded-lg border border-line bg-canvas p-3">
+                <p className="text-sm font-medium text-ink">{draft.subject}</p>
+                <p className="mt-2 whitespace-pre-wrap text-[13px] leading-6 text-ink/90">{draft.body}</p>
+              </div>
+            ) : null}
+            <WriteWithAiButton
+              leadId={d.leadId}
+              hasDraft={!!draft}
+              disabledReason={!ai.configured ? "The AI writer isn't set up yet (see the Agent page)." : !d.brief ? "Research the website first; the email is written from what it shows." : null}
+            />
+            <p className="mt-3 text-xs text-slate">Edit messages and send them from a campaign. Nothing is sent from here.</p>
+          </SectionCard>
+
           <SectionCard title="Contacts" description="Emails published by the business on its listing or website.">
             {d.contacts.length ? (
               <ul className="space-y-3">

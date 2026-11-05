@@ -96,9 +96,9 @@ const steps: { icon: React.ComponentType<{ className?: string }>; title: string;
   },
   {
     icon: Compass,
-    title: "Research and personalise",
-    copy: "Each lead gets an Opportunity Brief: what its website shows, with sources, and why that matters for your offer. Drafts start from those facts.",
-    status: ["opportunityBrief", "drafts"],
+    title: "Research and write with AI",
+    copy: "Each lead gets an Opportunity Brief: what its website shows, with sources. AI writes a personal first email from those facts and your pitch, using the built-in writer or your own agent.",
+    status: ["opportunityBrief", "drafts", "mcp"],
   },
   {
     icon: Send,

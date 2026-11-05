@@ -17,7 +17,7 @@ export function Hero() {
               <span className="absolute inline-flex size-full animate-ping rounded-full bg-mint opacity-60 motion-reduce:hidden" />
               <span className="relative inline-flex size-2 rounded-full bg-mint" />
             </span>
-            Private beta · Google Maps search and Gmail sending are live
+            Private beta · Google Maps, AI writing and Gmail sending are live
           </p>
           <h1 className="display-hero mt-6 text-white">
             <span data-reveal className="block">
@@ -28,7 +28,7 @@ export function Hero() {
             </span>
           </h1>
           <p data-reveal className="mx-auto mt-6 max-w-[660px] text-lg leading-8 text-white/72">
-            Find local businesses on Google Maps, see what their websites actually show, and send personal emails from your own Gmail, each one reviewed and approved by you.
+            Find local businesses on Google Maps, see what their websites actually show, and let AI write a personal email for each one. You approve, and it sends from your own Gmail.
           </p>
           <div data-reveal className="mt-8 flex flex-wrap items-center justify-center gap-3">
             <Button asChild variant="mint" size="lg">

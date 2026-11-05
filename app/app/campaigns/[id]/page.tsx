@@ -41,7 +41,7 @@ async function Campaign({ params }: { params: PageProps<"/app/campaigns/[id]">["
     <div>
       {back}
       <PageHeader title={d.campaign.name} actions={<Badge tone={tone[d.campaign.status]}>{label[d.campaign.status]}</Badge>} />
-      <CampaignView campaign={d.campaign} recipients={d.recipients} mailboxes={d.mailboxes} canManage={d.canManage} />
+      <CampaignView campaign={d.campaign} recipients={d.recipients} mailboxes={d.mailboxes} canManage={d.canManage} aiConfigured={d.aiConfigured} />
     </div>
   );
 }

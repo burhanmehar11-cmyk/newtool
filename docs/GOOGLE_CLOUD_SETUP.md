@@ -189,6 +189,14 @@ Approved campaigns send one email per mailbox every few minutes during the sendi
 
 Without the scheduler, campaigns still work: the campaign page has **Send next due email**, which sends one at a time with the same limits.
 
+## Part I: Built-in AI writer (Gemini, optional)
+
+1. Go to **aistudio.google.com** → sign in → **Get API key** → **Create API key** (in your Locentio Google Cloud project or a new one). Don't paste it into chat.
+2. Vercel → Settings → Environment Variables → `GEMINI_API_KEY` = the key → Production → Save → **Redeploy**.
+3. In the app: **Agent** page shows "Ready". Open a researched lead → **Write with AI**.
+
+Note: on Gemini's free tier, Google may use what's sent (lead research, your offer) to improve its products. A paid Gemini plan avoids that. People who connect their own agent over MCP don't use this key.
+
 ## Part F: First sign-in (owner)
 
 1. Open `https://YOUR-URL/sign-in` → **Continue with Google** → pick a Gmail account that is both a **test user** (Part B) and on `BETA_ALLOWED_EMAILS` (Part E).

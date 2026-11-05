@@ -165,3 +165,9 @@ export async function saveNotes(q: Q, leadId: string, notes: string) {
   const r = await q.query<{ id: string }>("update public.leads set notes = $2 where id = $1 returning id", [leadId, notes.slice(0, 5000)]);
   return r.rows.length > 0;
 }
+
+export type LatestDraft = { version: number; subject: string; body: string; origin: string; created_at: string };
+
+export async function latestDraft(q: Q, leadId: string): Promise<LatestDraft | null> {
+  return (await q.query<LatestDraft>("select version, subject, body, origin, created_at from public.drafts where lead_id = $1 order by version desc limit 1", [leadId])).rows[0] ?? null;
+}

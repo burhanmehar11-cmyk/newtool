@@ -10,7 +10,7 @@ import { requireWorkspace } from "@/server/auth";
 import { withUser } from "@/server/db";
 import { configuredSiteUrl } from "@/server/env";
 import type { Q } from "@/server/auth-store";
-import { contactById, leadDetail, recordDnsCheck, saveNotes, saveResearch, toBusiness, type ResearchOutcome } from "@/server/research-store";
+import { contactById, latestDraft, leadDetail, recordDnsCheck, saveNotes, saveResearch, toBusiness, type ResearchOutcome } from "@/server/research-store";
 import { safeFetch } from "@/server/research/fetch";
 import { dnsEmailCheck } from "@/server/research/email-check";
 import { getOfferProfileFor } from "@/server/services/workspaces";
@@ -132,4 +132,10 @@ export async function updateLeadNotes(leadId: string, notes: string) {
   const { user } = await requireWorkspace("/app/leads");
   if (!uuid.safeParse(leadId).success) return false;
   return asQ(user.id, (q) => saveNotes(q, leadId, String(notes ?? "")));
+}
+
+export async function getLatestDraft(leadId: string) {
+  const { user } = await requireWorkspace("/app/leads");
+  if (!uuid.safeParse(leadId).success) return null;
+  return asQ(user.id, (q) => latestDraft(q, leadId));
 }
