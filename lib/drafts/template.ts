@@ -2,7 +2,8 @@ import type { Business, OfferProfile, OpportunityBrief } from "@/lib/domain/type
 import { nicheWords } from "@/lib/discovery/niches";
 
 /**
- * Demo-only draft writer. Template-based and deterministic: no model is called.
+ * Rule-based draft writer, shared by the demo and the product. Template-based
+ * and deterministic: no model is called.
  * Every observation sentence maps to a fact in the brief, so the UI can show
  * what each draft relies on.
  */
@@ -91,7 +92,7 @@ export function generateDraft(
   const greeting = `Hi ${b.name} team,`;
   const observation = primary
     ? `${primary.line}${primary.inference ? ` ${primary.inference}` : ""} You may already have this covered.`
-    : `I came across ${b.name} while looking at ${nicheWords(b.niche).plural.toLowerCase()} in ${b.city}.`;
+    : `I came across ${b.name} while looking at ${nicheWords(b.niche).plural.toLowerCase()}${b.city ? ` in ${b.city}` : ""}.`;
 
   const offerLine =
     offer.tone === "direct"
