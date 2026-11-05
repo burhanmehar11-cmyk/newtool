@@ -1,3 +1,4 @@
+import type { FollowUp } from "@/lib/campaigns/followups";
 import type { Schedule } from "@/lib/campaigns/schedule";
 import type { Q } from "@/server/auth-store";
 
@@ -121,6 +122,9 @@ export type RecipientRow = {
   accepted_at: string | null;
   reply_kind: string | null;
   thread_id: string | null;
+  step: number | null;
+  next_send_at: string | null;
+  followups_sent: number;
 };
 
 export async function campaignRecipients(q: Q, campaignId: string): Promise<RecipientRow[]> {
@@ -133,6 +137,8 @@ export async function campaignRecipients(q: Q, campaignId: string): Promise<Reci
          d.id as draft_id, d.version as draft_version, d.subject, d.body, d.origin as draft_origin,
          e.state as enrollment_state, e.reason as enrollment_reason,
          x.status as dispatch_status, x.error as dispatch_error, x.accepted_at,
+         e.step, e.next_send_at,
+         (select count(*)::int from public.dispatches x2 where x2.enrollment_id = e.id and x2.step > 0 and x2.status = 'accepted') as followups_sent,
          (select t.classification from public.threads t where t.campaign_id = r.campaign_id and t.lead_id = l.id and t.last_inbound_at is not null limit 1) as reply_kind,
          (select t.id from public.threads t where t.campaign_id = r.campaign_id and t.lead_id = l.id and t.last_inbound_at is not null limit 1) as thread_id
        from public.campaign_recipients r
@@ -149,6 +155,32 @@ export async function campaignRecipients(q: Q, campaignId: string): Promise<Reci
       [campaignId],
     )
   ).rows;
+}
+
+/* ------------------------------------------------------------- follow-ups */
+
+export async function listFollowUps(q: Q, campaignId: string): Promise<FollowUp[]> {
+  return (
+    await q.query<{ delay_days: number; body: string }>(
+      "select delay_days, body from public.campaign_steps where campaign_id = $1 and kind = 'follow_up' order by position",
+      [campaignId],
+    )
+  ).rows.map((r) => ({ delayDays: r.delay_days, body: r.body }));
+}
+
+/** Replaces the follow-ups of a draft campaign (bumping its revision). False once the campaign is approved. */
+export async function saveFollowUps(q: Q, ws: string, campaignId: string, steps: FollowUp[]): Promise<boolean> {
+  const c = (await q.query<{ status: string }>("select status from public.campaigns where id = $1 for update", [campaignId])).rows[0];
+  if (c?.status !== "draft") return false;
+  await q.query("delete from public.campaign_steps where campaign_id = $1 and kind = 'follow_up'", [campaignId]);
+  for (const [i, f] of steps.entries()) {
+    await q.query(
+      "insert into public.campaign_steps (workspace_id, campaign_id, position, kind, delay_days, subject, body) values ($1, $2, $3, 'follow_up', $4, '', $5)",
+      [ws, campaignId, i + 1, f.delayDays, f.body.trim()],
+    );
+  }
+  await bumpRevision(q, campaignId);
+  return true;
 }
 
 /** Any change before launch bumps the revision, so an approval always matches what was reviewed. */
@@ -229,6 +261,7 @@ export async function setCampaignStatus(q: Q, campaignId: string, from: Campaign
   const r = await q.query("update public.campaigns set status = $3 where id = $1 and status = any($2::text[]) returning id", [campaignId, from, to]);
   if (r.rows.length && to === "cancelled") {
     await q.query("update public.enrollments set state = 'stopped', reason = 'Campaign cancelled', updated_at = now() where campaign_id = $1 and state = 'queued'", [campaignId]);
+    await q.query("update public.enrollments set next_send_at = null, reason = 'Campaign cancelled', updated_at = now() where campaign_id = $1 and state = 'sent' and next_send_at is not null", [campaignId]);
   }
   return r.rows.length > 0;
 }
@@ -246,12 +279,10 @@ export async function addSuppression(q: Q, ws: string, userId: string | null, va
     "insert into public.suppression_entries (workspace_id, value, kind, reason, created_by) values ($1, lower($2), $3, $4, $5) on conflict (workspace_id, value) do nothing",
     [ws, value, kind, reason, userId],
   );
-  // Stop anything still waiting to go to this address.
-  await q.query(
-    `update public.enrollments set state = 'stopped', reason = 'On the do-not-contact list', updated_at = now()
-     where workspace_id = $1 and state = 'queued' and (($3 = 'email' and email = lower($2)) or ($3 = 'domain' and (split_part(email, '@', 2) = lower($2) or split_part(email, '@', 2) like '%.' || lower($2))))`,
-    [ws, value, kind],
-  );
+  // Stop anything still waiting to go to this address: first emails and follow-ups.
+  const match = `(($3 = 'email' and email = lower($2)) or ($3 = 'domain' and (split_part(email, '@', 2) = lower($2) or split_part(email, '@', 2) like '%.' || lower($2))))`;
+  await q.query(`update public.enrollments set state = 'stopped', reason = 'On the do-not-contact list', updated_at = now() where workspace_id = $1 and state = 'queued' and ${match}`, [ws, value, kind]);
+  await q.query(`update public.enrollments set next_send_at = null, reason = 'On the do-not-contact list', updated_at = now() where workspace_id = $1 and state = 'sent' and next_send_at is not null and ${match}`, [ws, value, kind]);
 }
 
 export async function removeSuppression(q: Q, id: string) {

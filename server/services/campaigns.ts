@@ -1,5 +1,6 @@
 import "server-only";
 import { z } from "zod";
+import { followUpProblem, MAX_FOLLOW_UPS, type FollowUp } from "@/lib/campaigns/followups";
 import { DEFAULT_SCHEDULE, isValidTimezone, type Schedule } from "@/lib/campaigns/schedule";
 import { generateDraft } from "@/lib/drafts/template";
 import { requireWorkspace } from "@/server/auth";
@@ -14,6 +15,8 @@ import {
   eligibleLeads,
   getCampaign,
   listCampaigns,
+  listFollowUps,
+  saveFollowUps,
   listSuppressions,
   removeRecipient,
   removeSuppression,
@@ -82,10 +85,14 @@ export async function getCampaignDetail(id: string) {
   return asQ(user.id, async (q) => {
     const campaign = await getCampaign(q, id);
     if (!campaign) return null;
-    const [recipients, mailboxes] = await Promise.all([campaignRecipients(q, id), listMailboxes(q, workspace.id)]);
+    // One connection per request: run queries one after another.
+    const recipients = await campaignRecipients(q, id);
+    const mailboxes = await listMailboxes(q, workspace.id);
+    const followUps = await listFollowUps(q, id);
     return {
       campaign,
       mailboxes,
+      followUps,
       recipients: recipients.map((r) => ({ ...r, decision: classifyRecipient(r, campaign.policy) })),
       canManage: canManage(workspace.role),
       aiConfigured: aiWriterStatus().configured,
@@ -114,6 +121,21 @@ export async function saveCampaignSettings(id: string, input: unknown): Promise<
   const ok = await asQ(user.id, (q) =>
     updateCampaignSettings(q, id, { name: p.data.name, mailboxId: p.data.mailboxId, schedule, policy: { includeUnknown: p.data.includeUnknown, includeCatchAll: p.data.includeCatchAll } }),
   );
+  return ok ? { ok: true } : { ok: false, error: "Only draft campaigns can be changed. Cancel it and create a new one." };
+}
+
+const followUpsSchema = z.array(z.object({ delayDays: z.number().int(), body: z.string().max(2000) })).max(MAX_FOLLOW_UPS);
+
+/** Replaces a draft campaign's follow-ups (none, one or two). The campaign must be approved again. */
+export async function saveCampaignFollowUps(id: string, input: unknown): Promise<R> {
+  const { user, workspace } = await requireWorkspace(`/app/campaigns/${id}`);
+  if (!canManage(workspace.role)) return { ok: false, error: "Only workspace owners and admins can change campaigns." };
+  const p = followUpsSchema.safeParse(input);
+  if (!uuid.safeParse(id).success || !p.success) return { ok: false, error: "Check the follow-ups and try again." };
+  const steps: FollowUp[] = p.data.map((f) => ({ delayDays: f.delayDays, body: f.body.trim() }));
+  const problem = followUpProblem(steps);
+  if (problem) return { ok: false, error: problem };
+  const ok = await asQ(user.id, (q) => saveFollowUps(q, workspace.id, id, steps));
   return ok ? { ok: true } : { ok: false, error: "Only draft campaigns can be changed. Cancel it and create a new one." };
 }
 

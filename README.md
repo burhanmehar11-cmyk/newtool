@@ -75,7 +75,7 @@ Sign-in is **"Continue with Google"** through a Google OAuth client. It's free a
 **Step-by-step setup, written for Claude Cowork to follow in the browser: [docs/GOOGLE_CLOUD_SETUP.md](docs/GOOGLE_CLOUD_SETUP.md).** In short:
 
 1. Free Google Cloud project → consent screen (External, **Testing**, add test users) → OAuth client (Web) with redirect URI `https://YOUR-URL/api/auth/google/callback`.
-2. Vercel → Storage → Neon (Free) → run `database/migrations/0000_auth.sql`, `0001_foundation.sql`, `0002_password_and_discovery.sql`, `0003_research.sql`, `0004_google_places.sql`, `0005_mailboxes.sql`, `0006_campaigns.sql`, `0007_agents.sql`, `0008_replies.sql` and `0009_team.sql`, in order, in Neon's SQL Editor.
+2. Vercel → Storage → Neon (Free) → run `database/migrations/0000_auth.sql`, `0001_foundation.sql`, `0002_password_and_discovery.sql`, `0003_research.sql`, `0004_google_places.sql`, `0005_mailboxes.sql`, `0006_campaigns.sql`, `0007_agents.sql`, `0008_replies.sql`, `0009_team.sql` and `0010_followups.sql`, in order, in Neon's SQL Editor.
 3. Vercel variables: `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `SESSION_SECRET` (32+ characters), `NEXT_PUBLIC_SITE_URL`, `BETA_ALLOWED_EMAILS`; then redeploy.
 4. Optional email + password sign-in: `SMTP_URL` (free with a Gmail App Password) for confirmation and reset emails.
 5. Optional Gmail sending: same OAuth client plus the `gmail.send` scope, redirect URI `/api/gmail/callback` and test users (guide Part G).

@@ -53,7 +53,7 @@ Build order: auth and workspaces → one real search-to-saved-lead flow → enri
 | --- | --- | --- |
 | MCP server for your own AI agent | **Built** (started early, see M2 step 4) | |
 | Team invites and roles | **Built, tested against Postgres and in the browser** | Team page: invite by email as Admin or Member (link valid 7 days, works once, only for that email; emailed when SMTP is set, otherwise copy the link), open invites with revoke, change roles, remove people, leave. Rules enforced in the database (migration `0009_team.sql`): only owners and admins manage, the owner can't be removed or demoted. Invited people may sign in without being on the allowlist; onboarding offers open invites before creating a new workspace. |
-| Follow-up emails | Not started | Second and third emails that stop on reply, unsubscribe or bounce. |
+| Follow-up emails | **Built, tested against Postgres (Gmail stubbed)** | Up to two follow-ups per campaign (wait 1–14 days, `{business}` and `{sender}` placeholders), edited while the campaign is a draft so approval covers them. Sent as "Re:" in the first email's Gmail thread with In-Reply-To/References to our own Message-ID; stop on any real reply (not out-of-office), unsubscribe, bounce, failure or cancel. Migration `0010_followups.sql`. Not yet run against real Gmail: check that the recipient sees one thread. |
 | Public API and webhooks | Not started | REST endpoints with personal tokens (the MCP tokens), signed webhooks for new leads and replies. |
 | Real-Postgres CI job | Not started | Runs the database tests on a Postgres service container to cover real lock contention. |
 | Viewer role | Not started | Read-only access needs write restrictions in every table's policies. |

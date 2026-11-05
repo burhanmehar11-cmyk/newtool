@@ -31,7 +31,8 @@ export type Result<T = undefined> = { ok: true; value: T } | { ok: false; error:
 export async function getTeam() {
   const { user, workspace } = await requireWorkspace("/app/team");
   const canManage = ["owner", "admin"].includes(workspace.role);
-  const [members, invites] = await asQ(user.id, (q) => Promise.all([listMembers(q, workspace.id), canManage ? listInvites(q, workspace.id) : Promise.resolve([])]));
+  // One connection per request: run queries one after another.
+  const { members, invites } = await asQ(user.id, async (q) => ({ members: await listMembers(q, workspace.id), invites: canManage ? await listInvites(q, workspace.id) : [] }));
   return { me: user.id, workspace, canManage, members, invites, emailOn: emailConfigured() };
 }
 

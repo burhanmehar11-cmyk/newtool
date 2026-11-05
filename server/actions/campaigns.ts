@@ -9,7 +9,7 @@ import {
   dropRecipient,
   editRecipientDraft,
   removeDoNotContact,
-  saveCampaignSettings,
+  saveCampaignFollowUps, saveCampaignSettings,
   sendDueNow,
   autoSendTick,
 } from "@/server/services/campaigns";
@@ -23,6 +23,11 @@ export async function createCampaignAction(input: { name: string; mailboxId: str
 }
 export async function saveCampaignSettingsAction(id: string, input: unknown) {
   const r = await saveCampaignSettings(id, input);
+  refresh();
+  return r;
+}
+export async function saveFollowUpsAction(id: string, steps: { delayDays: number; body: string }[]) {
+  const r = await saveCampaignFollowUps(id, steps);
   refresh();
   return r;
 }

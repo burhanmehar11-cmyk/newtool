@@ -86,6 +86,11 @@ Before launch: a dedicated least-privilege database role for the app; real-Postg
 - Migration `0009_team.sql`: `workspace_invites` (token SHA-256 only, 7-day expiry, one open invite per email) and security-definer functions `app.invite_member`, `app.revoke_invite`, `app.accept_invite` / `app.accept_invite_id` (signed-in email must match), `app.my_invites`, `app.set_member_role`, `app.remove_member`, `app.workspace_members`.
 - `server/team-store.ts`, `server/services/team.ts`, `server/actions/team.ts`, `server/access.ts` (`mayUseLocenti`: allowlist or team invite, used by Google and password sign-in/up); UI `features/team/`, pages `app/app/team` and `app/invite/[token]`; onboarding lists open invites. Tests `tests/db/team.test.ts`.
 
+## Follow-up emails (M3)
+
+- `lib/campaigns/followups.ts` (rules, rendering, subject, timeline); templates stored in `campaign_steps` (positions 1–2); editor `features/campaigns/follow-ups.tsx`; `saveCampaignFollowUps` in `server/services/campaigns.ts`.
+- Sending: an enrollment stays `sent` while a follow-up waits (`step` = next step, `next_send_at` = when). `nextDue` picks first emails and due follow-ups; `recordAccepted` schedules the next one and never overwrites a reply; failures on a follow-up only stop later follow-ups. Each email carries our own `Message-ID` (stored in `dispatches.rfc_message_id`); follow-ups send with Gmail `threadId` plus In-Reply-To/References. Migration `0010_followups.sql`. Tests in `tests/followups.test.ts` and `tests/db/dispatch.test.ts`.
+
 ## Dashboard, Analytics, migration banner
 
 - `server/analytics-store.ts` + `server/services/analytics.ts`; UI `features/analytics/` (KPI tiles, trend chart, pipeline, campaign table, breakdowns, activity); pages `app/app/page.tsx` (Dashboard) and `app/app/analytics`.
@@ -98,6 +103,6 @@ Order: hero with self-playing product preview (`live-demo.tsx`, ~13 s loop, paus
 ## Next actions
 
 1. **Owner live checks** (listed at the end of the M2 section in `docs/MILESTONES.md`): a small real campaign, reply tracking, optional Gemini key, Google app verification, rotating the Places key.
-2. **M3** (see `docs/MILESTONES.md`): team invites are built (owner runs `0009_team.sql`); next follow-up emails, public API and webhooks, real-Postgres CI job; billing only after the owner approves prices and a provider.
+2. **M3** (see `docs/MILESTONES.md`): team invites and follow-up emails are built (owner runs `0009_team.sql` and `0010_followups.sql`); next public API and webhooks, real-Postgres CI job; billing only after the owner approves prices and a provider.
 3. Decide when to open sign-up (`BETA_ALLOWED_EMAILS` keeps it invite-only; the Google Maps and Gemini allowances are shared).
 4. Remove the old demo code under `demo/` and the `features/*-view.tsx` demo views once nothing links to them (the marketing page still uses `demo/fixtures` for its fictional sample data).

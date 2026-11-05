@@ -50,11 +50,12 @@ export async function refreshAccessToken(refreshToken: string): Promise<Refreshe
 
 export type SendResult = { ok: true; id: string; threadId: string } | { ok: false; code: "auth" | "permission" | "rate_limited" | "rejected" | "network"; message: string };
 
-export async function sendRaw(accessToken: string, raw: string): Promise<SendResult> {
+/** Sends a raw RFC 5322 message. With threadId, Gmail files it in that thread (follow-ups). */
+export async function sendRaw(accessToken: string, raw: string, threadId?: string): Promise<SendResult> {
   const res = await fetch(SEND_URL, {
     method: "POST",
     headers: { authorization: `Bearer ${accessToken}`, "content-type": "application/json" },
-    body: JSON.stringify({ raw }),
+    body: JSON.stringify(threadId ? { raw, threadId } : { raw }),
     signal: AbortSignal.timeout(20_000),
     cache: "no-store",
   }).catch(() => null);

@@ -11,6 +11,8 @@ import { describeSchedule, TIMEZONES } from "@/lib/campaigns/schedule";
 import { writeCampaignDraftsAction, writeDraftAction } from "@/server/actions/ai";
 import { approveAction, campaignStatusAction, dropRecipientAction, editDraftAction, saveCampaignSettingsAction, sendDueNowAction } from "@/server/actions/campaigns";
 import type { CampaignRow, RecipientRow } from "@/server/campaign-store";
+import type { FollowUp } from "@/lib/campaigns/followups";
+import { FollowUpsEditor, FollowUpsSummary } from "@/features/campaigns/follow-ups";
 import type { MailboxRow } from "@/server/mailbox-store";
 import { cn, formatDateTime } from "@/lib/utils";
 
@@ -19,11 +21,11 @@ type Msg = { tone: "green" | "danger" | "info"; text: string } | null;
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-export function CampaignView({ campaign, recipients, mailboxes, canManage, aiConfigured }: { campaign: CampaignRow; recipients: Recipient[]; mailboxes: MailboxRow[]; canManage: boolean; aiConfigured: boolean }) {
+export function CampaignView({ campaign, recipients, mailboxes, canManage, aiConfigured, followUps }: { campaign: CampaignRow; recipients: Recipient[]; mailboxes: MailboxRow[]; canManage: boolean; aiConfigured: boolean; followUps: FollowUp[] }) {
   return campaign.status === "draft" ? (
-    <DraftCampaign campaign={campaign} recipients={recipients} mailboxes={mailboxes} canManage={canManage} aiConfigured={aiConfigured} />
+    <DraftCampaign campaign={campaign} recipients={recipients} mailboxes={mailboxes} canManage={canManage} aiConfigured={aiConfigured} followUps={followUps} />
   ) : (
-    <LiveCampaign campaign={campaign} recipients={recipients} mailboxes={mailboxes} canManage={canManage} />
+    <LiveCampaign campaign={campaign} recipients={recipients} mailboxes={mailboxes} canManage={canManage} followUps={followUps} />
   );
 }
 
@@ -43,7 +45,7 @@ function useAction() {
 
 /* ------------------------------------------------------------------ draft */
 
-function DraftCampaign({ campaign, recipients, mailboxes, canManage, aiConfigured }: { campaign: CampaignRow; recipients: Recipient[]; mailboxes: MailboxRow[]; canManage: boolean; aiConfigured: boolean }) {
+function DraftCampaign({ campaign, recipients, mailboxes, canManage, aiConfigured, followUps }: { campaign: CampaignRow; recipients: Recipient[]; mailboxes: MailboxRow[]; canManage: boolean; aiConfigured: boolean; followUps: FollowUp[] }) {
   const willSend = recipients.filter((r) => r.decision.send);
   const ai = useAction();
   return (
@@ -85,6 +87,7 @@ function DraftCampaign({ campaign, recipients, mailboxes, canManage, aiConfigure
       </section>
       <div className="space-y-5">
         <ApprovePanel campaign={campaign} willSend={willSend.length} total={recipients.length} canManage={canManage} mailboxes={mailboxes} />
+        <FollowUpsEditor key={`${campaign.revision}`} campaignId={campaign.id} initial={followUps} canManage={canManage} />
         <SettingsForm campaign={campaign} mailboxes={mailboxes} canManage={canManage} />
       </div>
     </div>
@@ -355,7 +358,7 @@ const stateBadge = (r: Recipient) => {
   return <Badge tone="outline">Not included</Badge>;
 };
 
-function LiveCampaign({ campaign, recipients, mailboxes, canManage }: { campaign: CampaignRow; recipients: Recipient[]; mailboxes: MailboxRow[]; canManage: boolean }) {
+function LiveCampaign({ campaign, recipients, mailboxes, canManage, followUps }: { campaign: CampaignRow; recipients: Recipient[]; mailboxes: MailboxRow[]; canManage: boolean; followUps: FollowUp[] }) {
   const { pending, msg, setMsg, run } = useAction();
   const router = useRouter();
   const [sending, startSend] = React.useTransition();
@@ -392,6 +395,13 @@ function LiveCampaign({ campaign, recipients, mailboxes, canManage }: { campaign
                   {r.subject ? ` · ${r.subject}` : ""}
                 </span>
                 {r.dispatch_error && r.dispatch_status !== "accepted" ? <span className="block text-xs text-danger-fg">{r.dispatch_error}</span> : null}
+                {r.followups_sent > 0 || (r.enrollment_state === "sent" && r.next_send_at && (r.step ?? 0) > 0) ? (
+                  <span className="block text-xs text-slate">
+                    {r.followups_sent > 0 ? `${r.followups_sent} follow-up${r.followups_sent === 1 ? "" : "s"} sent` : ""}
+                    {r.followups_sent > 0 && r.enrollment_state === "sent" && r.next_send_at ? " · " : ""}
+                    {r.enrollment_state === "sent" && r.next_send_at && (r.step ?? 0) > 0 ? `Follow-up ${r.step} due ${formatDateTime(r.next_send_at)}` : ""}
+                  </span>
+                ) : null}
               </span>
               {stateBadge(r)}
             </li>
@@ -457,6 +467,7 @@ function LiveCampaign({ campaign, recipients, mailboxes, canManage }: { campaign
             Emails go out automatically during sending hours while Locenti is open in any tab (or around the clock with the optional scheduler). &quot;Send next due email&quot; sends one now, using the same limits.
           </p>
         </section>
+        <FollowUpsSummary steps={followUps} />
       </div>
     </div>
   );

@@ -1,7 +1,9 @@
 import "server-only";
+import { randomUUID } from "node:crypto";
 import { brand } from "@/config/brand";
 import { inSendingWindow } from "@/lib/campaigns/schedule";
 import { signUnsubscribe, unsubscribeHeaders, unsubscribeUrl, withFooter } from "@/lib/campaigns/compose";
+import { followUpSubject, renderFollowUp } from "@/lib/campaigns/followups";
 import { buildMessage, toGmailRaw } from "@/lib/gmail/mime";
 import type { Q } from "@/server/auth-store";
 import { withService } from "@/server/db";
@@ -60,12 +62,12 @@ export async function runDispatch(opts: { workspaceId?: string | null; now?: Dat
       await svc((q) => completeFinished(q, c.id));
       continue;
     }
-    const dispatchId = await svc((q) => claimDispatch(q, c.workspace_id, c.id, due.id, c.account_id));
+    const dispatchId = await svc((q) => claimDispatch(q, c.workspace_id, c.id, due.id, c.account_id, due.step));
     if (!dispatchId) continue; // another pass took it
     usedMailboxes.add(c.account_id);
 
     if (await svc((q) => isSuppressedEmail(q, c.workspace_id, due.email))) {
-      await svc((q) => recordFailure(q, dispatchId, due.id, "cancelled", "On the do-not-contact list"));
+      await svc((q) => recordFailure(q, dispatchId, due.id, "cancelled", "On the do-not-contact list", due.step));
       continue;
     }
 
@@ -81,33 +83,39 @@ export async function runDispatch(opts: { workspaceId?: string | null; now?: Dat
     }
 
     const unsubToken = await signUnsubscribe({ ws: c.workspace_id, email: due.email }, secret);
-    const body = withFooter(due.body, { businessAddress: c.business_address ?? "", unsubscribeUrl: unsubscribeUrl(origin, unsubToken) });
+    const isFollowUp = due.step > 0 && !!due.step_body;
+    const text = isFollowUp ? renderFollowUp(due.step_body!, { business: due.business_name, sender: c.sender_name ?? "" }) : due.body;
+    const subject = isFollowUp ? followUpSubject(due.subject) : due.subject;
+    const body = withFooter(text, { businessAddress: c.business_address ?? "", unsubscribeUrl: unsubscribeUrl(origin, unsubToken) });
+    // Our own Message-ID, kept so later follow-ups can reply to it (In-Reply-To / References).
+    const rfcMessageId = `<${randomUUID()}@${c.account_email.split("@")[1] ?? "locenti.local"}>`;
+    const threading: Record<string, string> = isFollowUp && due.message_ids.length ? { "In-Reply-To": due.message_ids[due.message_ids.length - 1], References: due.message_ids.join(" ") } : {};
     let raw: string;
     try {
       raw = toGmailRaw(
         buildMessage({
           from: { email: c.account_email, name: c.sender_name },
           to: due.email,
-          subject: due.subject,
+          subject,
           text: body,
-          headers: unsubscribeHeaders(`${origin}/api/unsubscribe/${unsubToken}`),
+          headers: { "Message-ID": rfcMessageId, ...threading, ...unsubscribeHeaders(`${origin}/api/unsubscribe/${unsubToken}`) },
         }),
       );
     } catch (e) {
-      await svc((q) => recordFailure(q, dispatchId, due.id, "failed", `Message couldn't be built: ${(e as Error).message}`));
+      await svc((q) => recordFailure(q, dispatchId, due.id, "failed", `Message couldn't be built: ${(e as Error).message}`, due.step));
       summary.failed++;
       continue;
     }
 
-    const sent = await sendRaw(token.token, raw);
+    const sent = await sendRaw(token.token, raw, isFollowUp ? (due.thread_id ?? undefined) : undefined);
     if (sent.ok) {
       await svc((q) =>
-        recordAccepted(q, { ws: c.workspace_id, dispatchId, enrollmentId: due.id, leadId: due.lead_id, campaignId: c.id, accountId: c.account_id, messageId: sent.id, threadId: sent.threadId, from: c.account_email, to: due.email, subject: due.subject, body }),
+        recordAccepted(q, { ws: c.workspace_id, dispatchId, enrollmentId: due.id, leadId: due.lead_id, campaignId: c.id, accountId: c.account_id, messageId: sent.id, threadId: sent.threadId, from: c.account_email, to: due.email, subject, body, step: due.step, rfcMessageId }),
       );
       summary.sent++;
       await svc((q) => completeFinished(q, c.id));
     } else if (sent.code === "network") {
-      await svc((q) => recordFailure(q, dispatchId, due.id, "ambiguous", sent.message));
+      await svc((q) => recordFailure(q, dispatchId, due.id, "ambiguous", sent.message, due.step));
       summary.failed++;
     } else if (sent.code === "auth" || sent.code === "permission" || sent.code === "rate_limited") {
       // Mailbox-level problem: put this email back and pause, rather than failing every recipient.
@@ -118,7 +126,7 @@ export async function runDispatch(opts: { workspaceId?: string | null; now?: Dat
       });
       summary.skipped.push(`${c.id}: ${sent.message} (campaign paused)`);
     } else {
-      await svc((q) => recordFailure(q, dispatchId, due.id, "failed", sent.message));
+      await svc((q) => recordFailure(q, dispatchId, due.id, "failed", sent.message, due.step));
       summary.failed++;
     }
   }

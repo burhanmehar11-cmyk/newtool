@@ -1,7 +1,8 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PGlite } from "@electric-sql/pglite";
 import type { Q } from "@/server/auth-store";
-import { addSuppression, approveCampaign, createCampaign, getCampaign, saveDraft, setCampaignStatus, updateCampaignSettings } from "@/server/campaign-store";
+import { addSuppression, approveCampaign, createCampaign, getCampaign, saveDraft, saveFollowUps, setCampaignStatus, updateCampaignSettings } from "@/server/campaign-store";
+import type { FollowUp } from "@/lib/campaigns/followups";
 import { upsertMailbox } from "@/server/mailbox-store";
 import { recordInbound } from "@/server/replies-store";
 import { as, createTestDb, createUser } from "./harness";
@@ -49,13 +50,14 @@ async function seedLead(email: string) {
 }
 
 /** A running campaign on its own mailbox, with one queued email per address. */
-async function runningCampaign(emails: string[]) {
+async function runningCampaign(emails: string[], followUps: FollowUp[] = []) {
   const mailbox = await as(db, A, () => upsertMailbox(q, ws, A, `box${n}@agency.example`, "Sam", "gmail.send"));
   const leadIds: string[] = [];
   for (const e of emails) leadIds.push(await seedLead(e));
   const id = await as(db, A, async () => {
     const c = await createCampaign(q, ws, A, { name: `C${n}`, schedule: ALWAYS, mailboxId: mailbox, leadIds });
     await updateCampaignSettings(q, c, { name: `C${n}`, mailboxId: mailbox, schedule: ALWAYS, policy: { includeUnknown: true, includeCatchAll: false } });
+    if (followUps.length) await saveFollowUps(q, ws, c, followUps);
     return c;
   });
   const c = await as(db, A, () => getCampaign(q, id));
@@ -222,5 +224,122 @@ describe("sending pass", () => {
     const r = await runDispatch({ workspaceId: ws, ignoreGap: true });
     expect(r.skipped.join()).toMatch(/outside sending hours/);
     expect(h.send).not.toHaveBeenCalled();
+  });
+});
+
+describe("follow-ups", () => {
+  const FU: FollowUp[] = [
+    { delayDays: 3, body: "Just checking this reached {business}. {sender}" },
+    { delayDays: 4, body: "Last note from me for {business}, no more after this." },
+  ];
+  const decode = (i: number) => Buffer.from(h.send.mock.calls[i][1] as string, "base64url").toString("utf8");
+  const makeDue = (campaign: string) => db.query("update public.enrollments set next_send_at = now() - interval '1 minute' where campaign_id = $1 and next_send_at is not null", [campaign]);
+  const enr = async (campaign: string) => (await db.query<{ state: string; step: number; next_send_at: Date | null; reason: string | null }>("select state, step, next_send_at, reason from public.enrollments where campaign_id = $1", [campaign])).rows[0];
+
+  it("waits the set days, then replies in the same thread, and completes after the last one", async () => {
+    const c = await runningCampaign(["fu@shop.example"], FU);
+    await only(c.id);
+    h.send.mockResolvedValueOnce({ ok: true, id: "gm-first", threadId: "thread0001" });
+    await runDispatch({ workspaceId: ws, ignoreGap: true });
+    const first = decode(0);
+    const firstId = /Message-ID: (<[^>]+>)/.exec(first)?.[1];
+    expect(firstId).toMatch(/@agency\.example>$/);
+    let e = await enr(c.id);
+    expect(e).toMatchObject({ state: "sent", step: 1 });
+    const waitDays = (e.next_send_at!.getTime() - Date.now()) / 86_400_000;
+    expect(waitDays).toBeGreaterThan(2.9);
+    expect(waitDays).toBeLessThan(3.1);
+    expect(await status(c.id)).toBe("running"); // a follow-up is waiting
+
+    // Not due yet: nothing goes out.
+    await runDispatch({ workspaceId: ws, ignoreGap: true });
+    expect(h.send).toHaveBeenCalledTimes(1);
+
+    await makeDue(c.id);
+    h.send.mockResolvedValueOnce({ ok: true, id: "gm-fu1", threadId: "thread0001" });
+    await runDispatch({ workspaceId: ws, ignoreGap: true });
+    expect(h.send).toHaveBeenCalledTimes(2);
+    expect(h.send.mock.calls[1][2]).toBe("thread0001");
+    const fu1 = decode(1);
+    expect(fu1).toMatch(/Subject: Re: Hello \d+/);
+    expect(fu1).toContain(`In-Reply-To: ${firstId}`);
+    expect(fu1).toContain(`References: ${firstId}`);
+    const fu1Body = Buffer.from(fu1.split("\r\n\r\n")[1].replace(/\r\n/g, ""), "base64").toString("utf8");
+    expect(fu1Body).toMatch(/^Just checking this reached Shop \d+\. Sam/);
+    expect(fu1Body).toMatch(/unsubscribe/i);
+    e = await enr(c.id);
+    expect(e).toMatchObject({ state: "sent", step: 2 });
+
+    await makeDue(c.id);
+    await runDispatch({ workspaceId: ws, ignoreGap: true });
+    expect(h.send).toHaveBeenCalledTimes(3);
+    expect(decode(2)).toContain("References: " + firstId); // threads back to the first email
+    e = await enr(c.id);
+    expect(e).toMatchObject({ state: "sent", step: 2, next_send_at: null });
+    expect(await status(c.id)).toBe("completed");
+    expect((await db.query<{ n: number }>("select count(*)::int as n from public.threads where provider_thread_id = 'thread0001'")).rows[0].n).toBe(1);
+  });
+
+  it("stops when the person replies", async () => {
+    const c = await runningCampaign(["fureply@shop.example"], FU);
+    await only(c.id);
+    h.send.mockResolvedValueOnce({ ok: true, id: "gm-r1", threadId: "thread0002" });
+    await runDispatch({ workspaceId: ws, ignoreGap: true });
+    const thread = (await db.query<{ id: string }>("select id from public.threads where provider_thread_id = 'thread0002'")).rows[0].id;
+    await recordInbound(q, { ws, threadId: thread, messageId: "in-fu", from: "fureply@shop.example", to: "box@agency.example", subject: "Re: Hello", text: "Sounds good, call me.", at: new Date(), kind: "interested", classificationSource: "rules", leadId: c.leadIds[0], campaignId: c.id });
+    await makeDue(c.id);
+    await runDispatch({ workspaceId: ws, ignoreGap: true });
+    expect(h.send).toHaveBeenCalledTimes(1);
+    expect((await enr(c.id)).state).toBe("replied");
+  });
+
+  it("doesn't stop for an out-of-office reply", async () => {
+    const c = await runningCampaign(["fuooo@shop.example"], FU.slice(0, 1));
+    await only(c.id);
+    h.send.mockResolvedValueOnce({ ok: true, id: "gm-o1", threadId: "thread0003" });
+    await runDispatch({ workspaceId: ws, ignoreGap: true });
+    const thread = (await db.query<{ id: string }>("select id from public.threads where provider_thread_id = 'thread0003'")).rows[0].id;
+    await recordInbound(q, { ws, threadId: thread, messageId: "in-ooo", from: "fuooo@shop.example", to: "box@agency.example", subject: "Auto: away", text: "I'm away until Monday.", at: new Date(), kind: "out_of_office", classificationSource: "rules", leadId: c.leadIds[0], campaignId: c.id });
+    await makeDue(c.id);
+    await runDispatch({ workspaceId: ws, ignoreGap: true });
+    expect(h.send).toHaveBeenCalledTimes(2);
+  });
+
+  it("stops for an unsubscribe without changing what was sent", async () => {
+    const c = await runningCampaign(["fuunsub@shop.example"], FU);
+    await only(c.id);
+    await runDispatch({ workspaceId: ws, ignoreGap: true });
+    await as(db, A, () => addSuppression(q, ws, null, "fuunsub@shop.example", "email", "unsubscribe"));
+    expect(await enr(c.id)).toMatchObject({ state: "sent", next_send_at: null, reason: "On the do-not-contact list" });
+    await runDispatch({ workspaceId: ws, ignoreGap: true });
+    expect(h.send).toHaveBeenCalledTimes(1);
+    expect(await status(c.id)).toBe("completed");
+  });
+
+  it("stops further follow-ups after a failed one, keeping the enrollment 'sent'", async () => {
+    const c = await runningCampaign(["fufail@shop.example"], FU);
+    await only(c.id);
+    await runDispatch({ workspaceId: ws, ignoreGap: true });
+    await makeDue(c.id);
+    h.send.mockResolvedValueOnce({ ok: false, code: "network", message: "Couldn't reach Gmail." });
+    await runDispatch({ workspaceId: ws, ignoreGap: true });
+    expect(await enr(c.id)).toMatchObject({ state: "sent", step: 1, next_send_at: null, reason: expect.stringMatching(/^Follow-up stopped/) });
+    await runDispatch({ workspaceId: ws, ignoreGap: true }); // the next pass finds nothing left
+    expect(h.send).toHaveBeenCalledTimes(2);
+    expect(await status(c.id)).toBe("completed");
+  });
+
+  it("cancelling a campaign drops waiting follow-ups", async () => {
+    const c = await runningCampaign(["fucancel@shop.example"], FU);
+    await only(c.id);
+    await runDispatch({ workspaceId: ws, ignoreGap: true });
+    await as(db, A, () => setCampaignStatus(q, c.id, ["running"], "cancelled"));
+    expect(await enr(c.id)).toMatchObject({ state: "sent", next_send_at: null, reason: "Campaign cancelled" });
+  });
+
+  it("can only be changed while the campaign is a draft", async () => {
+    const c = await runningCampaign(["fulocked@shop.example"], FU);
+    expect(await as(db, A, () => saveFollowUps(q, ws, c.id, []))).toBe(false);
+    expect((await db.query<{ n: number }>("select count(*)::int as n from public.campaign_steps where campaign_id = $1 and kind = 'follow_up'", [c.id])).rows[0].n).toBe(2);
   });
 });
