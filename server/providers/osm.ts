@@ -14,7 +14,15 @@ import type { ProviderError, Result } from "./types";
  */
 
 const NOMINATIM = process.env.NOMINATIM_URL?.trim() || "https://nominatim.openstreetmap.org";
-const OVERPASS = process.env.OVERPASS_URL?.trim() || "https://overpass-api.de/api/interpreter";
+/**
+ * Public Overpass instances, tried in order. The main instance increasingly
+ * answers automated requests with 406 or 429, so a busy or refusing instance
+ * falls through to the next. OVERPASS_URL (comma-separated) overrides the list.
+ */
+export const OVERPASS_URLS = (process.env.OVERPASS_URL?.trim() || "https://overpass-api.de/api/interpreter,https://overpass.private.coffee/api/interpreter,https://maps.mail.ru/osm/tools/overpass/api/interpreter")
+  .split(",")
+  .map((u) => u.trim())
+  .filter(Boolean);
 
 function userAgent() {
   const contact = process.env.OSM_CONTACT_EMAIL?.trim() || brand.supportEmail;
@@ -59,19 +67,41 @@ export async function searchBusinesses(p: {
 }): Promise<Result<OsmBusiness[]>> {
   // Ask for extra when filtering by website, since filtering happens after the query.
   const query = buildOverpassQuery({ selectors: p.selectors, lat: p.center.lat, lon: p.center.lon, radiusKm: p.radiusKm, limit: p.website === "any" ? p.limit * 2 : p.limit * 4 });
-  try {
-    const res = await fetch(OVERPASS, {
-      method: "POST",
-      headers: { "user-agent": userAgent(), "content-type": "application/x-www-form-urlencoded", accept: "application/json" },
-      body: new URLSearchParams({ data: query }),
-      signal: AbortSignal.timeout(30_000),
-      cache: "no-store",
-    });
-    if (res.status === 429) return err("rate_limited", "The map data service is busy right now. Try again in a minute.", true);
-    if (res.status === 504) return err("timeout", "The map data service took too long. Try a smaller radius.", true);
-    if (!res.ok) return err("upstream_error", `Map data search failed (HTTP ${res.status}).`, true);
-    return { ok: true, value: parseOverpass(await res.json(), { center: p.center, website: p.website, limit: p.limit }) };
-  } catch (e) {
-    return (e as Error)?.name === "TimeoutError" ? err("timeout", "The map data search timed out. Try a smaller radius.", true) : err("upstream_error", "Couldn't reach the map data service.", true);
+  const deadline = Date.now() + 45_000;
+  let last: { ok: false; error: ProviderError } = err("upstream_error", "Couldn't reach the map data service.", true);
+  for (const endpoint of OVERPASS_URLS) {
+    const left = deadline - Date.now();
+    if (left < 5_000) break;
+    try {
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "user-agent": userAgent(),
+          "content-type": "application/x-www-form-urlencoded",
+          accept: "application/json, text/plain, */*",
+          referer: configuredSiteUrl() ?? brand.siteUrl,
+        },
+        body: new URLSearchParams({ data: query }),
+        signal: AbortSignal.timeout(Math.min(30_000, left)),
+        cache: "no-store",
+      });
+      if (res.ok) {
+        const json: unknown = await res.json().catch(() => null);
+        if (json) return { ok: true, value: parseOverpass(json, { center: p.center, website: p.website, limit: p.limit }) };
+        last = err("upstream_error", "The map data service sent an unreadable answer.", true);
+        continue;
+      }
+      // 406/429/5xx: this instance refused or is overloaded; try the next one.
+      last =
+        res.status === 429
+          ? err("rate_limited", "The map data services are busy right now. Try again in a minute.", true)
+          : res.status === 504
+            ? err("timeout", "The map data service took too long. Try a smaller radius.", true)
+            : err("upstream_error", `Map data search failed (HTTP ${res.status}). Try again in a few minutes.`, true);
+      if (res.status === 400) return last; // our query is wrong; another instance won't help
+    } catch (e) {
+      last = (e as Error)?.name === "TimeoutError" ? err("timeout", "The map data search timed out. Try a smaller radius.", true) : err("upstream_error", "Couldn't reach the map data service.", true);
+    }
   }
+  return last;
 }
