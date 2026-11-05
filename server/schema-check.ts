@@ -1,0 +1,38 @@
+import "server-only";
+import type { Q } from "@/server/auth-store";
+import { withService } from "@/server/db";
+
+/**
+ * Detects database updates (migrations) that haven't been run yet, by
+ * checking for one column or table each migration adds. Shown to the
+ * workspace as a banner naming the exact file to run, instead of pages
+ * failing with a generic error. Cached for a few minutes per server.
+ */
+const MARKERS: { file: string; sql: string }[] = [
+  { file: "0002_password_and_discovery.sql", sql: "select 1 from information_schema.tables where table_schema = 'public' and table_name = 'discovery_results'" },
+  { file: "0003_research.sql", sql: "select 1 from information_schema.columns where table_schema = 'public' and table_name = 'businesses' and column_name = 'research_status'" },
+  { file: "0004_google_places.sql", sql: "select 1 from information_schema.tables where table_schema = 'app' and table_name = 'provider_daily_calls'" },
+  { file: "0005_mailboxes.sql", sql: "select 1 from information_schema.columns where table_schema = 'public' and table_name = 'sending_accounts' and column_name = 'scopes'" },
+  { file: "0006_campaigns.sql", sql: "select 1 from information_schema.columns where table_schema = 'public' and table_name = 'enrollments' and column_name = 'draft_id'" },
+  { file: "0007_agents.sql", sql: "select 1 from information_schema.tables where table_schema = 'public' and table_name = 'api_tokens'" },
+  { file: "0008_replies.sql", sql: "select 1 from information_schema.columns where table_schema = 'public' and table_name = 'threads' and column_name = 'last_inbound_at'" },
+];
+
+export const LATEST_MIGRATION = MARKERS.at(-1)!.file;
+
+let cache: { at: number; missing: string[] } | null = null;
+
+export async function missingMigrations(): Promise<string[]> {
+  if (cache && Date.now() - cache.at < 5 * 60_000) return cache.missing;
+  try {
+    const missing = await withService(async (q) => {
+      const out: string[] = [];
+      for (const m of MARKERS) if (!(await (q as unknown as Q).query(m.sql)).rows.length) out.push(m.file);
+      return out;
+    });
+    cache = { at: Date.now(), missing };
+    return missing;
+  } catch {
+    return [];
+  }
+}

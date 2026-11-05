@@ -81,6 +81,11 @@ Before launch: a dedicated least-privilege database role for the app; real-Postg
 - `lib/replies/gmail-thread.ts` (parse, text only), `lib/replies/classify.ts` (suggested labels), `server/gmail/google.ts#getThread`, `server/replies-store.ts`, `server/services/replies.ts`, actions `server/actions/replies.ts`, pages `app/app/inbox` and `app/app/inbox/[id]`, migration `0008_replies.sql`. Reply tracking consent: `/api/gmail/start?replies=1`.
 - Next: follow-up steps (now safe, since replies stop them) and M3.
 
+## Dashboard, Analytics, migration banner
+
+- `server/analytics-store.ts` + `server/services/analytics.ts`; UI `features/analytics/` (KPI tiles, trend chart, pipeline, campaign table, breakdowns, activity); pages `app/app/page.tsx` (Dashboard) and `app/app/analytics`.
+- `server/schema-check.ts` + `features/product/schema-banner.tsx` (banner in the app layout) and `app/app/error.tsx`. When adding a migration, add its marker to `MARKERS`.
+
 ## Landing page
 
 `components/marketing/audience-workflow.tsx` → `HowItWorks`: 5 steps (connect mailbox, search Google Maps, research and personalise, approve and launch, handle replies). Each step's badge comes from `config/milestone.ts`, so flipping a feature's `availability` updates the page.

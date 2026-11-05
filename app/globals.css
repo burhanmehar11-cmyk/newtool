@@ -397,6 +397,8 @@ html[data-scrolled] .site-header {
 
 html[data-theme="dark"] {
   color-scheme: dark;
+  --chart-1: #2a9d6c;
+  --chart-2: #5b8def;
   --color-canvas: #0b1218;
   --color-surface: #111b22;
   --color-ink: #e4ecee;
@@ -425,4 +427,10 @@ html[data-theme="dark"] .bg-danger-fg.text-white {
 }
 html[data-theme="dark"] ::selection {
   background: rgb(95 217 160 / 0.3);
+}
+
+/* Chart series colours (validated for colour-blind separation; dark values in the dark theme block). */
+:root {
+  --chart-1: #0f8a5f;
+  --chart-2: #2f6fd6;
 }

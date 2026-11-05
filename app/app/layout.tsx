@@ -4,6 +4,7 @@ import { ProductShell } from "@/components/app/product-shell";
 import { WorkspaceSwitcher } from "@/features/product/workspace-switcher";
 import { getActiveWorkspace, listWorkspaces } from "@/server/auth";
 import { Skeleton } from "@/components/ui/misc";
+import { SchemaBanner } from "@/features/product/schema-banner";
 
 export const metadata: Metadata = {
   title: { default: "Workspace", template: "%s · Locentio" },
@@ -24,6 +25,9 @@ export default function ProductLayout({ children }: LayoutProps<"/app">) {
         </Suspense>
       }
     >
+      <Suspense fallback={null}>
+        <SchemaBanner />
+      </Suspense>
       {children}
     </ProductShell>
   );
