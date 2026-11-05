@@ -14,8 +14,7 @@ export default function AppError({ error, retry }: { error: unknown; retry: () =
       </span>
       <h1 className="mt-4 font-display text-xl font-semibold text-ink">This page couldn&apos;t load</h1>
       <p className="mt-2 text-sm leading-6 text-slate">
-        Try again in a moment. If you just updated Locenti, a database update may still need to be run: check the yellow banner at the top of the Dashboard, or run the newest files in{" "}
-        <code className="font-mono text-ink">database/migrations/</code> in Neon&apos;s SQL Editor.
+        Something went wrong on our side. Try again in a moment; if it keeps happening, contact support.
       </p>
       <div className="mt-6 flex flex-wrap justify-center gap-2">
         <Button onClick={() => retry()}>
