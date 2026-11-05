@@ -12,7 +12,7 @@ import { formatDate } from "@/lib/utils";
 export const metadata: Metadata = { title: "Billing" };
 
 const PLAN_LABEL: Record<string, string> = { trial: "Free trial", free: "Free", paid: "Paid", comp: "Complimentary", lapsed: "Ended" };
-const STATUS: Record<string, string> = { active: "Active", trialing: "Trial (Paddle)", past_due: "Payment failed, retrying", paused: "Paused", canceled: "Cancelled" };
+const STATUS: Record<string, string> = { active: "Active", trialing: "Trial", past_due: "Payment failed, retrying", paused: "Paused", canceled: "Cancelled" };
 
 export default function BillingPage() {
   return (
@@ -77,7 +77,7 @@ async function Billing() {
         <section className="card mt-5 flex flex-wrap items-center justify-between gap-3 p-5">
           <div>
             <h2 className="font-display text-base font-semibold text-ink">Manage your subscription</h2>
-            <p className="text-sm text-slate">Card changes and cancellation happen on Paddle&apos;s secure pages. Cancelling keeps your plan until the end of the paid period.</p>
+            <p className="text-sm text-slate">Card changes and cancellation open on a secure payment page. Cancelling keeps your plan until the end of the paid period.</p>
           </div>
           <div className="flex gap-2 text-sm font-medium">
             {a.manage_url ? <a href={a.manage_url} target="_blank" rel="noreferrer" className="rounded-lg border border-line px-3 py-2 hover:bg-canvas">Update payment method</a> : null}
