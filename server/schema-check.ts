@@ -18,6 +18,7 @@ const MARKERS: { file: string; sql: string }[] = [
   { file: "0008_replies.sql", sql: "select 1 from information_schema.columns where table_schema = 'public' and table_name = 'threads' and column_name = 'last_inbound_at'" },
   { file: "0009_team.sql", sql: "select 1 from information_schema.tables where table_schema = 'public' and table_name = 'workspace_invites'" },
   { file: "0010_followups.sql", sql: "select 1 from information_schema.columns where table_schema = 'public' and table_name = 'dispatches' and column_name = 'rfc_message_id'" },
+  { file: "0011_admin.sql", sql: "select 1 from information_schema.tables where table_schema = 'app' and table_name = 'site_visits'" },
 ];
 
 export const LATEST_MIGRATION = MARKERS.at(-1)!.file;

@@ -41,6 +41,7 @@ export const legalDocs: Record<string, Doc> = {
           "Business information: when you search, we receive business listings from the Google Places API (Google Maps) or OpenStreetMap. Google Maps results are shown to you live and are not stored, except the Google place ID of businesses you save. When you research a lead, we read up to a few public pages of that business's own website (respecting its robots.txt) and keep short excerpts as sources, plus any business email address the website publicly shows.",
           "Mailbox information: if you connect a Gmail account, see section 4.",
           "Technical information: IP address and browser information in server logs, used for security, abuse prevention and rate limits; and the cookies described in section 7.",
+          "How you found us: if you sign up, we save which site or campaign link first brought you to Locenti (for example a Google search, LinkedIn, or a link with utm tags) and the page you landed on, so we can tell which channels work. Separately, we count first visits per source as anonymous daily totals, with no cookie, IP address or other identifier attached.",
         ],
       },
       {
@@ -79,7 +80,8 @@ export const legalDocs: Record<string, Doc> = {
       {
         h: "7. Cookies and local storage",
         p: [
-          "We use only essential cookies: a signed session cookie to keep you signed in, a short-lived cookie that protects the Google sign-in and Gmail connection steps, and a cookie that remembers your active workspace. Your light or dark appearance choice is kept in your browser's local storage.",
+          "We use only essential cookies: a signed session cookie to keep you signed in, a short-lived cookie that protects the Google sign-in and Gmail connection steps (and, when you sign up with Google, carries how you found us for that one step), and a cookie that remembers your active workspace. Your light or dark appearance choice is kept in your browser's local storage.",
+          "When you first open the site, your browser's session storage notes which site or campaign link brought you. It is cleared when you close the tab, is never shared, and is only sent to us if you sign up (see section 3).",
           "We do not use advertising cookies or third-party tracking, and campaign emails contain no tracking pixels.",
         ],
       },

@@ -6,6 +6,7 @@ import { LogoMark } from "@/components/brand/logo";
 import { Button } from "@/components/ui/button";
 import { brand } from "@/config/brand";
 import { AcceptInviteButton } from "@/features/team/accept-invite";
+import { AttributionCapture } from "@/components/attribution-capture";
 import { getCurrentUser } from "@/server/auth";
 import { getInvitePreview } from "@/server/services/team";
 
@@ -15,6 +16,7 @@ export const metadata: Metadata = { title: "Join a workspace", robots: { index: 
 export default function InvitePage({ params }: PageProps<"/invite/[token]">) {
   return (
     <main className="flex min-h-dvh items-center justify-center bg-canvas px-4 py-16">
+      <AttributionCapture />
       <div className="card w-full max-w-md p-7 text-center">
         <Link href="/" className="mx-auto mb-5 flex w-fit items-center gap-2 font-display text-lg font-semibold text-ink">
           <LogoMark className="size-7 text-green" /> {brand.name}

@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createRemoteJWKSet, jwtVerify } from "jose";
-import { GOOGLE_ISSUERS, GOOGLE_JWKS_URL, GOOGLE_TOKEN_URL, SESSION_COOKIE, STATE_COOKIE } from "@/lib/auth/constants";
+import { GOOGLE_ISSUERS, GOOGLE_JWKS_URL, GOOGLE_TOKEN_URL, SESSION_COOKIE, SIGNUP_SOURCE_COOKIE, STATE_COOKIE } from "@/lib/auth/constants";
+import { parseAttribution } from "@/lib/attribution";
+import { recordAttribution } from "@/server/attribution-store";
 import { callbackUrl, checkIdTokenClaims, resolveAppOrigin } from "@/lib/auth/oidc";
 import { verifyState } from "@/lib/auth/tokens";
 import { mayUseLocenti } from "@/server/access";
@@ -16,6 +18,7 @@ export async function GET(request: NextRequest) {
   const fail = (code: string) => {
     const res = NextResponse.redirect(new URL(`/sign-in?error=${code}`, request.url));
     res.cookies.delete({ name: STATE_COOKIE, path: "/api/auth/google" });
+  res.cookies.delete({ name: SIGNUP_SOURCE_COOKIE, path: "/api/auth/google" });
     return res;
   };
   if (!accountsConfigured()) return fail("not_configured");
@@ -61,6 +64,8 @@ export async function GET(request: NextRequest) {
   let token: string;
   try {
     const userId = await withService((q) => googleSignIn(q as unknown as Q, claims.subject, claims.email, claims.name));
+    const src = parseAttribution(request.cookies.get(SIGNUP_SOURCE_COOKIE)?.value ?? null);
+    if (src) await withService((q) => recordAttribution(q as unknown as Q, userId, src)).catch(() => undefined);
     token = await newSessionToken(userId, request.headers.get("user-agent"));
   } catch {
     return fail("server");
@@ -68,6 +73,7 @@ export async function GET(request: NextRequest) {
 
   const res = NextResponse.redirect(new URL(saved.next, request.url));
   res.cookies.delete({ name: STATE_COOKIE, path: "/api/auth/google" });
+  res.cookies.delete({ name: SIGNUP_SOURCE_COOKIE, path: "/api/auth/google" });
   res.cookies.set(SESSION_COOKIE, token, sessionCookieOptions);
   return res;
 }

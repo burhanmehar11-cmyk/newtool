@@ -1,4 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { parseAttribution } from "@/lib/attribution";
+import { SIGNUP_SOURCE_COOKIE } from "@/lib/auth/constants";
 import { STATE_COOKIE, STATE_MAX_AGE_S } from "@/lib/auth/constants";
 import { buildAuthorizeUrl, callbackUrl, pkceChallenge, randomToken, resolveAppOrigin } from "@/lib/auth/oidc";
 import { signState } from "@/lib/auth/tokens";
@@ -32,6 +34,9 @@ export async function GET(request: NextRequest) {
       codeChallenge: await pkceChallenge(verifier),
     }),
   );
+  // How a possible new account found us (see the privacy policy). Read once by the callback.
+  const src = parseAttribution(request.nextUrl.searchParams.get("src"));
+  if (src) res.cookies.set(SIGNUP_SOURCE_COOKIE, JSON.stringify(src), { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/api/auth/google", maxAge: STATE_MAX_AGE_S });
   res.cookies.set(STATE_COOKIE, await signState({ state, verifier, nonce, next }, sessionSecret()!), {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",

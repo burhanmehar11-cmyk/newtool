@@ -6,3 +6,6 @@ export const GOOGLE_ISSUERS = ["https://accounts.google.com", "accounts.google.c
 export const GOOGLE_JWKS_URL = "https://www.googleapis.com/oauth2/v3/certs";
 export const GOOGLE_AUTHORIZE_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 export const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
+
+/** Short-lived cookie carrying a new account's sign-up source through the Google sign-in step. */
+export const SIGNUP_SOURCE_COOKIE = "locenti_src";

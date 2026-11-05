@@ -92,7 +92,7 @@ Google calls this **Google Auth Platform** (older screens say **OAuth consent sc
 3. When asked which environments to connect, keep **Production** and **Preview** (and **Development** if offered). Vercel adds `DATABASE_URL` and related settings automatically.
 4. Open the database's **Open in Neon** (or **Neon Console**) link → **SQL Editor**.
 5. In another tab, open GitHub → **burhanmehar11-cmyk/newtool** → branch `claude/compassionate-knuth-hewpfn` → `database/migrations/0000_auth.sql` → **Copy raw file** (two-squares icon). Paste into the SQL Editor → **Run**.
-6. Clear the editor. Do the same, one file at a time, with `database/migrations/0001_foundation.sql` → **Run**, then `0002_password_and_discovery.sql` → **Run**, then `0003_research.sql` → **Run**, then `0004_google_places.sql` → **Run**, then `0005_mailboxes.sql` → **Run**, then `0006_campaigns.sql` → **Run**, then `0007_agents.sql` → **Run**, then `0008_replies.sql` → **Run**, then `0009_team.sql` → **Run**, then `0010_followups.sql` → **Run**.
+6. Clear the editor. Do the same, one file at a time, with `database/migrations/0001_foundation.sql` → **Run**, then `0002_password_and_discovery.sql` → **Run**, then `0003_research.sql` → **Run**, then `0004_google_places.sql` → **Run**, then `0005_mailboxes.sql` → **Run**, then `0006_campaigns.sql` → **Run**, then `0007_agents.sql` → **Run**, then `0008_replies.sql` → **Run**, then `0009_team.sql` → **Run**, then `0010_followups.sql` → **Run**, then `0011_admin.sql` → **Run**.
    - Already ran some of them earlier? Run only the ones after the last you ran (for example just **0003**). Later files only add things and are safe to run on top.
 7. Check by running:
 
@@ -195,6 +195,12 @@ Lets Locenti read replies to campaign emails (only threads it started), sort the
 
 1. Neon SQL Editor: run `database/migrations/0010_followups.sql`.
 2. On a draft campaign: **Follow-ups → Add follow-up** (up to two), set the wait in days, edit the text, **Save follow-ups**, then approve. They go to people who haven't replied, unsubscribed or bounced, in the same Gmail thread.
+
+## Part G5: Admin panel (owners only)
+
+1. Neon SQL Editor: run `database/migrations/0011_admin.sql`.
+2. Vercel → Settings → Environment Variables: add `ADMIN_EMAILS` = your email (comma-separate several, for example `hello@locenti.com,you@gmail.com`). Optional: `TRIAL_DAYS` (default 14). Redeploy.
+3. Sign in with that email and open `/admin` (an **Admin panel** link also appears under the workspace switcher, only for admins). Everyone else gets a "page not found".
 
 ## Part H: Campaign sending (no setup needed; scheduler optional)
 

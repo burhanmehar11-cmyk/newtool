@@ -3,6 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { readAttribution } from "@/components/attribution-capture";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { safeNextPath } from "@/lib/safe-redirect";
@@ -121,6 +122,11 @@ function GoogleButton({ next, label = "Continue with Google" }: { next: string; 
   return (
     <a
       href={`/api/auth/google/start?next=${encodeURIComponent(next)}`}
+      onClick={(e) => {
+        // Carry how this visitor found us, in case Google creates a new account.
+        const src = readAttribution();
+        if (src) e.currentTarget.href = `/api/auth/google/start?next=${encodeURIComponent(next)}&src=${encodeURIComponent(src)}`;
+      }}
       className="flex h-12 w-full items-center justify-center gap-3 rounded-[12px] border border-white/[0.14] bg-white/[0.04] text-[15px] font-semibold text-white transition-colors duration-200 hover:border-white/30 hover:bg-white/[0.08]"
     >
       <GoogleIcon /> {label}
@@ -202,6 +208,10 @@ export function SignInForm({ emailEnabled }: { emailEnabled: boolean }) {
 export function SignUpForm({ emailEnabled }: { emailEnabled: boolean }) {
   const params = useSearchParams();
   const [state, action, pending] = React.useActionState<FormState, FormData>(signUpWithPasswordAction, {});
+  const srcRef = React.useRef<HTMLInputElement>(null);
+  React.useEffect(() => {
+    if (srcRef.current) srcRef.current.value = readAttribution() ?? "";
+  });
   if (state.message) return <Notice tone="ok">{state.message}</Notice>;
   return (
     <>
@@ -210,6 +220,7 @@ export function SignUpForm({ emailEnabled }: { emailEnabled: boolean }) {
       <Divider>Or create an account with email</Divider>
       {emailEnabled ? (
         <form action={action} className="space-y-5" noValidate>
+          <input ref={srcRef} type="hidden" name="src" defaultValue="" />
           <DarkField name="name" label="Your name" autoComplete="name" placeholder="Alex Morgan" defaultValue={state.values?.name} error={state.fieldErrors?.name} />
           <DarkField
             name="email"

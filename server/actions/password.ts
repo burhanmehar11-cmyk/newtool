@@ -3,6 +3,8 @@
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { mayUseLocenti } from "@/server/access";
+import { parseAttribution } from "@/lib/attribution";
+import { recordAttribution } from "@/server/attribution-store";
 import { passwordProblem } from "@/lib/auth/password";
 import { safeNextPath } from "@/lib/safe-redirect";
 import { accountsConfigured } from "@/server/env";
@@ -67,6 +69,8 @@ export async function signUpWithPasswordAction(_: FormState, form: FormData): Pr
 
   const origin = await appOrigin();
   const r = await svc((q) => passwordSignUp(q, parsed.data.email, pw, parsed.data.name));
+  const src = parseAttribution(form.get("src"));
+  if (r.kind === "verify" && src) await svc((q) => recordAttribution(q, r.userId, src)).catch(() => undefined);
   try {
     if (r.kind === "verify") {
       await sendEmail(parsed.data.email, "Confirm your email", verifyEmailText(`${origin}/api/auth/verify?token=${r.token}`));

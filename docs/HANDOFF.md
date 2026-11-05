@@ -91,6 +91,11 @@ Before launch: a dedicated least-privilege database role for the app; real-Postg
 - `lib/campaigns/followups.ts` (rules, rendering, subject, timeline); templates stored in `campaign_steps` (positions 1–2); editor `features/campaigns/follow-ups.tsx`; `saveCampaignFollowUps` in `server/services/campaigns.ts`.
 - Sending: an enrollment stays `sent` while a follow-up waits (`step` = next step, `next_send_at` = when). `nextDue` picks first emails and due follow-ups; `recordAccepted` schedules the next one and never overwrites a reply; failures on a follow-up only stop later follow-ups. Each email carries our own `Message-ID` (stored in `dispatches.rfc_message_id`); follow-ups send with Gmail `threadId` plus In-Reply-To/References. Migration `0010_followups.sql`. Tests in `tests/followups.test.ts` and `tests/db/dispatch.test.ts`.
 
+## Admin panel (M3)
+
+- `/admin` (`app/admin/page.tsx`, tabs in `features/admin/sections.tsx`), gated by `requireAdmin()` in `server/services/admin.ts` (`ADMIN_EMAILS`, exact emails; others get `notFound()`). Queries in `server/admin-store.ts` on the service connection; plan changes via `setPlanAction` write `app.admin_audit`.
+- Sign-up sources: `components/attribution-capture.tsx` (session storage + anonymous `/api/visit` beacon), `lib/attribution.ts`, `server/attribution-store.ts`; saved at Google sign-up (short-lived cookie through the OAuth step) and password sign-up (hidden field). Migration `0011_admin.sql` (plans on `workspaces`, members can only update `name`; `app.signup_attribution`, `app.site_visits`, `app.admin_audit`). Tests `tests/attribution.test.ts`, `tests/db/admin.test.ts`.
+
 ## Dashboard, Analytics, migration banner
 
 - `server/analytics-store.ts` + `server/services/analytics.ts`; UI `features/analytics/` (KPI tiles, trend chart, pipeline, campaign table, breakdowns, activity); pages `app/app/page.tsx` (Dashboard) and `app/app/analytics`.
