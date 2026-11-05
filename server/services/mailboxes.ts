@@ -25,7 +25,7 @@ export async function connectMailbox(p: { userId: string; workspaceId: string; e
 }
 
 export async function getMailboxes() {
-  const { user, workspace } = await requireWorkspace("/app/settings");
+  const { user, workspace } = await requireWorkspace("/app/mailboxes");
   return asQ(user.id, (q) => listMailboxes(q, workspace.id));
 }
 
@@ -57,7 +57,7 @@ export async function accessTokenFor(accountId: string): Promise<{ ok: true; tok
  * end to end without contacting anyone else.
  */
 export async function sendTestEmail(accountId: string): Promise<{ ok: true; to: string } | { ok: false; error: string }> {
-  const { user, workspace } = await requireWorkspace("/app/settings");
+  const { user, workspace } = await requireWorkspace("/app/mailboxes");
   if (!uuid.safeParse(accountId).success) return { ok: false, error: "Mailbox not found." };
   const box = await asQ(user.id, (q) => getMailbox(q, accountId));
   if (!box || box.status === "disconnected") return { ok: false, error: "Mailbox not found." };
@@ -88,7 +88,7 @@ const settingsSchema = z.object({
 });
 
 export async function saveMailboxSettings(accountId: string, input: unknown): Promise<{ ok: true } | { ok: false; error: string }> {
-  const { user, workspace } = await requireWorkspace("/app/settings");
+  const { user, workspace } = await requireWorkspace("/app/mailboxes");
   if (!["owner", "admin"].includes(workspace.role)) return { ok: false, error: "Only workspace owners and admins can change mailboxes." };
   const parsed = settingsSchema.safeParse(input);
   if (!uuid.safeParse(accountId).success || !parsed.success) return { ok: false, error: parsed.success ? "Mailbox not found." : parsed.error.issues[0].message };
@@ -98,7 +98,7 @@ export async function saveMailboxSettings(accountId: string, input: unknown): Pr
 
 /** Revokes the grant at Google, deletes the stored token, and keeps the row (campaign history) as disconnected. */
 export async function disconnectMailbox(accountId: string): Promise<{ ok: true } | { ok: false; error: string }> {
-  const { user, workspace } = await requireWorkspace("/app/settings");
+  const { user, workspace } = await requireWorkspace("/app/mailboxes");
   if (!["owner", "admin"].includes(workspace.role)) return { ok: false, error: "Only workspace owners and admins can disconnect mailboxes." };
   if (!uuid.safeParse(accountId).success) return { ok: false, error: "Mailbox not found." };
   const box = await asQ(user.id, (q) => getMailbox(q, accountId));

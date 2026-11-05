@@ -9,14 +9,14 @@ import { tokenKey } from "@/server/gmail/crypto";
 
 /** Step 1 of "Connect Gmail": signed-in owners/admins are sent to Google's consent screen for the send permission. */
 export async function GET(request: NextRequest) {
-  const back = (code: string) => NextResponse.redirect(new URL(`/app/settings?mailbox_error=${code}#mailboxes`, request.url));
+  const back = (code: string) => NextResponse.redirect(new URL(`/app/mailboxes?mailbox_error=${code}`, request.url));
   if (!accountsConfigured() || !tokenKey()) return back("not_configured");
 
   const origin = resolveAppOrigin(configuredSiteUrl(), request.nextUrl.origin);
   if (origin !== request.nextUrl.origin) return NextResponse.redirect(new URL(request.nextUrl.pathname, origin));
 
   const user = await getCurrentUser();
-  if (!user) return NextResponse.redirect(new URL("/sign-in?next=/app/settings", request.url));
+  if (!user) return NextResponse.redirect(new URL("/sign-in?next=/app/mailboxes", request.url));
   const ws = await getActiveWorkspace();
   if (!ws) return NextResponse.redirect(new URL("/app/onboarding", request.url));
   if (!["owner", "admin"].includes(ws.role)) return back("not_allowed");

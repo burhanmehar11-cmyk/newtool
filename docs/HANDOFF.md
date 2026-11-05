@@ -62,6 +62,11 @@ Before launch: a dedicated least-privilege database role for the app; real-Postg
 - Verified locally: start redirect parameters, signed-out redirect, forged/denied callbacks, settings save, unreadable token → "Needs reconnecting", disconnect deletes the token, 390px layout. **Not verified:** the real Google consent, token exchange and Gmail send (needs the deployed app with Part G done). First live check: Connect Gmail → Send test email to myself.
 - Logo for Google's Branding page: `public/brand/locentio-logo-120.png`.
 
+## Campaigns (M2 step 5b)
+
+- Store `server/campaign-store.ts` (eligibility, create, drafts, recipients, classification, approval, status, do-not-contact) and `server/dispatch-store.ts` (service-side sending bookkeeping); services `server/services/campaigns.ts`, `server/services/dispatch.ts` (`runDispatch`), `server/services/unsubscribe.ts`; routes `app/api/cron/dispatch`, `app/api/unsubscribe/[token]`; pages `app/app/campaigns` (list + do-not-contact), `campaigns/new`, `campaigns/[id]`, public `app/unsubscribe/[token]`; UI in `features/campaigns/`; helpers `lib/campaigns/schedule.ts`, `lib/campaigns/compose.ts`; draft templates `lib/drafts/template.ts`.
+- Verified in a browser against a local Postgres: sidebar links, create campaign, generated messages, edit → revision bump, unverified opt-in, approve outside sending hours (queued), send with a broken mailbox token → email put back, campaign paused, mailbox "needs reconnecting"; unsubscribe page (link alone does nothing, button suppresses and stops queued), one-click POST, cron 401 without secret, 390px layouts. **Not verified:** a real Gmail send from a campaign.
+
 ## Landing page
 
 `components/marketing/audience-workflow.tsx` → `HowItWorks`: 5 steps (connect mailbox, search Google Maps, research and personalise, approve and launch, handle replies). Each step's badge comes from `config/milestone.ts`, so flipping a feature's `availability` updates the page.
@@ -70,8 +75,7 @@ Before launch: a dedicated least-privilege database role for the app; real-Postg
 
 1. **Google Maps** is live in production (owner confirmed 2026-11-05). Make sure the key pasted in chat during development was rotated.
 2. **Gmail live check:** owner completes setup guide Part G and runs migration 0005, then Connect Gmail and send the test email.
-3. **M2 step 5b: approved campaigns (in progress).** Committed so far, not wired to any page: `database/migrations/0006_campaigns.sql` (adds columns only; safe to run, not needed yet), `server/campaign-store.ts`, `lib/campaigns/schedule.ts`, `lib/campaigns/compose.ts`; draft templates moved to `lib/drafts/template.ts`. Still to build: services, sending endpoint, unsubscribe page, campaign pages, tests.
-   Original plan: (recipients + messages approval, suppression, unsubscribe, pacing via Vercel Cron).
+3. **Campaigns live check:** owner runs migration 0006, sets `CRON_SECRET` and the cron-job.org job (setup guide Part H), then creates a small campaign to their own second address and approves it.
 4. **M2 step 4: evidence-based drafts.** Needs `ANTHROPIC_API_KEY`; drafts must cite brief facts only.
 5. Mailbox verification provider (optional; the free DNS check stays as the floor).
 6. Add a real-Postgres CI job for concurrency tests.

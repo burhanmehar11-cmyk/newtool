@@ -5,18 +5,18 @@ import { disconnectMailbox, saveMailboxSettings, sendTestEmail } from "@/server/
 
 export async function sendTestEmailAction(accountId: string) {
   const r = await sendTestEmail(accountId);
-  revalidatePath("/app/settings");
+  revalidatePath("/app/mailboxes");
   return r;
 }
 
 export async function saveMailboxSettingsAction(accountId: string, values: { dailyCap: number; senderName: string }) {
   const r = await saveMailboxSettings(accountId, values);
-  if (r.ok) revalidatePath("/app/settings");
+  if (r.ok) revalidatePath("/app/mailboxes");
   return r;
 }
 
 export async function disconnectMailboxAction(accountId: string) {
   const r = await disconnectMailbox(accountId);
-  if (r.ok) revalidatePath("/app/settings");
+  if (r.ok) revalidatePath("/app/mailboxes");
   return r;
 }

@@ -92,7 +92,7 @@ Google calls this **Google Auth Platform** (older screens say **OAuth consent sc
 3. When asked which environments to connect, keep **Production** and **Preview** (and **Development** if offered). Vercel adds `DATABASE_URL` and related settings automatically.
 4. Open the database's **Open in Neon** (or **Neon Console**) link → **SQL Editor**.
 5. In another tab, open GitHub → **burhanmehar11-cmyk/newtool** → branch `claude/compassionate-knuth-hewpfn` → `database/migrations/0000_auth.sql` → **Copy raw file** (two-squares icon). Paste into the SQL Editor → **Run**.
-6. Clear the editor. Do the same, one file at a time, with `database/migrations/0001_foundation.sql` → **Run**, then `0002_password_and_discovery.sql` → **Run**, then `0003_research.sql` → **Run**, then `0004_google_places.sql` → **Run**, then `0005_mailboxes.sql` → **Run**.
+6. Clear the editor. Do the same, one file at a time, with `database/migrations/0001_foundation.sql` → **Run**, then `0002_password_and_discovery.sql` → **Run**, then `0003_research.sql` → **Run**, then `0004_google_places.sql` → **Run**, then `0005_mailboxes.sql` → **Run**, then `0006_campaigns.sql` → **Run**.
    - Already ran some of them earlier? Run only the ones after the last you ran (for example just **0003**). Later files only add things and are safe to run on top.
 7. Check by running:
 
@@ -174,6 +174,20 @@ Uses the **same OAuth client** as sign-in. No new credential is needed. Locentio
 7. Optional: `TOKEN_ENCRYPTION_KEY` in Vercel (32 random bytes, base64). Without it, the key is derived from `SESSION_SECRET`. Changing either later means mailboxes must be reconnected.
 
 Check: in the app, **Settings → Sending mailboxes → Connect Gmail**. On Google's screen, leave "Send email on your behalf" ticked. You'll see "This app isn't verified" in Testing; choose **Continue**. Then click **Send test email to myself**; it arrives in that inbox.
+
+## Part H: Campaign sending scheduler (free)
+
+Approved campaigns send one email per mailbox every few minutes during the sending hours you choose. Something has to "tick" every 5 minutes. Vercel's free plan only runs scheduled jobs once a day, so use a free external scheduler:
+
+1. Vercel → Settings → Environment Variables → add `CRON_SECRET` = a long random string (e.g. from a password generator, 32+ characters) → Production → Save → **Redeploy**.
+2. Create a free account at **cron-job.org** (no card needed). **Create cronjob**:
+   - URL: `https://YOUR-URL/api/cron/dispatch`
+   - Schedule: every **5 minutes**
+   - Advanced → Headers → add `Authorization` with value `Bearer YOUR_CRON_SECRET` (the word Bearer, a space, then the secret)
+   - Save. Its history should show status **200**. A **401** means the header doesn't match `CRON_SECRET`.
+3. Neon SQL Editor: run `database/migrations/0006_campaigns.sql`.
+
+Without the scheduler, campaigns still work: the campaign page has **Send next due email**, which sends one at a time with the same limits.
 
 ## Part F: First sign-in (owner)
 

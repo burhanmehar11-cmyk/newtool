@@ -14,7 +14,7 @@ const googleKeys = createRemoteJWKSet(new URL(GOOGLE_JWKS_URL));
 /** Step 2 of "Connect Gmail": verify the round trip, check the send permission was granted, store the encrypted refresh token. */
 export async function GET(request: NextRequest) {
   const done = (q: string) => {
-    const res = NextResponse.redirect(new URL(`/app/settings?${q}#mailboxes`, request.url));
+    const res = NextResponse.redirect(new URL(`/app/mailboxes?${q}`, request.url));
     res.cookies.delete({ name: GMAIL_STATE_COOKIE, path: "/api/gmail" });
     return res;
   };

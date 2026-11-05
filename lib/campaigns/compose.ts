@@ -11,7 +11,9 @@ export function unsubscribeUrl(origin: string, token: string) {
 
 export function withFooter(body: string, p: { businessAddress: string; unsubscribeUrl: string }) {
   const lines = [body.trimEnd(), "", "--"];
-  if (p.businessAddress.trim()) lines.push(p.businessAddress.trim());
+  // The address is required in commercial email; add it unless the message already shows it.
+  const address = p.businessAddress.trim();
+  if (address && !body.includes(address)) lines.push(address);
   lines.push(`Don't want emails from me? Unsubscribe: ${p.unsubscribeUrl}`);
   return lines.join("\n");
 }
