@@ -168,6 +168,7 @@ Uses the **same OAuth client** as sign-in. No new credential is needed. Locentio
    - Authorised domains: your domain (for example `your-app.vercel.app`).
 3. **Data Access → Add or remove scopes** → search `gmail.send` → tick `https://www.googleapis.com/auth/gmail.send` → **Update** → **Save**. It appears under sensitive scopes. Don't add read or modify scopes.
 4. **Clients → (your existing Web client)** → **Authorized redirect URIs → Add URI** → `https://YOUR-URL/api/gmail/callback` → **Save**. Keep the existing `/api/auth/google/callback` URI.
+   - **Using a separate client for Gmail instead?** Create it as type **Web application**, add only `https://YOUR-URL/api/gmail/callback` as its redirect URI, and set `GMAIL_OAUTH_CLIENT_ID` and `GMAIL_OAUTH_CLIENT_SECRET` in Vercel (both from that client). It must be in the same Google Cloud project, which holds the consent screen and the `gmail.send` scope.
 5. **Audience → Test users**: add every Gmail address that will be connected for sending. Keep the app in **Testing**; publishing with Gmail access needs Google's verification review.
 6. Neon SQL Editor: run `database/migrations/0005_mailboxes.sql`.
 7. Optional: `TOKEN_ENCRYPTION_KEY` in Vercel (32 random bytes, base64). Without it, the key is derived from `SESSION_SECRET`. Changing either later means mailboxes must be reconnected.

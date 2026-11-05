@@ -86,3 +86,22 @@ describe("mailbox token encryption", () => {
     expect(tokenKey()).toBeNull();
   });
 });
+
+describe("Gmail OAuth client choice", () => {
+  const keys = ["GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET", "GMAIL_OAUTH_CLIENT_ID", "GMAIL_OAUTH_CLIENT_SECRET"] as const;
+  const saved = Object.fromEntries(keys.map((k) => [k, process.env[k]]));
+  afterEach(() => keys.forEach((k) => (saved[k] === undefined ? delete process.env[k] : (process.env[k] = saved[k]))));
+
+  it("uses the Gmail client when both values are set, else the sign-in client", async () => {
+    const { gmailOAuth } = await import("@/server/env");
+    process.env.GOOGLE_OAUTH_CLIENT_ID = "signin-id";
+    process.env.GOOGLE_OAUTH_CLIENT_SECRET = "signin-secret";
+    delete process.env.GMAIL_OAUTH_CLIENT_ID;
+    delete process.env.GMAIL_OAUTH_CLIENT_SECRET;
+    expect(gmailOAuth()).toEqual({ clientId: "signin-id", clientSecret: "signin-secret" });
+    process.env.GMAIL_OAUTH_CLIENT_ID = "gmail-id";
+    expect(gmailOAuth()?.clientId).toBe("signin-id"); // a half-set Gmail client is ignored
+    process.env.GMAIL_OAUTH_CLIENT_SECRET = "gmail-secret";
+    expect(gmailOAuth()).toEqual({ clientId: "gmail-id", clientSecret: "gmail-secret" });
+  });
+});

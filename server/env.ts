@@ -14,6 +14,18 @@ export function googleOAuth(): { clientId: string; clientSecret: string } | null
   return clientId && clientSecret ? { clientId, clientSecret } : null;
 }
 
+/**
+ * OAuth client for "Connect Gmail". Optional separate client
+ * (GMAIL_OAUTH_CLIENT_ID/SECRET); otherwise the sign-in client is reused.
+ * Refresh tokens belong to the client that issued them, so changing this
+ * later means reconnecting mailboxes.
+ */
+export function gmailOAuth(): { clientId: string; clientSecret: string } | null {
+  const clientId = process.env.GMAIL_OAUTH_CLIENT_ID?.trim();
+  const clientSecret = process.env.GMAIL_OAUTH_CLIENT_SECRET?.trim();
+  return clientId && clientSecret ? { clientId, clientSecret } : googleOAuth();
+}
+
 /** At least 32 characters; used to sign session and OAuth-state cookies. */
 export function sessionSecret(): string | null {
   const s = process.env.SESSION_SECRET?.trim();

@@ -5,7 +5,7 @@ import { resolveAppOrigin } from "@/lib/auth/oidc";
 import { verifyState } from "@/lib/auth/tokens";
 import { gmailCallbackUrl, GMAIL_STATE_COOKIE, hasSendScope } from "@/lib/gmail/oauth";
 import { getActiveWorkspace, getCurrentUser } from "@/server/auth";
-import { accountsConfigured, configuredSiteUrl, googleOAuth, sessionSecret } from "@/server/env";
+import { accountsConfigured, configuredSiteUrl, gmailOAuth, sessionSecret } from "@/server/env";
 import { exchangeCode } from "@/server/gmail/google";
 import { connectMailbox } from "@/server/services/mailboxes";
 
@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
   if (!tokens?.id_token) return done("mailbox_error=exchange");
   let payload;
   try {
-    ({ payload } = await jwtVerify(tokens.id_token, googleKeys, { issuer: GOOGLE_ISSUERS, audience: googleOAuth()!.clientId }));
+    ({ payload } = await jwtVerify(tokens.id_token, googleKeys, { issuer: GOOGLE_ISSUERS, audience: gmailOAuth()!.clientId }));
   } catch {
     return done("mailbox_error=token");
   }

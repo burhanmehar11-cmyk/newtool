@@ -1,6 +1,6 @@
 import "server-only";
 import { GOOGLE_TOKEN_URL } from "@/lib/auth/constants";
-import { googleOAuth } from "@/server/env";
+import { gmailOAuth } from "@/server/env";
 
 /**
  * Google token and Gmail API calls (server-side only).
@@ -15,7 +15,7 @@ const REVOKE_URL = "https://oauth2.googleapis.com/revoke";
 export type TokenResponse = { access_token?: string; refresh_token?: string; expires_in?: number; scope?: string; id_token?: string; error?: string };
 
 export async function exchangeCode(code: string, verifier: string, redirectUri: string): Promise<TokenResponse | null> {
-  const cfg = googleOAuth();
+  const cfg = gmailOAuth();
   if (!cfg) return null;
   const res = await fetch(GOOGLE_TOKEN_URL, {
     method: "POST",
@@ -32,8 +32,8 @@ export type Refreshed = { ok: true; accessToken: string; expiresAt: number } | {
 
 /** invalid_grant means the user revoked access or the token expired: the mailbox must be reconnected. */
 export async function refreshAccessToken(refreshToken: string): Promise<Refreshed> {
-  const cfg = googleOAuth();
-  if (!cfg) return { ok: false, revoked: false, message: "Google sign-in isn't configured on this server." };
+  const cfg = gmailOAuth();
+  if (!cfg) return { ok: false, revoked: false, message: "The Gmail OAuth client isn't configured on this server." };
   const res = await fetch(GOOGLE_TOKEN_URL, {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
