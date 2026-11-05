@@ -209,6 +209,24 @@ Without the scheduler, campaigns still work: the campaign page has **Send next d
 
 Note: on Gemini's free tier, Google may use what's sent (lead research, your offer) to improve its products. A paid Gemini plan avoids that. People who connect their own agent over MCP don't use this key.
 
+## Part J: Google app verification (publishing the consent screen)
+
+Google checks three things before approving the app: you own the home page, the privacy policy is complete and public, and the requested permissions are justified.
+
+1. **Owner details** are built in: Burhan Javed (founder), hello@locenti.com. Make sure that mailbox receives email. Optional in Vercel: `NEXT_PUBLIC_BUSINESS_ADDRESS`, `NEXT_PUBLIC_LEGAL_COUNTRY` (or override name/email with `NEXT_PUBLIC_LEGAL_NAME` / `NEXT_PUBLIC_CONTACT_EMAIL`).
+2. **Prove you own the home page** (free):
+   - Open **search.google.com/search-console**, signed in with the **same Google account that owns the Google Cloud project**.
+   - **Add property** → **URL prefix** → `https://YOUR-URL/` (exactly the home page URL on the consent screen) → **Continue**.
+   - Choose **HTML tag**. Copy only the value inside `content="..."`.
+   - Vercel → Environment Variables → `GOOGLE_SITE_VERIFICATION` = that value → **Redeploy**.
+   - Back in Search Console, click **Verify**.
+3. **Branding page** in Google Cloud: home page `https://YOUR-URL`, privacy policy `https://YOUR-URL/legal/privacy`, terms `https://YOUR-URL/legal/terms`, authorised domain = your domain (e.g. `your-app.vercel.app`).
+4. **Wait 24 hours** after verifying ownership (Google's systems need to update), then submit verification again.
+5. **Scopes:** submit with `openid`, `email`, `profile` and `gmail.send` only. `gmail.readonly` (reply tracking) is a restricted scope: publishing it requires an annual third-party security assessment that costs money. Remove it from **Data Access** before submitting; reply tracking then works only for test users while the app stays in Testing, or after that assessment.
+6. In the verification form, explain each scope in plain words (e.g. "gmail.send: sends emails the user reviewed and approved, from their own address") and, if asked, record a short screen video showing Connect Gmail → approve campaign → email sent.
+
+If Google refuses a `*.vercel.app` address, the dependable fix is a custom domain (Vercel → Settings → Domains), verified in Search Console as a **Domain** property.
+
 ## Part F: First sign-in (owner)
 
 1. Open `https://YOUR-URL/sign-in` → **Continue with Google** → pick a Gmail account that is both a **test user** (Part B) and on `BETA_ALLOWED_EMAILS` (Part E).

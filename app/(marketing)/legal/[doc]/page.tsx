@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
-import { AlertTriangle } from "lucide-react";
 import { brand } from "@/config/brand";
-import { legalDocs } from "./docs";
+import { LEGAL_UPDATED, legalDocs } from "./docs";
 
 export function generateStaticParams() {
   return Object.keys(legalDocs).map((doc) => ({ doc }));
@@ -11,7 +11,29 @@ export function generateStaticParams() {
 export async function generateMetadata({ params }: PageProps<"/legal/[doc]">): Promise<Metadata> {
   const { doc } = await params;
   const d = legalDocs[doc];
-  return { title: d ? `${d.title} (draft)` : "Not found", robots: { index: false } };
+  return d ? { title: d.title, description: d.intro, alternates: { canonical: `/legal/${doc}` } } : { title: "Not found" };
+}
+
+/** Links and email addresses in the text become clickable. */
+function Linked({ text }: { text: string }) {
+  const parts = text.split(/(https?:\/\/[^\s)]+[^\s).,]|[\w.+-]+@[\w-]+\.[\w.-]+[a-z])/gi);
+  return (
+    <>
+      {parts.map((p, i) =>
+        /^https?:\/\//.test(p) ? (
+          <a key={i} href={p} target="_blank" rel="noopener noreferrer" className="break-all text-green underline underline-offset-2">
+            {p}
+          </a>
+        ) : /@/.test(p) && /^[\w.+-]+@/.test(p) ? (
+          <a key={i} href={`mailto:${p}`} className="text-green underline underline-offset-2">
+            {p}
+          </a>
+        ) : (
+          p
+        ),
+      )}
+    </>
+  );
 }
 
 export default async function LegalPage({ params }: PageProps<"/legal/[doc]">) {
@@ -20,31 +42,51 @@ export default async function LegalPage({ params }: PageProps<"/legal/[doc]">) {
   if (!d) notFound();
   return (
     <article className="container-page max-w-3xl py-16 sm:py-20">
-      <div role="note" className="flex gap-3 rounded-xl border border-warn-fg/20 bg-warn-bg px-4 py-3.5 text-sm leading-6 text-warn-fg">
-        <AlertTriangle aria-hidden className="mt-1 size-4 shrink-0" />
-        <div>
-          <p className="font-semibold">Draft for owner and legal review. Not in effect.</p>
-          <p>
-            This outline has not been reviewed by a lawyer. Company identity, jurisdiction and contact details are placeholders. It makes no compliance or certification claims.
-          </p>
-        </div>
-      </div>
-      <h1 className="mt-10 text-4xl font-bold text-ink">{d.title}</h1>
+      <p className="eyebrow text-green">Legal</p>
+      <h1 className="mt-3 text-4xl font-bold text-ink">{d.title}</h1>
       <p className="mt-2 text-sm text-slate">
-        {brand.name} · Last updated: not yet published
+        {brand.name} · Last updated {LEGAL_UPDATED}
       </p>
-      <div className="mt-10 space-y-8">
-        {d.sections.map((s) => (
-          <section key={s.h}>
+      <p className="mt-6 text-[16px] leading-7 text-ink">{d.intro}</p>
+      {d.sections.length > 6 ? (
+        <nav aria-label="Contents" className="mt-8 rounded-xl border border-line bg-surface p-5">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate">Contents</p>
+          <ol className="mt-3 grid gap-1.5 text-sm sm:grid-cols-2">
+            {d.sections.map((s, i) => (
+              <li key={s.h}>
+                <a href={`#s${i}`} className="text-ink hover:text-green">
+                  {s.h}
+                </a>
+              </li>
+            ))}
+          </ol>
+        </nav>
+      ) : null}
+      <div className="mt-10 space-y-9">
+        {d.sections.map((s, i) => (
+          <section key={s.h} id={`s${i}`} className="scroll-mt-24">
             <h2 className="text-xl font-bold text-ink">{s.h}</h2>
             <div className="mt-3 space-y-3 text-[15px] leading-7 text-slate">
               {s.p.map((p) => (
-                <p key={p}>{p}</p>
+                <p key={p}>
+                  <Linked text={p} />
+                </p>
               ))}
             </div>
           </section>
         ))}
       </div>
+      <p className="mt-12 border-t border-line pt-6 text-sm text-slate">
+        See also:{" "}
+        {Object.entries(legalDocs)
+          .filter(([k]) => k !== doc)
+          .map(([k, v], i) => (
+            <span key={k}>
+              {i ? " · " : ""}
+              <Link href={`/legal/${k}`}>{v.title}</Link>
+            </span>
+          ))}
+      </p>
     </article>
   );
 }

@@ -58,9 +58,18 @@ export function SiteFooter() {
       <div className="border-t border-white/[0.08]">
         <div className="container-page flex flex-col gap-2 py-6 text-xs text-fog sm:flex-row sm:items-center sm:justify-between">
           <p>
-            © {brand.copyrightYear} {brand.legalEntity ?? brand.name}. {brand.name} is a provisional product name.
+            © {brand.copyrightYear} {brand.legalEntity ?? brand.name}. Contact: <a href={`mailto:${brand.supportEmail}`} className="underline underline-offset-2">{brand.supportEmail}</a>
           </p>
           <p>Businesses shown in product previews are fictional.</p>
+        </div>
+        <div className="container-page pb-6 text-xs leading-5 text-fog">
+          <p>
+            {brand.name}&apos;s use and transfer of information received from Google APIs to any other app will adhere to the{" "}
+            <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">
+              Google API Services User Data Policy
+            </a>
+            , including the Limited Use requirements. <Link href="/legal/privacy" className="underline underline-offset-2">Privacy policy</Link>.
+          </p>
         </div>
       </div>
     </footer>

@@ -33,6 +33,8 @@ export const metadata: Metadata = {
     description: brand.description,
   },
   twitter: { card: "summary_large_image" },
+  // Google Search Console ownership check (URL-prefix property, "HTML tag" method). Set GOOGLE_SITE_VERIFICATION.
+  ...(process.env.GOOGLE_SITE_VERIFICATION?.trim() ? { verification: { google: process.env.GOOGLE_SITE_VERIFICATION.trim() } } : {}),
 };
 
 export const viewport: Viewport = {

@@ -1,9 +1,9 @@
 /**
  * Central brand configuration.
  *
- * "Locenti" is a provisional working name. Domain and trademark availability
- * have NOT been checked. Change the values here and re-run `npm run brand`
- * to regenerate the wordmark SVGs.
+ * Change the values here and re-run `npm run brand` to regenerate the
+ * wordmark SVGs. Owner and contact details for the legal pages come from
+ * NEXT_PUBLIC_* settings so they can be set per deployment (they're public).
  */
 export const brand = {
   name: "Locenti",
@@ -19,10 +19,15 @@ export const brand = {
   siteUrl:
     process.env.NEXT_PUBLIC_SITE_URL ??
     (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "http://localhost:3000"),
-  /** Placeholder support address on a reserved example domain until the owner sets one. */
-  supportEmail: "support@locenti.example",
-  /** Legal entity is intentionally unset; legal pages show an owner-review notice. */
-  legalEntity: null as string | null,
+  /** Public contact address (legal pages, footer). Set NEXT_PUBLIC_CONTACT_EMAIL. */
+  supportEmail: process.env.NEXT_PUBLIC_CONTACT_EMAIL?.trim() || "hello@locenti.com",
+  /** Person or company operating the service (legal pages). Set NEXT_PUBLIC_LEGAL_NAME. */
+  legalEntity: (process.env.NEXT_PUBLIC_LEGAL_NAME?.trim() || "Burhan Javed") as string | null,
+  /** Shown on the legal pages next to the operator's name. */
+  ownerRole: process.env.NEXT_PUBLIC_LEGAL_ROLE?.trim() || "founder",
+  /** Optional postal address and country for the legal pages. */
+  businessAddress: (process.env.NEXT_PUBLIC_BUSINESS_ADDRESS?.trim() || null) as string | null,
+  legalCountry: (process.env.NEXT_PUBLIC_LEGAL_COUNTRY?.trim() || null) as string | null,
   /** Static to keep pages prerenderable; update yearly. */
   copyrightYear: 2026,
   logo: {
