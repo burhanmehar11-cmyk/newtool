@@ -92,7 +92,7 @@ Google calls this **Google Auth Platform** (older screens say **OAuth consent sc
 3. When asked which environments to connect, keep **Production** and **Preview** (and **Development** if offered). Vercel adds `DATABASE_URL` and related settings automatically.
 4. Open the database's **Open in Neon** (or **Neon Console**) link → **SQL Editor**.
 5. In another tab, open GitHub → **burhanmehar11-cmyk/newtool** → branch `claude/compassionate-knuth-hewpfn` → `database/migrations/0000_auth.sql` → **Copy raw file** (two-squares icon). Paste into the SQL Editor → **Run**.
-6. Clear the editor. Do the same, one file at a time, with `database/migrations/0001_foundation.sql` → **Run**, then `0002_password_and_discovery.sql` → **Run**, then `0003_research.sql` → **Run**.
+6. Clear the editor. Do the same, one file at a time, with `database/migrations/0001_foundation.sql` → **Run**, then `0002_password_and_discovery.sql` → **Run**, then `0003_research.sql` → **Run**, then `0004_google_places.sql` → **Run**.
    - Already ran some of them earlier? Run only the ones after the last you ran (for example just **0003**). Later files only add things and are safe to run on top.
 7. Check by running:
 
@@ -102,7 +102,7 @@ Google calls this **Google Auth Platform** (older screens say **OAuth consent sc
      (select count(*) from information_schema.tables where table_schema = 'auth') as auth_tables;
    ```
 
-   Expected: `public_tables = 31`, `auth_tables = 4` (0003 adds columns, not tables, so the counts don't change).
+   Expected: `public_tables = 31`, `auth_tables = 4` (0003 and 0004 don't add tables to these schemas, so the counts don't change).
 
 If a migration shows an error, **stop and report the exact message**. Don't run it twice.
 
@@ -142,6 +142,19 @@ Google sign-in works without this. Add it if invited people should also be able 
 5. **Redeploy.** `/sign-up` now shows the email form, and "Forgot your password?" sends reset links.
 
 Gmail's free sending limit (about 500 emails a day) is far more than sign-ups and resets need.
+
+## Part E3: Google Maps search (optional, free within Google's monthly allowance)
+
+Google Maps search uses the official **Places API (New)**. Google requires a billing account on the project even for free usage, but Locentio is set up to stay inside the free allowance (Text Search with website/phone/rating: 1,000 free requests a month at the time of writing, up to 20 businesses each).
+
+1. Google Cloud Console → ☰ → **Billing** → link the project to a billing account. Stop if it asks you to choose a paid support plan or prepay. Ask the owner before adding a card.
+2. **APIs & Services → Library** → search **Places API (New)** → **Enable**. (Not the old "Places API": new projects can't enable it, and the page keeps reloading.)
+3. **APIs & Services → Places API (New) → Quotas & System Limits** → find the **per day** limit for Text Search requests → **Edit** → set **30** → Save. This is Google's hard cap; requests beyond it fail instead of costing money.
+4. **APIs & Services → Credentials → Create credentials → API key**. On the key: **API restrictions → Restrict key → Places API (New)** → Save. Don't type or paste the key into chat.
+5. Vercel → Settings → Environment Variables: `GOOGLE_PLACES_API_KEY` = the key (Production and Preview), optionally `GOOGLE_PLACES_DAILY_LIMIT` = `30`. Redeploy.
+6. Run `database/migrations/0004_google_places.sql` in Neon's SQL Editor (adds the daily call counter).
+
+Check: in the app, **Discover** shows a **Google Maps** / **OpenStreetMap** switch and "N left today".
 
 ## Part F: First sign-in (owner)
 

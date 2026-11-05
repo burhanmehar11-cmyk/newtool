@@ -73,6 +73,7 @@ export function normalizeWebsite(raw: string | undefined): { website: string; do
     const u = new URL(/^https?:\/\//i.test(v) ? v : `https://${v}`);
     if (u.protocol !== "http:" && u.protocol !== "https:") return null;
     if (!u.hostname.includes(".")) return null;
+    for (const k of [...u.searchParams.keys()]) if (/^(utm_|gclid$|fbclid$)/i.test(k)) u.searchParams.delete(k);
     return { website: u.toString(), domain: u.hostname.toLowerCase().replace(/^www\./, "") };
   } catch {
     return null;

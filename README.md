@@ -11,7 +11,7 @@ Locentio is a local prospecting and outreach workspace for agencies: discover bu
 | Milestone | Scope | Status |
 | --- | --- | --- |
 | **M1** | Brand, landing page, interactive demo on fixture data | **Complete. Not production-ready.** |
-| M2 | Accounts, persistence, real discovery, research, Gmail sending, reply sync | **In progress.** Steps 1–3 built: sign-in (Google or email), workspaces, free OpenStreetMap search, saved leads, website research with Opportunity Briefs, free DNS email check. Google Maps (Places API) planned |
+| M2 | Accounts, persistence, real discovery, research, Gmail sending, reply sync | **In progress.** Steps 1–3 built: sign-in (Google or email), workspaces, Google Maps search (official Places API) and free OpenStreetMap search, saved leads, website research with Opportunity Briefs, free DNS email check |
 | M3 | Billing, team roles, public API, webhooks, MCP | Not started |
 
 ### What is simulated in M1
@@ -75,9 +75,10 @@ Sign-in is **"Continue with Google"** through a Google OAuth client. It's free a
 **Step-by-step setup, written for Claude Cowork to follow in the browser: [docs/GOOGLE_CLOUD_SETUP.md](docs/GOOGLE_CLOUD_SETUP.md).** In short:
 
 1. Free Google Cloud project → consent screen (External, **Testing**, add test users) → OAuth client (Web) with redirect URI `https://YOUR-URL/api/auth/google/callback`.
-2. Vercel → Storage → Neon (Free) → run `database/migrations/0000_auth.sql`, `0001_foundation.sql`, `0002_password_and_discovery.sql` and `0003_research.sql`, in order, in Neon's SQL Editor.
+2. Vercel → Storage → Neon (Free) → run `database/migrations/0000_auth.sql`, `0001_foundation.sql`, `0002_password_and_discovery.sql`, `0003_research.sql` and `0004_google_places.sql`, in order, in Neon's SQL Editor.
 3. Vercel variables: `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `SESSION_SECRET` (32+ characters), `NEXT_PUBLIC_SITE_URL`, `BETA_ALLOWED_EMAILS`; then redeploy.
 4. Optional email + password sign-in: `SMTP_URL` (free with a Gmail App Password) for confirmation and reset emails.
+5. Optional Google Maps search: `GOOGLE_PLACES_API_KEY` (Places API (New); free within Google's monthly allowance, billing account required). Guide Part E3.
 
 How sign-in works:
 
@@ -133,7 +134,7 @@ docs/                    PRODUCT, BRAND, ARCHITECTURE, MILESTONES, DECISIONS, HA
 
 ## Known limitations
 
-- Discovery uses OpenStreetMap only; Google Maps (Places API) is planned and not built.
+- Google Maps results are shown live and not stored (Google's terms); saved Google leads keep only the place ID and website. Daily limit `GOOGLE_PLACES_DAILY_LIMIT` (default 30).
 - Email check is DNS-only and never marks an address valid. No AI, sending or billing provider is connected yet (M2 steps 4–6).
 - Live OpenStreetMap and website fetches haven't been run from this development environment (its network blocks them).
 - Legal pages are drafts marked for owner and legal review.

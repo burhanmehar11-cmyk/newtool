@@ -91,8 +91,8 @@ const steps: { icon: React.ComponentType<{ className?: string }>; title: string;
   {
     icon: MapPinned,
     title: "Search Google Maps",
-    copy: "Describe who you want to reach, like “dentists in Austin”. Locentio pulls matching local businesses from map listings, then reads their public websites for contact details.",
-    status: ["discovery", "googleMaps"],
+    copy: "Describe who you want to reach, like “dentists in Austin”. Locentio finds matching businesses on Google Maps (or free OpenStreetMap data), then reads their public websites for contact details.",
+    status: ["googleMaps", "discovery"],
   },
   {
     icon: Compass,

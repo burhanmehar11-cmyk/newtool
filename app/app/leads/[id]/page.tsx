@@ -10,6 +10,7 @@ import { EvidenceItem } from "@/components/product/evidence";
 import { OpportunityBriefView } from "@/components/product/opportunity-brief";
 import { PageLoading } from "@/features/product/page-loading";
 import { OsmCredit } from "@/features/product/osm-credit";
+import { GoogleDetails } from "@/features/product/google-search";
 import { CheckEmailButton, NotesEditor, ResearchButton } from "@/features/product/lead-actions";
 import { nicheWords } from "@/lib/discovery/niches";
 import { offerTypeLabels } from "@/lib/domain/labels";
@@ -58,6 +59,7 @@ async function Lead({ params }: { params: PageProps<"/app/leads/[id]">["params"]
     .filter((e) => e.kind !== "other")
     .map((e) => ({ id: e.id, businessId: b.id, kind: e.kind as Evidence["kind"], label: e.label, url: e.url, collectedAt: e.collected_at, excerpt: e.excerpt }));
   const status = b.research_status ? researchLabel[b.research_status] : null;
+  const fromGoogle = b.provider === "google_places";
 
   return (
     <div>
@@ -67,6 +69,7 @@ async function Lead({ params }: { params: PageProps<"/app/leads/[id]">["params"]
         description={
           <span className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
             <span>{b.niche ? words.singular : b.category ?? "Business"}</span>
+            {fromGoogle && !b.researched_at ? <span>Name shown is the website&apos;s domain until you research it</span> : null}
             {b.address ? (
               <span className="inline-flex items-center gap-1">
                 <MapPin aria-hidden className="size-3.5" /> {b.address}
@@ -155,6 +158,12 @@ async function Lead({ params }: { params: PageProps<"/app/leads/[id]">["params"]
             )}
           </SectionCard>
 
+          {fromGoogle ? (
+            <SectionCard title="Google Maps listing" description="Found on Google Maps. Locentio stores only the place ID.">
+              <GoogleDetails placeId={b.provider_ref} label={b.name} />
+            </SectionCard>
+          ) : null}
+
           <SectionCard title="Sources">
             {evidence.length ? (
               <div className="space-y-1.5">
@@ -165,9 +174,11 @@ async function Lead({ params }: { params: PageProps<"/app/leads/[id]">["params"]
             ) : (
               <p className="text-sm text-slate">No sources yet.</p>
             )}
-            <div className="mt-4">
-              <OsmCredit />
-            </div>
+            {fromGoogle ? null : (
+              <div className="mt-4">
+                <OsmCredit />
+              </div>
+            )}
           </SectionCard>
 
           <SectionCard title="Notes">

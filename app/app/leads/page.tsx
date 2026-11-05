@@ -8,6 +8,7 @@ import { EmptyState } from "@/components/ui/misc";
 import { EmailStatusBadge, NoEmailBadge } from "@/components/product/badges";
 import { PageLoading } from "@/features/product/page-loading";
 import { OsmCredit } from "@/features/product/osm-credit";
+import { googleMapsLink } from "@/lib/discovery/google-places";
 import { getLeads } from "@/server/services/discovery";
 import type { EmailStatus } from "@/lib/domain/types";
 import { formatDate } from "@/lib/utils";
@@ -56,7 +57,9 @@ async function Leads() {
                       <Link href={`/app/leads/${l.lead_id}`} className="font-medium text-ink hover:text-green hover:underline">
                         {l.name}
                       </Link>
-                      <span className="block text-xs text-slate">{l.address ?? l.city ?? "Address not listed"}</span>
+                      <span className="block text-xs text-slate">
+                        {l.provider === "google_places" ? (l.address ?? "Open the lead for Google Maps details") : (l.address ?? l.city ?? "Address not listed")}
+                      </span>
                     </td>
                     <td className="max-w-[200px] truncate py-3 pr-3 font-mono text-xs text-slate">
                       {l.website ? (
@@ -78,7 +81,11 @@ async function Leads() {
                       )}
                     </td>
                     <td className="py-3 pr-3">
-                      {l.source_url ? (
+                      {l.provider === "google_places" ? (
+                        <a href={googleMapsLink(l.provider_ref, l.name)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-green hover:underline">
+                          Google Maps <ExternalLink aria-hidden className="size-3" />
+                        </a>
+                      ) : l.source_url ? (
                         <a href={l.source_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-green hover:underline">
                           OSM listing <ExternalLink aria-hidden className="size-3" />
                         </a>
@@ -90,9 +97,11 @@ async function Leads() {
               </tbody>
             </table>
           </div>
-          <div className="border-t border-line px-5 py-3">
-            <OsmCredit />
-          </div>
+          {leads.some((l) => l.provider !== "google_places") ? (
+            <div className="border-t border-line px-5 py-3">
+              <OsmCredit />
+            </div>
+          ) : null}
         </div>
       ) : (
         <EmptyState icon={<Users />} title="No leads yet" action={<Button asChild><Link href="/app/discover">Run a search</Link></Button>}>

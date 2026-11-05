@@ -47,6 +47,7 @@ export async function researchLead(leadId: string): Promise<{ ok: true; status: 
 
   const now = new Date();
   const outcome = await readWebsite(detail.business.id, detail.business.website, detail.business.domain_normalized, now);
+  if (outcome.siteName && detail.business.provider === "google_places") detail.business.name = outcome.siteName.slice(0, 120);
   const brief = { ...researchBusiness(toBusiness(detail, outcome.evidence, outcome.signals), offer.serviceType as OfferType, now.toISOString()), generator: "template" as const };
   await asQ(user.id, (q) => saveResearch(q, workspace.id, detail.business.id, outcome, brief, offer.serviceType));
   return { ok: true, status: outcome.status, note: outcome.note };
@@ -105,6 +106,7 @@ async function readWebsite(businessId: string, website: string | null, domain: s
     signals,
     evidence,
     emails,
+    siteName: home.siteName,
   };
 }
 

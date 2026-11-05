@@ -1,6 +1,6 @@
 # Handoff
 
-_Last updated: 2026-11-02. M1 complete; M2 steps 1–3 built: Google + email/password sign-in, workspaces, free OpenStreetMap search, saved leads, website research with Opportunity Briefs, free DNS email check. Landing page has the 5-step "How it works" flow._
+_Last updated: 2026-11-05. M1 complete; M2 steps 1–3 built, plus Google Maps search: Google + email/password sign-in, workspaces, free OpenStreetMap search, saved leads, website research with Opportunity Briefs, free DNS email check. Landing page has the 5-step "How it works" flow._
 
 ## State
 
@@ -18,7 +18,7 @@ npm run build && npm start
 BASE_URL=http://localhost:3000 npm run test:e2e
 ```
 
-- Lint and typecheck clean; 179 unit and database tests pass; production build succeeds; the smoke test passes (3 widths, no overflow, no console errors, no external requests).
+- Lint and typecheck clean; 192 unit and database tests pass; production build succeeds; the smoke test passes (3 widths, no overflow, no console errors, no external requests).
 - Brand renamed to Locentio. Landing page has scroll effects (`components/marketing/scroll-effects.tsx`, styles at the end of `app/globals.css`).
 
 ## M2 step 1: what exists
@@ -50,13 +50,19 @@ Before launch: a dedicated least-privilege database role for the app; real-Postg
 - Persistence `server/research-store.ts`, service `server/services/research.ts`, actions `server/actions/research.ts`, page `app/app/leads/[id]/page.tsx`, buttons `features/product/lead-actions.tsx`.
 - Verified in a browser against a real Postgres: lead page, research failure path (shows the error and keeps Unknowns), notes saved, unknown lead id shows "Lead not found". Not verified: research against live websites (sandbox network blocks outbound fetches).
 
+## Google Maps search (M2 step 3b)
+
+- Pure helpers `lib/discovery/google-places.ts` (field mask, request body, parsing, Maps link); provider `server/providers/google-places.ts` (Text Search, Place Details, global daily limit); store `saveGoogleLeads`/`savedPlaceIds` in `server/discovery-store.ts`; service `runGoogleSearch`/`saveGoogleSearchLeads`/`getGooglePlaceDetails`; UI `features/product/discover-panel.tsx` and `google-search.tsx`; migration `0004_google_places.sql`.
+- Storage rule (DECISIONS #43): Google results are never stored. Saved Google leads hold the place ID and website only.
+- Verified live on 2026-11-05 with a real key: search (20 Austin dentists, rating filter), save 2 leads, leads list, live details on the lead page, saved-search view, 390px layout. Website research on those leads wasn't run here (this sandbox blocks outbound website fetches).
+
 ## Landing page
 
 `components/marketing/audience-workflow.tsx` → `HowItWorks`: 5 steps (connect mailbox, search Google Maps, research and personalise, approve and launch, handle replies). Each step's badge comes from `config/milestone.ts`, so flipping a feature's `availability` updates the page.
 
 ## Next actions
 
-1. **Google Maps (Places API).** Owner: allow `developers.google.com`, `cloud.google.com` and `places.googleapis.com` in the environment's network settings so the official docs and terms can be read; create a Google Cloud project with billing enabled (free monthly allowance; stop before any paid plan) and a server-side API key restricted to the Places API. Then: a `server/providers/google-places.ts` adapter next to OSM, storage rules per the terms, attribution in results, and flip `googleMaps` to `beta`.
+1. **Google Maps in production:** owner follows `docs/GOOGLE_CLOUD_SETUP.md` Part E3 (billing linked, Places API (New), per-day quota 30, restricted key in Vercel, migration 0004). Rotate the key that was pasted in chat during development.
 2. **M2 step 4: evidence-based drafts.** Needs `ANTHROPIC_API_KEY`; drafts must cite brief facts only.
 3. Mailbox verification provider (optional; the free DNS check stays as the floor).
 4. Add a real-Postgres CI job for concurrency tests.

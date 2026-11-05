@@ -112,6 +112,8 @@ export type ResearchOutcome = {
   signals: BusinessSignals;
   evidence: Evidence[];
   emails: { email: string; kind: "role" | "named" }[];
+  /** The name the website gives itself, from the homepage. */
+  siteName?: string | null;
 };
 
 /** Stores new evidence, signals, any emails found on the site, and the brief built from them. */
@@ -133,6 +135,11 @@ export async function saveResearch(q: Q, ws: string, businessId: string, r: Rese
     "update public.businesses set signals = $2::jsonb, researched_at = now(), research_status = $3, research_note = $4 where id = $1",
     [businessId, JSON.stringify(r.signals), r.status, r.note.slice(0, 1000)],
   );
+  // Google Maps leads start named after their domain (Google's names can't be stored);
+  // use the name the business's own website gives.
+  if (r.siteName) {
+    await q.query("update public.businesses set name = $2 where id = $1 and provider = 'google_places'", [businessId, r.siteName.slice(0, 120)]);
+  }
   await q.query("insert into public.briefs (workspace_id, business_id, offer_type, payload, generator) values ($1, $2, $3, $4::jsonb, 'template')", [ws, businessId, offerType, JSON.stringify(brief)]);
 }
 

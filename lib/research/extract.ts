@@ -8,6 +8,8 @@
 export type PageSignals = {
   url: string;
   title: string | null;
+  /** The name the site gives itself (og:site_name, else the first part of the title). */
+  siteName: string | null;
   copyrightYear: { year: number; excerpt: string } | null;
   viewport: boolean;
   booking: { excerpt: string; via: string | null } | null; // online booking link/button seen
@@ -73,6 +75,18 @@ function snippet(text: string, index: number, len: number, pad = 70) {
 function attr(tag: string, name: string) {
   const m = tag.match(new RegExp(`\\b${name}\\s*=\\s*("([^"]*)"|'([^']*)'|([^\\s>]+))`, "i"));
   return m ? decodeEntities(m[2] ?? m[3] ?? m[4] ?? "") : null;
+}
+
+/** The business name a site gives itself: og:site_name, else the most name-like part of <title>. */
+export function siteNameOf(html: string, title: string | null): string | null {
+  const og = html.match(/<meta\b[^>]*property\s*=\s*["']og:site_name["'][^>]*>/i)?.[0];
+  const ogName = og ? attr(og, "content")?.replace(/\s+/g, " ").trim() : null;
+  const clean = (v: string | null | undefined) => (v && v.length >= 2 && v.length <= 80 && !/^(home|homepage|welcome)$/i.test(v) ? v : null);
+  if (clean(ogName)) return ogName!;
+  if (!title) return null;
+  const parts = decodeEntities(title).split(/\s+[|–—·:-]\s+/).map((x) => x.trim()).filter((x) => clean(x));
+  // "Home | Smile Dental" → "Smile Dental"; "Smile Dental | Dentist in Austin" → "Smile Dental"
+  return parts[0] ?? null;
 }
 
 export function extractPage(html: string, pageUrl: string, now = new Date()): PageSignals {
@@ -142,6 +156,7 @@ export function extractPage(html: string, pageUrl: string, now = new Date()): Pa
   return {
     url: pageUrl,
     title,
+    siteName: siteNameOf(html, title),
     copyrightYear,
     viewport,
     booking,

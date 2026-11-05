@@ -1,5 +1,6 @@
 import type { OsmBusiness } from "@/lib/discovery/osm";
-import { OSM_ATTRIBUTION } from "@/lib/discovery/osm";
+import { normalizeWebsite, OSM_ATTRIBUTION } from "@/lib/discovery/osm";
+import { GOOGLE_PROVIDER, PLACE_ID } from "@/lib/discovery/google-places";
 import type { Q } from "@/server/auth-store";
 
 /**
@@ -13,11 +14,13 @@ export const PROVIDER = "openstreetmap";
 
 export type SearchFilters = { niche: string; place: string; radiusKm: number; website: "any" | "has" | "none"; maxResults: number };
 
-export async function createJob(q: Q, ws: string, userId: string, query: string, filters: SearchFilters): Promise<string> {
+export type GoogleSearchFilters = { source: "google"; niche: string; place: string; minRating: number; website: "any" | "has" | "none"; maxResults: number };
+
+export async function createJob(q: Q, ws: string, userId: string, query: string, filters: SearchFilters | GoogleSearchFilters, provider: string = PROVIDER): Promise<string> {
   const r = await q.query<{ id: string }>(
     `insert into public.discovery_jobs (workspace_id, created_by, query, filters, provider, status, estimated_units, reservation_key)
      values ($1, $2, $3, $4::jsonb, $5, 'running', $6, null) returning id`,
-    [ws, userId, query.slice(0, 300), JSON.stringify(filters), PROVIDER, filters.maxResults],
+    [ws, userId, query.slice(0, 300), JSON.stringify(filters), provider, filters.maxResults],
   );
   const id = r.rows[0].id;
   await q.query("update public.discovery_jobs set reservation_key = $2 where id = $1", [id, `discovery:${id}`]);
@@ -84,6 +87,8 @@ export async function persistResults(q: Q, ws: string, jobId: string, results: O
 
 export type ResultRow = {
   id: string;
+  provider: string;
+  provider_ref: string;
   name: string;
   category: string | null;
   address: string | null;
@@ -96,7 +101,7 @@ export type ResultRow = {
   saved: boolean;
 };
 
-const RESULT_COLUMNS = `b.id, b.name, b.category, b.address, b.city, b.phone, b.website,
+const RESULT_COLUMNS = `b.id, b.provider, b.provider_ref, b.name, b.category, b.address, b.city, b.phone, b.website,
   c.email_normalized as email, c.status as email_status,
   (select e.url from public.evidence e where e.business_id = b.id order by e.collected_at desc limit 1) as source_url,
   exists (select 1 from public.leads l where l.business_id = b.id) as saved`;
@@ -114,16 +119,16 @@ export async function jobResults(q: Q, jobId: string): Promise<ResultRow[]> {
   ).rows;
 }
 
-export type JobRow = { id: string; query: string; status: string; estimated_units: number; charged_units: number; error: string | null; created_at: string; filters: SearchFilters };
+export type JobRow = { id: string; provider: string; query: string; status: string; estimated_units: number; charged_units: number; error: string | null; created_at: string; filters: SearchFilters };
 
 export async function getJob(q: Q, jobId: string): Promise<JobRow | null> {
-  return (await q.query<JobRow>("select id, query, status, estimated_units, charged_units, error, created_at, filters from public.discovery_jobs where id = $1", [jobId])).rows[0] ?? null;
+  return (await q.query<JobRow>("select id, provider, query, status, estimated_units, charged_units, error, created_at, filters from public.discovery_jobs where id = $1", [jobId])).rows[0] ?? null;
 }
 
 export async function recentJobs(q: Q, ws: string, limit = 8): Promise<JobRow[]> {
   return (
     await q.query<JobRow>(
-      "select id, query, status, estimated_units, charged_units, error, created_at, filters from public.discovery_jobs where workspace_id = $1 order by created_at desc limit $2",
+      "select id, provider, query, status, estimated_units, charged_units, error, created_at, filters from public.discovery_jobs where workspace_id = $1 order by created_at desc limit $2",
       [ws, limit],
     )
   ).rows;
@@ -153,4 +158,51 @@ export async function listLeads(q: Q, ws: string): Promise<LeadRow[]> {
       [ws],
     )
   ).rows;
+}
+
+export type GoogleSaveItem = { placeId: string; website: string };
+
+/**
+ * Saves Google Maps results as leads without copying Google content. Stored:
+ * the place ID (allowed indefinitely) and the business's own website, which
+ * research then reads. The name starts as the website's domain and is
+ * replaced by the name the website gives itself once researched. No Google
+ * name, address, phone, rating or review is stored.
+ */
+export async function saveGoogleLeads(q: Q, ws: string, userId: string, items: GoogleSaveItem[], niche: string | null): Promise<{ added: number; skipped: number }> {
+  let added = 0;
+  let skipped = 0;
+  for (const it of items) {
+    const site = normalizeWebsite(it.website);
+    if (!PLACE_ID.test(it.placeId) || !site) {
+      skipped++;
+      continue;
+    }
+    const biz = await q.query<{ id: string }>(
+      `insert into public.businesses (workspace_id, provider, provider_ref, name, website, domain_normalized, attribution, niche, collected_at)
+       values ($1, $2, $3, $4, $5, $6, 'Found on Google Maps', $7, now())
+       on conflict (workspace_id, provider, provider_ref) do update set website = excluded.website, domain_normalized = excluded.domain_normalized
+       returning id`,
+      [ws, GOOGLE_PROVIDER, it.placeId, site.domain, site.website, site.domain, niche],
+    );
+    const lead = await q.query(
+      `insert into public.leads (workspace_id, business_id, source, saved_by) values ($1, $2, 'search', $3)
+       on conflict (workspace_id, business_id) do nothing returning id`,
+      [ws, biz.rows[0].id, userId],
+    );
+    if (lead.rows.length) added++;
+    else skipped++;
+  }
+  return { added, skipped };
+}
+
+/** Place IDs (from the given list) this workspace has already saved as leads. */
+export async function savedPlaceIds(q: Q, ws: string, placeIds: string[]): Promise<string[]> {
+  if (!placeIds.length) return [];
+  const r = await q.query<{ provider_ref: string }>(
+    `select b.provider_ref from public.businesses b join public.leads l on l.business_id = b.id
+     where b.workspace_id = $1 and b.provider = $2 and b.provider_ref = any($3::text[])`,
+    [ws, GOOGLE_PROVIDER, placeIds],
+  );
+  return r.rows.map((x) => x.provider_ref);
 }

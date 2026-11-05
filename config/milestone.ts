@@ -21,7 +21,7 @@ export const PRICING_LIVE = false;
 
 export const features = {
   discovery: { label: "Business discovery (OpenStreetMap)", availability: "beta", target: "M2" },
-  googleMaps: { label: "Google Maps listings (Places API)", availability: "planned", target: "M2" },
+  googleMaps: { label: "Google Maps search (Places API)", availability: "beta", target: "M2" },
   verification: { label: "Email verification", availability: "demo", target: "M2" },
   opportunityBrief: { label: "Opportunity Briefs from website research", availability: "beta", target: "M2" },
   drafts: { label: "Evidence-based drafts", availability: "demo", target: "M2" },
