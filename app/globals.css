@@ -389,3 +389,40 @@ html[data-scrolled] .site-header {
     color: #8ff0c0;
   }
 }
+
+/* ------------------------------------------------------------ app dark theme */
+/* Applied to /app only (data-theme is set by the boot script and the app shell). */
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --color-canvas: #0b1218;
+  --color-surface: #111b22;
+  --color-ink: #e4ecee;
+  --color-slate: #9fb0b8;
+  --color-line: #1f2e37;
+  --color-line-strong: #5d727c;
+  --color-mint-soft: #123628;
+  --color-green: #5fd9a0;
+  --color-green-hover: #7be6b3;
+  --color-warn-bg: #3a2e0a;
+  --color-warn-fg: #f5cf6a;
+  --color-danger-bg: #3d1513;
+  --color-danger-fg: #ff8a80;
+  --color-info-bg: #10263f;
+  --color-info-fg: #8cbcf5;
+  --color-demo-bg: #3a2e0a;
+  --color-demo-fg: #f5cf6a;
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.35), 0 4px 16px -4px rgb(0 0 0 / 0.45);
+  --shadow-float: 0 2px 4px rgb(0 0 0 / 0.4), 0 24px 48px -16px rgb(0 0 0 / 0.7);
+}
+/* Light fills that carried white text become light in dark mode: switch the text to dark. */
+html[data-theme="dark"] .bg-ink.text-white,
+html[data-theme="dark"] .bg-green.text-white,
+html[data-theme="dark"] .bg-danger-fg.text-white {
+  color: var(--color-midnight);
+}
+html[data-theme="dark"] ::selection {
+  background: rgb(95 217 160 / 0.3);
+}

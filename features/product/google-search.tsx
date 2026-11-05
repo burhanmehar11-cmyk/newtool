@@ -21,7 +21,7 @@ export function GoogleCredit() {
   return (
     <p className="text-xs text-slate">
       Results from{" "}
-      <span translate="no" className="font-medium text-[#5e5e5e]">
+      <span translate="no" className="font-medium text-[#5e5e5e] dark:text-[#e0e0e0]">
         Google Maps
       </span>
       . Shown live and not stored by Locentio; saving a lead keeps only its Google place ID and website.

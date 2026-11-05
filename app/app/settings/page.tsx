@@ -9,6 +9,7 @@ import { requireWorkspace } from "@/server/auth";
 import { getOfferProfile } from "@/server/services/workspaces";
 import { getProviderStatus } from "@/server/providers/status";
 import Link from "next/link";
+import { ThemeToggle } from "@/components/app/theme-toggle";
 import { getMailboxes } from "@/server/services/mailboxes";
 
 export const metadata: Metadata = { title: "Settings" };
@@ -45,6 +46,9 @@ async function Settings({ searchParams }: { searchParams: PageProps<"/app/settin
                 <dd className="capitalize text-ink">{workspace.role}</dd>
               </div>
             </dl>
+          </SectionCard>
+          <SectionCard title="Appearance" description="Saved in this browser. System follows your device setting.">
+            <ThemeToggle withLabels />
           </SectionCard>
           <SectionCard title="Sending mailboxes" description="Gmail accounts campaigns send from.">
             <p className="text-sm text-slate">

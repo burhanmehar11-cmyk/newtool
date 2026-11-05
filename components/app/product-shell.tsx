@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogTrigger, SheetCloseButton, SheetContent } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { signOutAction } from "@/server/actions/auth";
+import { ThemeToggle, useAppTheme } from "@/components/app/theme-toggle";
 
 /**
  * Shell for the live product. Only shipped areas appear in the navigation;
@@ -24,6 +25,7 @@ const nav = [
 ] as const;
 
 export function ProductShell({ workspaceSlot, children }: { workspaceSlot: React.ReactNode; children: React.ReactNode }) {
+  useAppTheme();
   return (
     <div className="min-h-dvh bg-canvas lg:pl-[240px]">
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-[240px] flex-col border-r border-line bg-surface lg:flex" aria-label="Workspace navigation">
@@ -51,7 +53,11 @@ function Sidebar({ workspaceSlot, onNavigate }: { workspaceSlot: React.ReactNode
       <React.Suspense fallback={<NavLinks pathname={null} onNavigate={onNavigate} />}>
         <ActiveNav onNavigate={onNavigate} />
       </React.Suspense>
-      <div className="border-t border-line p-4">
+      <div className="space-y-3 border-t border-line p-4">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-xs text-slate">Appearance</span>
+          <ThemeToggle />
+        </div>
         <form action={signOutAction}>
           <Button type="submit" variant="ghost" size="sm" className="w-full justify-start text-slate">
             <LogOut aria-hidden /> Sign out
