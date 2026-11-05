@@ -3,7 +3,7 @@ import { createRemoteJWKSet, jwtVerify } from "jose";
 import { GOOGLE_ISSUERS, GOOGLE_JWKS_URL, GOOGLE_TOKEN_URL, SESSION_COOKIE, STATE_COOKIE } from "@/lib/auth/constants";
 import { callbackUrl, checkIdTokenClaims, resolveAppOrigin } from "@/lib/auth/oidc";
 import { verifyState } from "@/lib/auth/tokens";
-import { isAllowedBetaEmail } from "@/lib/beta-allowlist";
+import { mayUseLocenti } from "@/server/access";
 import { accountsConfigured, configuredSiteUrl, googleOAuth, sessionSecret } from "@/server/env";
 import { withService } from "@/server/db";
 import { googleSignIn, type Q } from "@/server/auth-store";
@@ -55,8 +55,8 @@ export async function GET(request: NextRequest) {
   const claims = checkIdTokenClaims(payload, saved.nonce);
   if (!claims.ok) return fail(claims.code);
 
-  // Invite-only: only listed emails may sign in (checked on every sign-in, so removal takes effect).
-  if (!isAllowedBetaEmail(claims.email)) return fail("not_invited");
+  // Invite-only: listed or team-invited emails may sign in (checked on every sign-in, so removal takes effect).
+  if (!(await mayUseLocenti(claims.email))) return fail("not_invited");
 
   let token: string;
   try {

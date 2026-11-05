@@ -30,7 +30,7 @@ const faqs: { q: string; a: React.ReactNode }[] = [
   },
   {
     q: "How does an agency organise its work?",
-    a: "Today: saved lists, tags, notes and a workspace-wide suppression list. Separate client workspaces with their own data, allowances and sending identities, plus owner, admin, operator and viewer roles, are planned for launch.",
+    a: "Invite teammates as admins or members, and give each client its own workspace with its own leads, mailboxes, campaigns, usage and do-not-contact list, then switch between them from the sidebar. Admins connect mailboxes and approve campaigns; members find leads, research and write. A read-only viewer role is planned.",
   },
   {
     q: "Is this compliant with email law where I work?",

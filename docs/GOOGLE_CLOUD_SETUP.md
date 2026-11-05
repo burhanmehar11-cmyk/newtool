@@ -92,7 +92,7 @@ Google calls this **Google Auth Platform** (older screens say **OAuth consent sc
 3. When asked which environments to connect, keep **Production** and **Preview** (and **Development** if offered). Vercel adds `DATABASE_URL` and related settings automatically.
 4. Open the database's **Open in Neon** (or **Neon Console**) link → **SQL Editor**.
 5. In another tab, open GitHub → **burhanmehar11-cmyk/newtool** → branch `claude/compassionate-knuth-hewpfn` → `database/migrations/0000_auth.sql` → **Copy raw file** (two-squares icon). Paste into the SQL Editor → **Run**.
-6. Clear the editor. Do the same, one file at a time, with `database/migrations/0001_foundation.sql` → **Run**, then `0002_password_and_discovery.sql` → **Run**, then `0003_research.sql` → **Run**, then `0004_google_places.sql` → **Run**, then `0005_mailboxes.sql` → **Run**, then `0006_campaigns.sql` → **Run**, then `0007_agents.sql` → **Run**, then `0008_replies.sql` → **Run**.
+6. Clear the editor. Do the same, one file at a time, with `database/migrations/0001_foundation.sql` → **Run**, then `0002_password_and_discovery.sql` → **Run**, then `0003_research.sql` → **Run**, then `0004_google_places.sql` → **Run**, then `0005_mailboxes.sql` → **Run**, then `0006_campaigns.sql` → **Run**, then `0007_agents.sql` → **Run**, then `0008_replies.sql` → **Run**, then `0009_team.sql` → **Run**.
    - Already ran some of them earlier? Run only the ones after the last you ran (for example just **0003**). Later files only add things and are safe to run on top.
 7. Check by running:
 
@@ -184,6 +184,12 @@ Lets Locenti read replies to campaign emails (only threads it started), sort the
 2. Neon SQL Editor: run `database/migrations/0008_replies.sql`.
 3. In the app: **Mailboxes** → your mailbox → **Reply tracking: Turn on** → on Google's screen, leave both boxes ticked.
 4. **Inbox** in the sidebar shows replies (checked every few minutes while Locenti is open, or click **Check for replies**).
+
+## Part G3: Team invites (no Google setup)
+
+1. Neon SQL Editor: run `database/migrations/0009_team.sql`.
+2. In the app: **Team** → enter a teammate's email → **Invite** → copy the link and send it to them. If `SMTP_URL` is set, Locenti also emails it.
+3. They open the link, sign in or create an account **with that email**, and click **Join**. Invited people don't need to be on `BETA_ALLOWED_EMAILS`.
 
 ## Part H: Campaign sending (no setup needed; scheduler optional)
 

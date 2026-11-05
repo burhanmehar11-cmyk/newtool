@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { isAllowedBetaEmail } from "@/lib/beta-allowlist";
+import { mayUseLocenti } from "@/server/access";
 import { passwordProblem } from "@/lib/auth/password";
 import { safeNextPath } from "@/lib/safe-redirect";
 import { accountsConfigured } from "@/server/env";
@@ -40,7 +40,7 @@ export async function signInWithPasswordAction(_: FormState, form: FormData): Pr
   const values = { email: String(form.get("email") ?? "").slice(0, 254) };
   const parsed = z.object({ email, password: z.string().min(1, "Enter your password.").max(128) }).safeParse({ email: form.get("email"), password: form.get("password") });
   if (!parsed.success) return { values, fieldErrors: Object.fromEntries(parsed.error.issues.map((i) => [String(i.path[0]), i.message])) };
-  if (!isAllowedBetaEmail(parsed.data.email)) return { values, error: NOT_INVITED };
+  if (!(await mayUseLocenti(parsed.data.email))) return { values, error: NOT_INVITED };
 
   const ip = await clientIp();
   const r = await svc((q) => passwordSignIn(q, parsed.data.email, parsed.data.password, ip));
@@ -63,7 +63,7 @@ export async function signUpWithPasswordAction(_: FormState, form: FormData): Pr
   const pwProblem = passwordProblem(pw);
   if (pwProblem) fieldErrors.password = pwProblem;
   if (!parsed.success || pwProblem) return { values, fieldErrors };
-  if (!isAllowedBetaEmail(parsed.data.email)) return { values, error: NOT_INVITED };
+  if (!(await mayUseLocenti(parsed.data.email))) return { values, error: NOT_INVITED };
 
   const origin = await appOrigin();
   const r = await svc((q) => passwordSignUp(q, parsed.data.email, pw, parsed.data.name));
@@ -83,7 +83,7 @@ export async function signUpWithPasswordAction(_: FormState, form: FormData): Pr
 export async function resendVerificationAction(emailAddress: string): Promise<FormState> {
   if (!accountsConfigured() || !emailConfigured()) return NO_EMAIL;
   const e = email.safeParse(emailAddress);
-  if (!e.success || !isAllowedBetaEmail(e.data)) return { message: "If that account needs confirming, a new link is on its way." };
+  if (!e.success || !(await mayUseLocenti(e.data))) return { message: "If that account needs confirming, a new link is on its way." };
   const token = await svc((q) => resendVerification(q, e.data));
   if (token) {
     try {
@@ -101,7 +101,7 @@ export async function forgotPasswordAction(_: FormState, form: FormData): Promis
   const e = email.safeParse(form.get("email"));
   if (!e.success) return { values: { email: String(form.get("email") ?? "").slice(0, 254) }, fieldErrors: { email: e.error.issues[0].message } };
   const generic: FormState = { message: "If an account exists for that email, a reset link is on its way. It expires in 1 hour." };
-  if (!isAllowedBetaEmail(e.data)) return generic;
+  if (!(await mayUseLocenti(e.data))) return generic;
   const token = await svc((q) => requestPasswordReset(q, e.data));
   if (token) {
     try {

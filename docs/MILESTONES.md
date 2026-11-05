@@ -47,9 +47,14 @@ Build order: auth and workspaces → one real search-to-saved-lead flow → enri
 - Google app verification: Search Console ownership (`GOOGLE_SITE_VERIFICATION`), then submit without `gmail.readonly` (that scope needs a CASA assessment).
 - Rotate the Places API key that was pasted in chat during development.
 
-## M3: paid launch
+## M3: teams, more automation, paid launch (in progress)
 
-Started early: MCP server (see M2 step 4).
-
-
-Needs owner-approved prices, trial policy, limits and billing provider eligibility before payments are enabled.
+| Item | Status | Notes |
+| --- | --- | --- |
+| MCP server for your own AI agent | **Built** (started early, see M2 step 4) | |
+| Team invites and roles | **Built, tested against Postgres and in the browser** | Team page: invite by email as Admin or Member (link valid 7 days, works once, only for that email; emailed when SMTP is set, otherwise copy the link), open invites with revoke, change roles, remove people, leave. Rules enforced in the database (migration `0009_team.sql`): only owners and admins manage, the owner can't be removed or demoted. Invited people may sign in without being on the allowlist; onboarding offers open invites before creating a new workspace. |
+| Follow-up emails | Not started | Second and third emails that stop on reply, unsubscribe or bounce. |
+| Public API and webhooks | Not started | REST endpoints with personal tokens (the MCP tokens), signed webhooks for new leads and replies. |
+| Real-Postgres CI job | Not started | Runs the database tests on a Postgres service container to cover real lock contention. |
+| Viewer role | Not started | Read-only access needs write restrictions in every table's policies. |
+| Billing | Waiting on the owner | Needs owner-approved prices, trial policy, limits and a billing provider before payments are enabled. Nothing paid is set up. |

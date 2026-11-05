@@ -81,6 +81,11 @@ Before launch: a dedicated least-privilege database role for the app; real-Postg
 - `lib/replies/gmail-thread.ts` (parse, text only), `lib/replies/classify.ts` (suggested labels), `server/gmail/google.ts#getThread`, `server/replies-store.ts`, `server/services/replies.ts`, actions `server/actions/replies.ts`, pages `app/app/inbox` and `app/app/inbox/[id]`, migration `0008_replies.sql`. Reply tracking consent: `/api/gmail/start?replies=1`.
 - Next: follow-up steps (now safe, since replies stop them) and M3.
 
+## Team invites (M3)
+
+- Migration `0009_team.sql`: `workspace_invites` (token SHA-256 only, 7-day expiry, one open invite per email) and security-definer functions `app.invite_member`, `app.revoke_invite`, `app.accept_invite` / `app.accept_invite_id` (signed-in email must match), `app.my_invites`, `app.set_member_role`, `app.remove_member`, `app.workspace_members`.
+- `server/team-store.ts`, `server/services/team.ts`, `server/actions/team.ts`, `server/access.ts` (`mayUseLocenti`: allowlist or team invite, used by Google and password sign-in/up); UI `features/team/`, pages `app/app/team` and `app/invite/[token]`; onboarding lists open invites. Tests `tests/db/team.test.ts`.
+
 ## Dashboard, Analytics, migration banner
 
 - `server/analytics-store.ts` + `server/services/analytics.ts`; UI `features/analytics/` (KPI tiles, trend chart, pipeline, campaign table, breakdowns, activity); pages `app/app/page.tsx` (Dashboard) and `app/app/analytics`.
@@ -93,6 +98,6 @@ Order: hero with self-playing product preview (`live-demo.tsx`, ~13 s loop, paus
 ## Next actions
 
 1. **Owner live checks** (listed at the end of the M2 section in `docs/MILESTONES.md`): a small real campaign, reply tracking, optional Gemini key, Google app verification, rotating the Places key.
-2. **M3** (see `docs/MILESTONES.md`): team invites and roles, follow-up emails, public API and webhooks, real-Postgres CI job; billing only after the owner approves prices and a provider.
+2. **M3** (see `docs/MILESTONES.md`): team invites are built (owner runs `0009_team.sql`); next follow-up emails, public API and webhooks, real-Postgres CI job; billing only after the owner approves prices and a provider.
 3. Decide when to open sign-up (`BETA_ALLOWED_EMAILS` keeps it invite-only; the Google Maps and Gemini allowances are shared).
 4. Remove the old demo code under `demo/` and the `features/*-view.tsx` demo views once nothing links to them (the marketing page still uses `demo/fixtures` for its fictional sample data).

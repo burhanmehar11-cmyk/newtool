@@ -200,12 +200,13 @@ export function SignInForm({ emailEnabled }: { emailEnabled: boolean }) {
 }
 
 export function SignUpForm({ emailEnabled }: { emailEnabled: boolean }) {
+  const params = useSearchParams();
   const [state, action, pending] = React.useActionState<FormState, FormData>(signUpWithPasswordAction, {});
   if (state.message) return <Notice tone="ok">{state.message}</Notice>;
   return (
     <>
       <UrlError />
-      <GoogleButton next="/app" label="Sign up with Google" />
+      <GoogleButton next={safeNextPath(params.get("next"))} label="Sign up with Google" />
       <Divider>Or create an account with email</Divider>
       {emailEnabled ? (
         <form action={action} className="space-y-5" noValidate>

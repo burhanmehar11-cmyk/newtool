@@ -16,6 +16,7 @@ const MARKERS: { file: string; sql: string }[] = [
   { file: "0006_campaigns.sql", sql: "select 1 from information_schema.columns where table_schema = 'public' and table_name = 'enrollments' and column_name = 'draft_id'" },
   { file: "0007_agents.sql", sql: "select 1 from information_schema.tables where table_schema = 'public' and table_name = 'api_tokens'" },
   { file: "0008_replies.sql", sql: "select 1 from information_schema.columns where table_schema = 'public' and table_name = 'threads' and column_name = 'last_inbound_at'" },
+  { file: "0009_team.sql", sql: "select 1 from information_schema.tables where table_schema = 'public' and table_name = 'workspace_invites'" },
 ];
 
 export const LATEST_MIGRATION = MARKERS.at(-1)!.file;
