@@ -142,3 +142,11 @@ docs/                    PRODUCT, BRAND, ARCHITECTURE, MILESTONES, DECISIONS, HA
 - Legal pages are drafts marked for owner and legal review.
 - Pricing shows "Private beta pricing coming soon". No prices are set.
 - Demo data is per-browser and can be reset at any time.
+
+## Continuous integration
+
+`.github/workflows/ci.yml` runs lint, type checks, all tests and the production build on every push and pull request, and runs the database tests again on a real Postgres 16 (including lock-contention tests). To run them locally against your own Postgres:
+
+```bash
+TEST_DATABASE_URL=postgres://postgres:postgres@localhost:5432/postgres npx vitest run tests/db
+```
