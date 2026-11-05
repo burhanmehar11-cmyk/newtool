@@ -1,9 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { Check, CreditCard } from "lucide-react";
-import { PageHero } from "@/components/app/page-hero";
+import { Check } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Callout } from "@/components/ui/misc";
 import { plans } from "@/config/plans";
 import { CheckoutButton } from "@/features/billing/checkout-button";
 import { PageLoading } from "@/features/product/page-loading";
@@ -30,32 +28,14 @@ async function Billing() {
   const current = a?.plan_id ? plans.find((p) => p.id === a.plan_id) : null;
   return (
     <div>
-      <PageHero
-        icon={CreditCard}
-        eyebrow="Workspace"
-        title="Billing"
-        description={`Plans for ${b.workspace.name}. Payments are handled by Paddle, which also takes care of sales tax and invoices.`}
-        stats={[
-          { label: "Plan", value: current ? current.name : PLAN_LABEL[b.plan] ?? b.plan, hint: a?.status ? STATUS[a.status] : undefined },
-          {
-            label: b.plan === "trial" ? "Trial" : a?.cancel_at ? "Ends" : "Renews",
-            value: b.plan === "trial" ? (b.trialDaysLeft > 0 ? `${b.trialDaysLeft} days left` : "Ended") : a?.cancel_at ? formatDate(a.cancel_at) : a?.period_ends_at ? formatDate(a.period_ends_at) : "—",
-            hint: b.plan === "trial" ? `until ${formatDate(b.trialEndsAt)}` : undefined,
-          },
-          { label: "Payments", value: b.checkout ? (b.checkout.environment === "sandbox" ? "Test mode" : "Live") : "Not set up" },
-        ]}
-      />
-
-      {a?.status === "past_due" ? (
-        <Callout tone="warn" title="Your last payment didn't go through" className="mb-5">
-          Paddle will retry it. Update your card to avoid interruption.{a.manage_url ? <> <a href={a.manage_url} target="_blank" rel="noreferrer">Update payment method</a>.</> : null}
-        </Callout>
-      ) : null}
-      {b.plan === "lapsed" || (b.plan === "trial" && b.trialDaysLeft <= 0) ? (
-        <Callout tone={b.enforce ? "warn" : "info"} title={b.plan === "lapsed" ? "Your subscription has ended" : "Your free trial has ended"} className="mb-5">
-          {b.enforce ? "Searches, research, AI writing and sending are paused until you choose a plan. Everything you saved is still here." : "Choose a plan to keep going. Nothing is locked yet."}
-        </Callout>
-      ) : null}
+      <div className="mb-6">
+        <h1 className="font-display text-2xl font-bold tracking-tight text-ink sm:text-[28px]">Billing</h1>
+        <p className="mt-1 text-sm text-slate">
+          {current ? current.name : (PLAN_LABEL[b.plan] ?? b.plan)}
+          {b.plan === "trial" ? ` · ${b.trialDaysLeft > 0 ? `${b.trialDaysLeft} days left, until ${formatDate(b.trialEndsAt)}` : "ended"}` : a?.cancel_at ? ` · ends ${formatDate(a.cancel_at)}` : a?.period_ends_at ? ` · renews ${formatDate(a.period_ends_at)}` : ""}
+          {a?.status && a.status !== "active" ? ` · ${STATUS[a.status]}` : ""}
+        </p>
+      </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
         {plans.map((p) => {
@@ -105,7 +85,7 @@ async function Billing() {
           </div>
         </section>
       ) : null}
-      <p className="mt-5 text-xs leading-5 text-slate">Switching plans opens a new checkout; cancel the old subscription from the link above once the new one is active. Prices include any tax Paddle adds for your country.</p>
+      <p className="mt-5 text-xs leading-5 text-slate">Switching plans opens a new checkout; cancel the old subscription from the link above once the new one is active.</p>
     </div>
   );
 }
