@@ -339,7 +339,15 @@ function SettingsForm({ campaign, mailboxes, canManage }: { campaign: CampaignRo
 
 /* ------------------------------------------------------- running and after */
 
+const replyLabel: Record<string, string> = { interested: "Replied · interested", not_interested: "Replied · not interested", out_of_office: "Out of office", bounce: "Bounced", unclassified: "Replied" };
+
 const stateBadge = (r: Recipient) => {
+  if (r.reply_kind)
+    return (
+      <a href={r.thread_id ? `/app/inbox/${r.thread_id}` : "/app/inbox"}>
+        <Badge tone={r.reply_kind === "interested" ? "green" : r.reply_kind === "bounce" ? "danger" : "info"}>{replyLabel[r.reply_kind] ?? "Replied"}</Badge>
+      </a>
+    );
   if (r.dispatch_status === "accepted") return <Badge tone="green">Sent{r.accepted_at ? ` ${formatDateTime(r.accepted_at)}` : ""}</Badge>;
   if (r.enrollment_state === "queued") return <Badge tone="info">Queued</Badge>;
   if (r.enrollment_state === "stopped") return <Badge tone={r.dispatch_status === "ambiguous" ? "warn" : "neutral"}>{r.enrollment_reason ?? "Stopped"}</Badge>;
@@ -355,13 +363,17 @@ function LiveCampaign({ campaign, recipients, mailboxes, canManage }: { campaign
   const sent = recipients.filter((r) => r.dispatch_status === "accepted").length;
   const queued = recipients.filter((r) => r.enrollment_state === "queued").length;
   const stopped = recipients.filter((r) => r.enrollment_state === "stopped").length;
+  const replied = recipients.filter((r) => r.reply_kind && r.reply_kind !== "out_of_office" && r.reply_kind !== "bounce").length;
+  const interested = recipients.filter((r) => r.reply_kind === "interested").length;
   return (
     <div className="grid gap-5 xl:grid-cols-[minmax(0,8fr)_minmax(0,4fr)]">
       <section className="card">
-        <div className="grid grid-cols-3 divide-x divide-line border-b border-line">
+        <div className="grid grid-cols-3 divide-x divide-line border-b border-line sm:grid-cols-5">
           {[
             ["Sent", sent],
             ["Queued", queued],
+            ["Replied", replied],
+            ["Interested", interested],
             ["Stopped", stopped],
           ].map(([label, n]) => (
             <div key={label} className="px-5 py-4">

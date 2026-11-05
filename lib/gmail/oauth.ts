@@ -8,15 +8,17 @@ import { GOOGLE_AUTHORIZE_URL } from "@/lib/auth/constants";
  */
 
 export const GMAIL_SEND_SCOPE = "https://www.googleapis.com/auth/gmail.send";
+/** Optional, asked only when someone turns on reply tracking. Google classes it as restricted. */
+export const GMAIL_READ_SCOPE = "https://www.googleapis.com/auth/gmail.readonly";
 export const GMAIL_CALLBACK_PATH = "/api/gmail/callback";
 export const GMAIL_STATE_COOKIE = "locentio_gmail";
 
-export function buildGmailAuthorizeUrl(p: { clientId: string; redirectUri: string; state: string; nonce: string; codeChallenge: string; loginHint?: string | null }) {
+export function buildGmailAuthorizeUrl(p: { clientId: string; redirectUri: string; state: string; nonce: string; codeChallenge: string; loginHint?: string | null; withReplies?: boolean }) {
   const u = new URL(GOOGLE_AUTHORIZE_URL);
   u.searchParams.set("client_id", p.clientId);
   u.searchParams.set("redirect_uri", p.redirectUri);
   u.searchParams.set("response_type", "code");
-  u.searchParams.set("scope", `openid email ${GMAIL_SEND_SCOPE}`);
+  u.searchParams.set("scope", `openid email ${GMAIL_SEND_SCOPE}${p.withReplies ? ` ${GMAIL_READ_SCOPE}` : ""}`);
   // A refresh token lets scheduled sends run while the user is away.
   u.searchParams.set("access_type", "offline");
   // Always show consent, so Google returns a refresh token every time.
@@ -37,4 +39,8 @@ export function hasSendScope(scope: string | null | undefined) {
 
 export function gmailCallbackUrl(origin: string) {
   return `${origin}${GMAIL_CALLBACK_PATH}`;
+}
+
+export function hasReadScope(scope: string | null | undefined) {
+  return (scope ?? "").split(/\s+/).includes(GMAIL_READ_SCOPE);
 }

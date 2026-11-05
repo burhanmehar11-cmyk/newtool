@@ -79,7 +79,7 @@ export type CampaignRow = {
 
 const CAMPAIGN_COLS = "id, name, status, revision, schedule, policy, sending_account_id, created_at, launched_at";
 
-export type CampaignListRow = CampaignRow & { recipients: number; sent: number; queued: number };
+export type CampaignListRow = CampaignRow & { recipients: number; sent: number; queued: number; replied: number; interested: number };
 
 export async function listCampaigns(q: Q, ws: string): Promise<CampaignListRow[]> {
   return (
@@ -87,7 +87,9 @@ export async function listCampaigns(q: Q, ws: string): Promise<CampaignListRow[]
       `select ${CAMPAIGN_COLS.split(", ").map((c) => `c.${c}`).join(", ")},
          (select count(*)::int from public.campaign_recipients r where r.campaign_id = c.id) as recipients,
          (select count(*)::int from public.enrollments e where e.campaign_id = c.id and e.state in ('sent', 'replied')) as sent,
-         (select count(*)::int from public.enrollments e where e.campaign_id = c.id and e.state = 'queued') as queued
+         (select count(*)::int from public.enrollments e where e.campaign_id = c.id and e.state = 'queued') as queued,
+         (select count(*)::int from public.enrollments e where e.campaign_id = c.id and e.state = 'replied') as replied,
+         (select count(*)::int from public.threads t where t.campaign_id = c.id and t.classification = 'interested' and t.last_inbound_at is not null) as interested
        from public.campaigns c where c.workspace_id = $1 order by c.created_at desc limit 100`,
       [ws],
     )
@@ -117,6 +119,8 @@ export type RecipientRow = {
   dispatch_status: string | null;
   dispatch_error: string | null;
   accepted_at: string | null;
+  reply_kind: string | null;
+  thread_id: string | null;
 };
 
 export async function campaignRecipients(q: Q, campaignId: string): Promise<RecipientRow[]> {
@@ -128,7 +132,9 @@ export async function campaignRecipients(q: Q, campaignId: string): Promise<Reci
          exists (select 1 from public.briefs br where br.business_id = b.id) as has_brief,
          d.id as draft_id, d.version as draft_version, d.subject, d.body, d.origin as draft_origin,
          e.state as enrollment_state, e.reason as enrollment_reason,
-         x.status as dispatch_status, x.error as dispatch_error, x.accepted_at
+         x.status as dispatch_status, x.error as dispatch_error, x.accepted_at,
+         (select t.classification from public.threads t where t.campaign_id = r.campaign_id and t.lead_id = l.id and t.last_inbound_at is not null limit 1) as reply_kind,
+         (select t.id from public.threads t where t.campaign_id = r.campaign_id and t.lead_id = l.id and t.last_inbound_at is not null limit 1) as thread_id
        from public.campaign_recipients r
        join public.leads l on l.id = r.lead_id
        join public.businesses b on b.id = l.business_id
@@ -235,7 +241,7 @@ export async function listSuppressions(q: Q, ws: string): Promise<SuppressionRow
   return (await q.query<SuppressionRow>("select id, value, kind, reason, created_at from public.suppression_entries where workspace_id = $1 order by created_at desc limit 500", [ws])).rows;
 }
 
-export async function addSuppression(q: Q, ws: string, userId: string | null, value: string, kind: "email" | "domain", reason: "manual" | "unsubscribe") {
+export async function addSuppression(q: Q, ws: string, userId: string | null, value: string, kind: "email" | "domain", reason: "manual" | "unsubscribe" | "bounce") {
   await q.query(
     "insert into public.suppression_entries (workspace_id, value, kind, reason, created_by) values ($1, lower($2), $3, $4, $5) on conflict (workspace_id, value) do nothing",
     [ws, value, kind, reason, userId],

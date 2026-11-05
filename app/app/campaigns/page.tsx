@@ -47,7 +47,7 @@ async function Campaigns() {
         {campaigns.length ? (
           <div className="card overflow-hidden">
             <div className="overflow-x-auto scrollbar-thin">
-              <table className="w-full min-w-[620px] text-left text-sm">
+              <table className="w-full min-w-[760px] text-left text-sm">
                 <caption className="sr-only">Campaigns</caption>
                 <thead className="border-b border-line bg-canvas/60 text-xs text-slate">
                   <tr>
@@ -55,7 +55,9 @@ async function Campaigns() {
                     <th scope="col" className="py-2.5 pr-3 font-medium">Status</th>
                     <th scope="col" className="py-2.5 pr-3 text-right font-medium">Recipients</th>
                     <th scope="col" className="py-2.5 pr-3 text-right font-medium">Sent</th>
-                    <th scope="col" className="py-2.5 pr-5 text-right font-medium">Queued</th>
+                    <th scope="col" className="py-2.5 pr-3 text-right font-medium">Queued</th>
+                    <th scope="col" className="py-2.5 pr-3 text-right font-medium">Replies</th>
+                    <th scope="col" className="py-2.5 pr-5 text-right font-medium">Interested</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -72,7 +74,9 @@ async function Campaigns() {
                       </td>
                       <td className="py-3 pr-3 text-right tabular-nums">{c.recipients}</td>
                       <td className="py-3 pr-3 text-right tabular-nums">{c.sent}</td>
-                      <td className="py-3 pr-5 text-right tabular-nums">{c.queued}</td>
+                      <td className="py-3 pr-3 text-right tabular-nums">{c.queued}</td>
+                      <td className="py-3 pr-3 text-right tabular-nums">{c.replied}</td>
+                      <td className="py-3 pr-5 text-right tabular-nums text-green">{c.interested}</td>
                     </tr>
                   ))}
                 </tbody>

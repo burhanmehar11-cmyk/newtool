@@ -22,7 +22,7 @@ export function AutoSender() {
       busy = true;
       try {
         const r = await autoSendTickAction();
-        if (r.sent) router.refresh();
+        if (r.sent || r.newReplies) router.refresh();
       } catch {
         // offline or signed out: try again next minute
       } finally {

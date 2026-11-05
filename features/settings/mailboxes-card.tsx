@@ -9,6 +9,7 @@ import { FieldHint, Input, Label } from "@/components/ui/field";
 import { Callout } from "@/components/ui/misc";
 import { disconnectMailboxAction, saveMailboxSettingsAction, sendTestEmailAction } from "@/server/actions/mailboxes";
 import type { MailboxRow } from "@/server/mailbox-store";
+import { hasReadScope } from "@/lib/gmail/oauth";
 import { formatDateTime } from "@/lib/utils";
 
 const errorText: Record<string, string> = {
@@ -98,6 +99,19 @@ function MailboxItem({ m, canEdit }: { m: MailboxRow; canEdit: boolean }) {
         {statusBadge[m.status]}
       </div>
       {m.last_error ? <p className="mt-2 text-xs text-danger-fg">{m.last_error}</p> : null}
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-canvas px-3 py-2">
+        <span className="text-xs text-slate">
+          <span className="font-medium text-ink">Reply tracking: {hasReadScope(m.scopes) ? "on" : "off"}</span>
+          {hasReadScope(m.scopes)
+            ? ` · ${m.last_synced_at ? `checked ${formatDateTime(m.last_synced_at)} UTC` : "not checked yet"}`
+            : " · lets Locentio read replies to campaign emails, sort them and stop emailing people who say no"}
+        </span>
+        {canEdit && !hasReadScope(m.scopes) && m.status === "connected" ? (
+          <Button size="sm" variant="secondary" asChild>
+            <a href={`/api/gmail/start?replies=1&email=${encodeURIComponent(m.email)}`}>Turn on</a>
+          </Button>
+        ) : null}
+      </div>
 
       {canEdit ? (
         <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_120px]">

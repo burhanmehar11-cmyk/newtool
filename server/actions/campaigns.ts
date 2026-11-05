@@ -65,6 +65,6 @@ export async function removeDoNotContactAction(id: string) {
 /** Called by open app tabs about once a minute; revalidates only when something was sent. */
 export async function autoSendTickAction() {
   const r = await autoSendTick();
-  if (r.sent) refresh();
+  if (r.sent || r.newReplies) refresh();
   return r;
 }

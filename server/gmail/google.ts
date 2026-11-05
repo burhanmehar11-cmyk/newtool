@@ -76,3 +76,21 @@ export async function revokeToken(token: string) {
     signal: AbortSignal.timeout(10_000),
   }).catch(() => null);
 }
+
+const THREAD_URL = "https://gmail.googleapis.com/gmail/v1/users/me/threads/";
+
+export type ThreadResult = { ok: true; messages: import("@/lib/replies/gmail-thread").GmailMessage[] } | { ok: false; code: "auth" | "permission" | "not_found" | "rate_limited" | "network" | "error"; message: string };
+
+/** users.threads.get (format=full). Needs the gmail.readonly scope. */
+export async function getThread(accessToken: string, threadId: string): Promise<ThreadResult> {
+  if (!/^[a-f0-9]{8,40}$/i.test(threadId)) return { ok: false, code: "not_found", message: "Not a Gmail thread id." };
+  const res = await fetch(`${THREAD_URL}${threadId}?format=full`, { headers: { authorization: `Bearer ${accessToken}` }, signal: AbortSignal.timeout(20_000), cache: "no-store" }).catch(() => null);
+  if (!res) return { ok: false, code: "network", message: "Couldn't reach Gmail." };
+  if (res.status === 401) return { ok: false, code: "auth", message: "Gmail rejected the mailbox's access. Reconnect it." };
+  if (res.status === 403) return { ok: false, code: "permission", message: "Reply tracking isn't allowed for this mailbox. Turn it on again on the Mailboxes page." };
+  if (res.status === 404) return { ok: false, code: "not_found", message: "Thread not found (it may have been deleted)." };
+  if (res.status === 429) return { ok: false, code: "rate_limited", message: "Gmail asked to slow down. Try again later." };
+  if (!res.ok) return { ok: false, code: "error", message: `Gmail returned an error (HTTP ${res.status}).` };
+  const json = (await res.json().catch(() => ({}))) as { messages?: import("@/lib/replies/gmail-thread").GmailMessage[] };
+  return { ok: true, messages: json.messages ?? [] };
+}

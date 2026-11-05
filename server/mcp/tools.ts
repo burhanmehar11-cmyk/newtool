@@ -259,7 +259,7 @@ export const mcpTools: ToolDef<McpCtx>[] = [
   },
   {
     name: "get_campaign",
-    description: "A campaign's results: each recipient's state (sent, queued, stopped and why).",
+    description: "A campaign's results: each recipient's state (sent, queued, replied, stopped and why) and the reply label (interested, not_interested, out_of_office, bounce, unclassified).",
     inputSchema: { type: "object", properties: { campaign_id: { type: "string" } }, required: ["campaign_id"], additionalProperties: false },
     annotations: { readOnlyHint: true },
     run: async (args, ctx) => {
@@ -277,6 +277,7 @@ export const mcpTools: ToolDef<McpCtx>[] = [
             subject: r.subject,
             state: r.dispatch_status === "accepted" ? "sent" : (r.enrollment_state ?? "not included"),
             sent_at: r.accepted_at,
+            reply: r.reply_kind,
             reason: r.enrollment_reason ?? r.dispatch_error,
           })),
           url: `${origin()}/app/campaigns/${a.campaign_id}`,

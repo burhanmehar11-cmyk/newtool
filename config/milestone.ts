@@ -27,7 +27,7 @@ export const features = {
   drafts: { label: "AI-written emails", availability: "beta", target: "M2" },
   sequences: { label: "Approved campaigns (first email)", availability: "beta", target: "M2" },
   gmail: { label: "Gmail connection (send-only)", availability: "beta", target: "M2" },
-  replySync: { label: "Reply sync and classification", availability: "demo", target: "M2" },
+  replySync: { label: "Reply tracking and sorting", availability: "beta", target: "M2" },
   csv: { label: "CSV import and export", availability: "demo", target: "M2" },
   usage: { label: "Usage ledger", availability: "demo", target: "M2" },
   multiWorkspace: { label: "Client workspaces", availability: "planned", target: "M3" },

@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
   if (!accountsConfigured() || !tokenKey()) return back("not_configured");
 
   const origin = resolveAppOrigin(configuredSiteUrl(), request.nextUrl.origin);
-  if (origin !== request.nextUrl.origin) return NextResponse.redirect(new URL(request.nextUrl.pathname, origin));
+  if (origin !== request.nextUrl.origin) return NextResponse.redirect(new URL(`${request.nextUrl.pathname}${request.nextUrl.search}`, origin));
 
   const user = await getCurrentUser();
   if (!user) return NextResponse.redirect(new URL("/sign-in?next=/app/mailboxes", request.url));
@@ -25,7 +25,15 @@ export async function GET(request: NextRequest) {
   const state = randomToken(16);
   const nonce = randomToken(16);
   const res = NextResponse.redirect(
-    buildGmailAuthorizeUrl({ clientId: gmailOAuth()!.clientId, redirectUri: gmailCallbackUrl(origin), state, nonce, codeChallenge: await pkceChallenge(verifier), loginHint: user.email }),
+    buildGmailAuthorizeUrl({
+      clientId: gmailOAuth()!.clientId,
+      redirectUri: gmailCallbackUrl(origin),
+      state,
+      nonce,
+      codeChallenge: await pkceChallenge(verifier),
+      loginHint: request.nextUrl.searchParams.get("email")?.slice(0, 254) || user.email,
+      withReplies: request.nextUrl.searchParams.get("replies") === "1",
+    }),
   );
   // Bind the round trip to this user and workspace.
   res.cookies.set(GMAIL_STATE_COOKIE, await signState({ state, verifier, nonce, next: `${user.id}:${ws.id}` }, sessionSecret()!), {

@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { timingSafeEqual } from "node:crypto";
 import { runDispatch } from "@/server/services/dispatch";
+import { syncWorkspaceReplies } from "@/server/services/replies";
+import { withService } from "@/server/db";
 
 /**
  * Scheduler entry point: one sending pass across all workspaces. Call every
@@ -13,5 +15,9 @@ export async function GET(request: NextRequest) {
   const ok = !!secret && given.length === secret.length && timingSafeEqual(Buffer.from(given), Buffer.from(secret));
   if (!ok) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const r = await runDispatch();
-  return NextResponse.json({ sent: r.sent, failed: r.failed, skipped: r.skipped.length }, { headers: { "cache-control": "no-store" } });
+  // Reply tracking for every workspace with it turned on (throttled per mailbox).
+  const ws = await withService((q) => q.query<{ workspace_id: string }>("select distinct workspace_id from public.sending_accounts where status = 'connected' and scopes like '%gmail.readonly%'"));
+  let replies = 0;
+  for (const w of ws.rows) replies += (await syncWorkspaceReplies(w.workspace_id).catch(() => ({ newReplies: 0 }))).newReplies;
+  return NextResponse.json({ sent: r.sent, failed: r.failed, skipped: r.skipped.length, newReplies: replies }, { headers: { "cache-control": "no-store" } });
 }

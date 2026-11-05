@@ -15,9 +15,11 @@ export type MailboxRow = {
   last_tested_at: string | null;
   last_error: string | null;
   created_at: string;
+  scopes: string | null;
+  last_synced_at: string | null;
 };
 
-const COLS = "id, email, sender_name, status, daily_cap, last_tested_at, last_error, created_at";
+const COLS = "id, email, sender_name, status, daily_cap, last_tested_at, last_error, created_at, scopes, last_synced_at";
 
 export async function upsertMailbox(q: Q, ws: string, userId: string, email: string, senderName: string | null, scopes: string): Promise<string> {
   const r = await q.query<{ id: string }>(

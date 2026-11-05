@@ -102,7 +102,7 @@ export async function runDispatch(opts: { workspaceId?: string | null; now?: Dat
     const sent = await sendRaw(token.token, raw);
     if (sent.ok) {
       await svc((q) =>
-        recordAccepted(q, { ws: c.workspace_id, dispatchId, enrollmentId: due.id, leadId: due.lead_id, campaignId: c.id, messageId: sent.id, threadId: sent.threadId, from: c.account_email, to: due.email, subject: due.subject, body }),
+        recordAccepted(q, { ws: c.workspace_id, dispatchId, enrollmentId: due.id, leadId: due.lead_id, campaignId: c.id, accountId: c.account_id, messageId: sent.id, threadId: sent.threadId, from: c.account_email, to: due.email, subject: due.subject, body }),
       );
       summary.sent++;
       await svc((q) => completeFinished(q, c.id));

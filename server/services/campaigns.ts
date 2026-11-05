@@ -27,6 +27,7 @@ import { leadDetail, toBusiness } from "@/server/research-store";
 import { runDispatch } from "@/server/services/dispatch";
 import { getOfferProfile } from "@/server/services/workspaces";
 import { aiWriterStatus } from "@/server/services/ai-writer";
+import { syncWorkspaceReplies } from "@/server/services/replies";
 
 const asQ = <T,>(userId: string, fn: (q: Q) => Promise<T>) => withUser(userId, (q) => fn(q as unknown as Q));
 const uuid = z.string().uuid();
@@ -216,11 +217,12 @@ export async function removeDoNotContact(id: string): Promise<R> {
  * Runs one sending pass for this workspace (same limits as the scheduler)
  * only when a campaign is running. Cheap no-op otherwise.
  */
-export async function autoSendTick(): Promise<{ sent: number }> {
+export async function autoSendTick(): Promise<{ sent: number; newReplies: number }> {
   const { user, workspace } = await requireWorkspace("/app");
-  if (!canManage(workspace.role)) return { sent: 0 };
+  if (!canManage(workspace.role)) return { sent: 0, newReplies: 0 };
+  const replies = await syncWorkspaceReplies(workspace.id).catch(() => ({ newReplies: 0 }));
   const running = await asQ(user.id, (q) => q.query("select 1 from public.campaigns where workspace_id = $1 and status = 'running' limit 1", [workspace.id]));
-  if (!running.rows.length) return { sent: 0 };
+  if (!running.rows.length) return { sent: 0, newReplies: replies.newReplies };
   const r = await runDispatch({ workspaceId: workspace.id });
-  return { sent: r.sent };
+  return { sent: r.sent, newReplies: replies.newReplies };
 }

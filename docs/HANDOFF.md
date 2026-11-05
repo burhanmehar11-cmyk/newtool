@@ -76,6 +76,11 @@ Before launch: a dedicated least-privilege database role for the app; real-Postg
 
 - `lib/ai/draft-prompt.ts` (prompt + output checks, tested), `server/ai/gemini.ts`, `server/services/ai-writer.ts`, actions `server/actions/ai.ts`; UI: lead page "First email" card, campaign "Write all with AI" and per-recipient rewrite; Agent page (`app/app/agent`). Needs `GEMINI_API_KEY` (setup guide Part I). Not yet called with a real key from here.
 
+## Reply sync (M2 step 6)
+
+- `lib/replies/gmail-thread.ts` (parse, text only), `lib/replies/classify.ts` (suggested labels), `server/gmail/google.ts#getThread`, `server/replies-store.ts`, `server/services/replies.ts`, actions `server/actions/replies.ts`, pages `app/app/inbox` and `app/app/inbox/[id]`, migration `0008_replies.sql`. Reply tracking consent: `/api/gmail/start?replies=1`.
+- Next: follow-up steps (now safe, since replies stop them) and M3.
+
 ## Landing page
 
 `components/marketing/audience-workflow.tsx` → `HowItWorks`: 5 steps (connect mailbox, search Google Maps, research and personalise, approve and launch, handle replies). Each step's badge comes from `config/milestone.ts`, so flipping a feature's `availability` updates the page.

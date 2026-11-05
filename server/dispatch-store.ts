@@ -83,15 +83,15 @@ export async function claimDispatch(q: Q, ws: string, campaignId: string, enroll
 
 export async function recordAccepted(
   q: Q,
-  p: { ws: string; dispatchId: string; enrollmentId: string; leadId: string; campaignId: string; messageId: string; threadId: string; from: string; to: string; subject: string; body: string },
+  p: { ws: string; dispatchId: string; enrollmentId: string; leadId: string; campaignId: string; accountId?: string; messageId: string; threadId: string; from: string; to: string; subject: string; body: string },
 ) {
   await q.query("update public.dispatches set status = 'accepted', provider_message_id = $2, accepted_at = now(), error = null where id = $1", [p.dispatchId, p.messageId]);
   await q.query("update public.enrollments set state = 'sent', updated_at = now() where id = $1", [p.enrollmentId]);
   const t = await q.query<{ id: string }>(
-    `insert into public.threads (workspace_id, lead_id, campaign_id, provider_thread_id, subject, unread)
-     values ($1, $2, $3, $4, $5, false)
+    `insert into public.threads (workspace_id, lead_id, campaign_id, provider_thread_id, subject, unread, sending_account_id)
+     values ($1, $2, $3, $4, $5, false, $6)
      on conflict (workspace_id, provider_thread_id) do update set updated_at = now() returning id`,
-    [p.ws, p.leadId, p.campaignId, p.threadId, p.subject.slice(0, 300)],
+    [p.ws, p.leadId, p.campaignId, p.threadId, p.subject.slice(0, 300), p.accountId ?? null],
   );
   await q.query(
     `insert into public.messages (workspace_id, thread_id, direction, provider_message_id, from_addr, to_addr, subject, body_text, occurred_at)

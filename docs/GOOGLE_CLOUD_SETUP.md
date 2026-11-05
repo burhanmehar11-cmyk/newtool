@@ -92,7 +92,7 @@ Google calls this **Google Auth Platform** (older screens say **OAuth consent sc
 3. When asked which environments to connect, keep **Production** and **Preview** (and **Development** if offered). Vercel adds `DATABASE_URL` and related settings automatically.
 4. Open the database's **Open in Neon** (or **Neon Console**) link → **SQL Editor**.
 5. In another tab, open GitHub → **burhanmehar11-cmyk/newtool** → branch `claude/compassionate-knuth-hewpfn` → `database/migrations/0000_auth.sql` → **Copy raw file** (two-squares icon). Paste into the SQL Editor → **Run**.
-6. Clear the editor. Do the same, one file at a time, with `database/migrations/0001_foundation.sql` → **Run**, then `0002_password_and_discovery.sql` → **Run**, then `0003_research.sql` → **Run**, then `0004_google_places.sql` → **Run**, then `0005_mailboxes.sql` → **Run**, then `0006_campaigns.sql` → **Run**, then `0007_agents.sql` → **Run**.
+6. Clear the editor. Do the same, one file at a time, with `database/migrations/0001_foundation.sql` → **Run**, then `0002_password_and_discovery.sql` → **Run**, then `0003_research.sql` → **Run**, then `0004_google_places.sql` → **Run**, then `0005_mailboxes.sql` → **Run**, then `0006_campaigns.sql` → **Run**, then `0007_agents.sql` → **Run**, then `0008_replies.sql` → **Run**.
    - Already ran some of them earlier? Run only the ones after the last you ran (for example just **0003**). Later files only add things and are safe to run on top.
 7. Check by running:
 
@@ -174,6 +174,16 @@ Uses the **same OAuth client** as sign-in. No new credential is needed. Locentio
 7. Optional: `TOKEN_ENCRYPTION_KEY` in Vercel (32 random bytes, base64). Without it, the key is derived from `SESSION_SECRET`. Changing either later means mailboxes must be reconnected.
 
 Check: in the app, **Settings → Sending mailboxes → Connect Gmail**. On Google's screen, leave "Send email on your behalf" ticked. You'll see "This app isn't verified" in Testing; choose **Continue**. Then click **Send test email to myself**; it arrives in that inbox.
+
+## Part G2: Reply tracking (optional)
+
+Lets Locentio read replies to campaign emails (only threads it started), sort them, and stop emailing people who decline or bounce.
+
+1. **Google Auth Platform → Data Access → Add or remove scopes** → search `gmail.readonly` → tick `https://www.googleapis.com/auth/gmail.readonly` → **Update** → **Save**. Google lists it under **restricted** scopes.
+   - Fine in **Testing** mode for your test users. Publishing the app with this scope later needs Google's verification, including a paid third-party security assessment. Keep the app in Testing for the beta.
+2. Neon SQL Editor: run `database/migrations/0008_replies.sql`.
+3. In the app: **Mailboxes** → your mailbox → **Reply tracking: Turn on** → on Google's screen, leave both boxes ticked.
+4. **Inbox** in the sidebar shows replies (checked every few minutes while Locentio is open, or click **Check for replies**).
 
 ## Part H: Campaign sending (no setup needed; scheduler optional)
 
