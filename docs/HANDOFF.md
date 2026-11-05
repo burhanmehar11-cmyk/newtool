@@ -70,7 +70,8 @@ Before launch: a dedicated least-privilege database role for the app; real-Postg
 
 1. **Google Maps** is live in production (owner confirmed 2026-11-05). Make sure the key pasted in chat during development was rotated.
 2. **Gmail live check:** owner completes setup guide Part G and runs migration 0005, then Connect Gmail and send the test email.
-3. **M2 step 5b: approved campaigns** (recipients + messages approval, suppression, unsubscribe, pacing via Vercel Cron).
+3. **M2 step 5b: approved campaigns (in progress).** Committed so far, not wired to any page: `database/migrations/0006_campaigns.sql` (adds columns only; safe to run, not needed yet), `server/campaign-store.ts`, `lib/campaigns/schedule.ts`, `lib/campaigns/compose.ts`; draft templates moved to `lib/drafts/template.ts`. Still to build: services, sending endpoint, unsubscribe page, campaign pages, tests.
+   Original plan: (recipients + messages approval, suppression, unsubscribe, pacing via Vercel Cron).
 4. **M2 step 4: evidence-based drafts.** Needs `ANTHROPIC_API_KEY`; drafts must cite brief facts only.
 5. Mailbox verification provider (optional; the free DNS check stays as the floor).
 6. Add a real-Postgres CI job for concurrency tests.
