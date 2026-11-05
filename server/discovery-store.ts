@@ -163,12 +163,14 @@ export async function saveLeads(q: Q, ws: string, userId: string, businessIds: s
   return r.rows.length;
 }
 
-export type LeadRow = ResultRow & { lead_id: string; saved_at: string };
+export type LeadRow = ResultRow & { lead_id: string; saved_at: string; researched_at: string | null; research_status: string | null; fit: string | null; niche: string | null };
 
 export async function listLeads(q: Q, ws: string): Promise<LeadRow[]> {
   return (
     await q.query<LeadRow>(
-      `select l.id as lead_id, l.created_at as saved_at, ${RESULT_COLUMNS}
+      `select l.id as lead_id, l.created_at as saved_at, b.researched_at, b.research_status, b.niche,
+         (select br.payload->'fit'->>'level' from public.briefs br where br.business_id = b.id order by br.created_at desc limit 1) as fit,
+         ${RESULT_COLUMNS}
        from public.leads l join public.businesses b on b.id = l.business_id
        left join lateral (select email_normalized, status from public.contacts where business_id = b.id order by created_at limit 1) c on true
        where l.workspace_id = $1 order by l.created_at desc limit 500`,
