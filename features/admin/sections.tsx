@@ -15,8 +15,8 @@ type Daily = Record<string, string | number>[];
 
 const C1 = "var(--chart-1)";
 const C2 = "var(--chart-2)";
-const planTone = { trial: "info", free: "outline", paid: "green", comp: "neutral" } as const;
-const planLabel = { trial: "Trial", free: "Free", paid: "Paid", comp: "Complimentary" } as const;
+const planTone = { trial: "info", free: "outline", paid: "green", comp: "neutral", lapsed: "warn" } as const;
+const planLabel = { trial: "Trial", free: "Free", paid: "Paid", comp: "Complimentary", lapsed: "Lapsed" } as const;
 const sum = (d: Daily, k: string) => d.reduce((a, r) => a + Number(r[k] ?? 0), 0);
 const rows = (d: Daily) => d as ({ day: string } & Record<string, string | number>)[];
 
@@ -349,21 +349,71 @@ export function ApisTab({ d, days }: { d: Of<"apis">; days: number }) {
   );
 }
 
-export function RevenueTab({ d }: { d: Of<"revenue"> }) {
+const money = (minor: number, currency: string) => {
+  try {
+    return (minor / 100).toLocaleString("en-US", { style: "currency", currency });
+  } catch {
+    return `${(minor / 100).toFixed(2)} ${currency}`;
+  }
+};
+
+export function RevenueTab({ d, days }: { d: Of<"revenue">; days: number }) {
   const o = d.overview;
+  const b = d.billing;
+  const hasPayments = b.ready && b.byCurrency.length > 0;
   return (
     <div className="space-y-5">
-      <Callout tone="info" title="No payment provider connected yet">
-        Locenti doesn&apos;t take payments yet, so there is no revenue, MRR or churn to show. Once you approve prices and a provider (M3 billing), real payments will appear here. Until then, plans below are set by hand on the Workspaces tab.
-      </Callout>
-      <Tiles
-        items={[
-          { label: "Revenue", value: "—", hint: "no billing connected" },
-          { label: "Paid workspaces", value: num(o.plans.paid), hint: "marked paid by an admin", tone: "green" },
-          { label: "On trial", value: num(o.plans.trial), hint: `${o.trialsEndingSoon} ending within 7 days · ${o.trialsExpired} ended` },
-          { label: "Free and complimentary", value: num(o.plans.free + o.plans.comp), hint: `${o.plans.free} free · ${o.plans.comp} complimentary` },
-        ]}
-      />
+      <div className="flex flex-wrap gap-x-6 gap-y-2 rounded-xl border border-line bg-surface px-5 py-3">
+        <Status on={d.configured.checkout} label="Paddle checkout (client token + price ids)" />
+        <Status on={d.configured.webhook} label="Paddle webhook secret" />
+        <Status on={d.configured.environment === "production"} label={d.configured.environment === "production" ? "Live payments" : "Sandbox (test) payments"} />
+        <Status on={d.configured.enforce} label="Plan limits enforced (BILLING_ENFORCE)" />
+      </div>
+      {!b.ready ? (
+        <Callout tone="warn" title="Run migration 0014_billing.sql">Billing tables aren&apos;t in the database yet.</Callout>
+      ) : !hasPayments ? (
+        <Callout tone="info" title="No payments yet">
+          Revenue appears here from real Paddle payments as soon as the first one arrives. Until then, plans can still be set by hand on the Workspaces tab.
+        </Callout>
+      ) : null}
+      {b.ready ? (
+        <Tiles
+          items={[
+            ...b.byCurrency.map((c) => ({ label: `Revenue, ${days} days (${c.currency})`, value: money(c.period, c.currency), hint: `${c.payments} payment${c.payments === 1 ? "" : "s"} · ${money(c.allTime, c.currency)} all time`, tone: "green" as const })),
+            ...(b.mrr.length ? b.mrr.map((m) => ({ label: `Monthly recurring (${m.currency})`, value: money(m.amount, m.currency), hint: "last payment of each active subscription" })) : [{ label: "Monthly recurring", value: "—", hint: "no active subscriptions" }]),
+            { label: "Active subscriptions", value: num(b.subs.active), hint: `${b.subs.trialing} trialing · ${b.subs.past_due} payment failed`, tone: b.subs.past_due ? ("warn" as const) : undefined },
+            { label: `Cancelled, ${days} days`, value: num(b.subs.canceled_period) },
+            { label: "On trial (Locenti)", value: num(o.plans.trial), hint: `${o.trialsEndingSoon} ending within 7 days · ${o.trialsExpired} ended` },
+            { label: "Lapsed", value: num(o.plans.lapsed), hint: "subscription ended" },
+          ]}
+        />
+      ) : null}
+      {b.ready && b.byPlan.length ? (
+        <Panel title="Subscriptions by plan" flush>
+          <Table caption="Subscriptions by plan" minWidth={320} head={["Plan", { label: "Active", right: true }]}>
+            {b.byPlan.map((p) => (
+              <tr key={p.plan_id ?? "unknown"}>
+                <td className="capitalize">{p.plan_id ?? "Unknown price"}</td>
+                <td className="text-right tabular-nums">{p.n}</td>
+              </tr>
+            ))}
+          </Table>
+        </Panel>
+      ) : null}
+      {b.ready && b.recent.length ? (
+        <Panel title="Recent billing events" description="As received from Paddle" flush>
+          <Table caption="Recent billing events" minWidth={560} head={["When", "Event", "Workspace", { label: "Amount", right: true }]}>
+            {b.recent.map((e, i) => (
+              <tr key={i}>
+                <td className="whitespace-nowrap text-xs text-slate">{formatDateTime(e.received_at)}</td>
+                <td className="font-mono text-xs">{e.type}</td>
+                <td className="text-xs">{e.workspace ?? <span className="text-slate">Unmatched</span>}</td>
+                <td className="text-right tabular-nums">{e.amount_minor !== null && e.currency ? money(e.amount_minor, e.currency) : "—"}</td>
+              </tr>
+            ))}
+          </Table>
+        </Panel>
+      ) : null}
       <Panel title="Paid and complimentary workspaces" flush>
         {d.paying.length ? (
           <Table caption="Paid and complimentary workspaces" minWidth={560} head={["Workspace", "Owner", "Plan", "Note", "Since"]}>

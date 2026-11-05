@@ -101,6 +101,11 @@ Before launch: a dedicated least-privilege database role for the app; real-Postg
 - REST: `app/api/v1/[...path]/route.ts` maps routes onto the MCP tool handlers (one implementation, same validation and RLS). Docs on the Agent page (`features/agent/developers.tsx`).
 - Webhooks: `lib/webhooks.ts` (events, signing, retry timing, URL rules), `server/webhook-store.ts` (endpoints, queue with per-event dedupe, claim/mark), `server/services/webhooks.ts` (`emitWebhook`, `emitLeadsCreated`, `deliverDueWebhooks`, management), `safePost` in `server/research/fetch.ts`. Emitted from lead saves, the sending pass (`email.sent`, `campaign.completed`) and reply sync; delivered by the open-tab tick and the cron route. Secrets encrypted with the mailbox-token key. Migration `0012_webhooks.sql`. Tests `tests/webhooks.test.ts`, `tests/db/webhooks.test.ts`.
 
+## Billing (M3)
+
+- `lib/billing/paddle.ts` (signature check, event normaliser, status → plan), `server/billing-store.ts` (events once, subscription state, unit grants, revenue), `server/services/billing.ts` (`billingConfig`, `accessProblem` enforcement, `getBilling`, `handlePaddleWebhook`), route `app/api/billing/paddle`, page `app/app/billing`, checkout `features/billing/checkout-button.tsx`, Admin → Revenue. Enforcement checks sit in search, research, email finding, the AI writer, campaign approval and the sending pass. Migration `0014_billing.sql`. Tests `tests/billing.test.ts`, `tests/db/billing.test.ts`. Setup: `docs/GOOGLE_CLOUD_SETUP.md` Part K.
+- One workspace per person: onboarding redirects anyone who has one, and creating a second is refused; teammates join via Team invites. The admin panel is reached at `/admin` only (no sidebar link).
+
 ## Dashboard, Analytics, migration banner
 
 - `server/analytics-store.ts` + `server/services/analytics.ts`; UI `features/analytics/` (KPI tiles, trend chart, pipeline, campaign table, breakdowns, activity); pages `app/app/page.tsx` (Dashboard) and `app/app/analytics`.
@@ -113,6 +118,6 @@ Order: hero with self-playing product preview (`live-demo.tsx`, ~13 s loop, paus
 ## Next actions
 
 1. **Owner live checks** (listed at the end of the M2 section in `docs/MILESTONES.md`): a small real campaign, reply tracking, optional Gemini key, Google app verification, rotating the Places key.
-2. **M3** (see `docs/MILESTONES.md`): team invites, follow-ups, admin panel, public API and webhooks are built (owner runs migrations up to `0012_webhooks.sql`); plus the viewer role (owner runs migrations up to `0013_viewer.sql`); left: billing (owner decisions), optional real-Postgres CI, real-Postgres CI job; billing only after the owner approves prices and a provider.
+2. **M3** (see `docs/MILESTONES.md`): team invites, follow-ups, admin panel, public API and webhooks are built (owner runs migrations up to `0012_webhooks.sql`); plus the viewer role, CI with real Postgres and billing code (owner runs migrations up to `0014_billing.sql`); left: Paddle account setup (Part K), real-Postgres CI job; billing only after the owner approves prices and a provider.
 3. Decide when to open sign-up (`BETA_ALLOWED_EMAILS` keeps it invite-only; the Google Maps and Gemini allowances are shared).
 4. Remove the old demo code under `demo/` and the `features/*-view.tsx` demo views once nothing links to them (the marketing page still uses `demo/fixtures` for its fictional sample data).

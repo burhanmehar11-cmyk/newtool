@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { Callout } from "@/components/ui/misc";
+import { redirect } from "next/navigation";
 import { PageLoading } from "@/features/product/page-loading";
 import { ProductOnboarding } from "@/features/product/product-forms";
 import { listWorkspaces, requireUser } from "@/server/auth";
@@ -21,14 +21,11 @@ export default function ProductOnboardingPage() {
 async function Onboarding() {
   await requireUser("/app/onboarding");
   const [existing, invites] = await Promise.all([listWorkspaces(), getMyInvites()]);
+  // One workspace per person: anyone who already has one goes to it (teammates are added from Team).
+  if (existing.length) redirect("/app");
   return (
     <div>
       {invites.length ? <PendingInvites invites={invites} /> : null}
-      {existing.length ? (
-        <Callout tone="info" className="mx-auto mb-6 max-w-2xl">
-          You already belong to {existing.length} workspace{existing.length === 1 ? "" : "s"}. Finishing this creates another one, for example for a client.
-        </Callout>
-      ) : null}
       <ProductOnboarding
         defaultValues={{ workspaceName: "", ...emptyOfferProfile }}
       />

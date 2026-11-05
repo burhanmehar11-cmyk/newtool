@@ -47,7 +47,7 @@ Build order: auth and workspaces → one real search-to-saved-lead flow → enri
 - Google app verification: Search Console ownership (`GOOGLE_SITE_VERIFICATION`), then submit without `gmail.readonly` (that scope needs a CASA assessment).
 - Rotate the Places API key that was pasted in chat during development.
 
-## M3: teams, more automation, paid launch (built except billing)
+## M3: teams, more automation, paid launch (built; Paddle account setup left to the owner)
 
 | Item | Status | Notes |
 | --- | --- | --- |
@@ -58,4 +58,4 @@ Build order: auth and workspaces → one real search-to-saved-lead flow → enri
 | Public API and webhooks | **Built, tested against Postgres and over HTTP** | REST API at `/api/v1` (workspace, search, leads, research, drafts, campaigns, replies) using the same personal tokens and rules as MCP; JSON errors. Signed webhooks (`lead.created`, `email.sent`, `reply.received`, `campaign.completed`): HMAC-SHA256 `Locenti-Signature`, https-only public URLs with the SSRF-safe client, retries 1 min → 6 h, endpoints switched off after 30 straight failures, test button, delivery log. Migration `0012_webhooks.sql`. Real endpoint delivery not run from this sandbox (outbound network blocked). |
 | Real-Postgres CI job | **Built, verified locally on Postgres 16** | `.github/workflows/ci.yml`: lint, types, all tests and the build on every push and pull request, plus a second job that runs every database test on a real Postgres 16 service (fresh database per file via `TEST_DATABASE_URL`) and real lock contention (`tests/db/concurrency.test.ts`: parallel usage reservations never overspend; parallel sending passes claim an email once). |
 | Viewer role | **Built, tested against Postgres** | Invite or switch someone to Viewer: they see everything in the workspace but change nothing. Enforced by row-level security (every workspace table's policy split into read for all members, write for owners, admins and members; migration `0013_viewer.sql`) and in the app, which shows "view-only" instead of failing. |
-| Billing | Waiting on the owner | Needs owner-approved prices, trial policy, limits and a billing provider before payments are enabled. Nothing paid is set up. |
+| Billing | **Built, provider setup left to the owner** | Paddle (merchant of record): Billing page with plan cards and Paddle checkout (workspace id in custom data), signed webhook at `/api/billing/paddle` (HMAC `Paddle-Signature`, each event stored once), subscription state per workspace (plan follows it: paid / lapsed), monthly unit grants that roll over, past-due and cancel links from Paddle, enforcement switch `BILLING_ENFORCE` (ended trials and lapsed plans can't search, research, use AI or send), real revenue / MRR / subscriptions in Admin → Revenue. Migration `0014_billing.sql`. Tested against Postgres with signed test events; not yet run against Paddle's sandbox (docs host blocked here). Prices and monthly grants are proposals for the owner. |

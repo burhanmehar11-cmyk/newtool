@@ -30,7 +30,7 @@ export const features = {
   replySync: { label: "Reply tracking and sorting", availability: "beta", target: "M2" },
   csv: { label: "CSV import and export", availability: "demo", target: "M2" },
   usage: { label: "Usage ledger", availability: "demo", target: "M2" },
-  multiWorkspace: { label: "Client workspaces", availability: "live", target: "M3" },
+  multiWorkspace: { label: "Multiple workspaces per person (not offered)", availability: "planned", target: "M3" },
   roles: { label: "Team invites and roles", availability: "live", target: "M3" },
   billing: { label: "Billing", availability: "planned", target: "M3" },
   api: { label: "REST API and webhooks", availability: "planned", target: "M3" },

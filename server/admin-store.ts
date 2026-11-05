@@ -6,8 +6,8 @@ import type { Q } from "@/server/auth-store";
  * Every number comes from stored records; nothing is estimated.
  */
 
-export type Plan = "trial" | "free" | "paid" | "comp";
-export const PLANS: Plan[] = ["trial", "free", "paid", "comp"];
+export type Plan = "trial" | "free" | "paid" | "comp" | "lapsed";
+export const PLANS: Plan[] = ["trial", "free", "paid", "comp", "lapsed"];
 
 /** SQL: when a workspace's trial ends ($trial = TRIAL_DAYS). */
 const TRIAL_END = (trialParam: string) => `coalesce(w.trial_ends_at, w.created_at + make_interval(days => ${trialParam}::int))`;

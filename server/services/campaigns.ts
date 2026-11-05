@@ -1,4 +1,5 @@
 import "server-only";
+import { accessProblem } from "@/server/services/billing";
 import { z } from "zod";
 import { followUpProblem, MAX_FOLLOW_UPS, type FollowUp } from "@/lib/campaigns/followups";
 import { DEFAULT_SCHEDULE, isValidTimezone, type Schedule } from "@/lib/campaigns/schedule";
@@ -183,6 +184,10 @@ export async function approveAndLaunch(campaignId: string, revision: number, con
   const { user, workspace } = await requireWorkspace(`/app/campaigns/${campaignId}`);
   if (!canManage(workspace.role)) return { ok: false, error: "Only workspace owners and admins can approve campaigns." };
   if (!confirmed) return { ok: false, error: "Tick the box to confirm you reviewed every recipient and message." };
+  {
+    const why = await accessProblem(workspace.id);
+    if (why) return { ok: false, error: why };
+  }
   if (!uuid.safeParse(campaignId).success || !Number.isInteger(revision)) return { ok: false, error: "Campaign not found." };
   try {
     const { enrolled } = await asQ(user.id, (q) => approveCampaign(q, workspace.id, user.id, campaignId, revision));

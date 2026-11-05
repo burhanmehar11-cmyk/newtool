@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { FieldError, Input, Label, Select } from "@/components/ui/field";
 import { setPlanAction } from "@/server/actions/admin";
 
-const LABELS = { trial: "Trial", free: "Free", paid: "Paid", comp: "Complimentary" } as const;
+const LABELS = { trial: "Trial", free: "Free", paid: "Paid", comp: "Complimentary", lapsed: "Lapsed" } as const;
 
 /** Inline editor for a workspace's plan (manual until billing exists; every change is audited). */
 export function PlanEditor({ workspaceId, plan, trialEndsAt, note }: { workspaceId: string; plan: string; trialEndsAt: string; note: string | null }) {

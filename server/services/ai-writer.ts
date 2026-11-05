@@ -1,4 +1,5 @@
 import "server-only";
+import { accessProblem } from "@/server/services/billing";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { buildDraftPrompt, checkDraftOutput, DRAFT_RESPONSE_SCHEMA, type DraftFact } from "@/lib/ai/draft-prompt";
@@ -28,6 +29,10 @@ export function aiWriterStatus() {
  */
 export async function writeDraftAs(ctx: Ctx, leadId: string): Promise<WriteResult> {
   if (!["owner", "admin"].includes(ctx.workspace.role)) return { ok: false, error: "Only workspace owners and admins can write drafts." };
+  {
+    const why = await accessProblem(ctx.workspace.id);
+    if (why) return { ok: false, error: why };
+  }
   if (!uuid.safeParse(leadId).success) return { ok: false, error: "Lead not found." };
   if (!geminiKey()) return { ok: false, error: "The AI writer isn't set up yet. Add GEMINI_API_KEY on the server (see the Agent page)." };
   const offer = await getOfferProfileFor(ctx.user.id, ctx.workspace.id);

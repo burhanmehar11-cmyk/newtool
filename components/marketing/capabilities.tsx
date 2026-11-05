@@ -159,14 +159,14 @@ export function Capabilities() {
                 </div>
               </div>
               <p className="mt-3 text-[15px] leading-7 text-fog">
-                Saved lists, tags, notes, CSV import and export, with deduplication by business and address. Separate client workspaces and team roles are planned for agencies.
+                Saved lists, tags, notes, CSV import and export, with deduplication by business and address. One shared workspace per agency: invite teammates as admins or members, and clients as read-only viewers.
               </p>
             </div>
             <div className="mt-6 grid flex-1 gap-3 sm:grid-cols-3 lg:mt-0">
               {[
                 { icon: Tags, label: "Lists and tags", k: "csv" as const },
                 { icon: Users, label: "Team roles", k: "roles" as const },
-                { icon: FolderKanban, label: "Client workspaces", k: "multiWorkspace" as const },
+                { icon: FolderKanban, label: "Read-only client access", k: "roles" as const },
               ].map(({ icon: Icon, label, k }) => (
                 <div key={label} className="rounded-[12px] border border-line-dark bg-midnight/50 p-4">
                   <Icon aria-hidden className="size-4 text-mint" />

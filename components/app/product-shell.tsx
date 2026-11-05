@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, Bot, Inbox, LayoutDashboard, LogOut, Mail, Menu, Search, Send, Settings, Users, UsersRound } from "lucide-react";
+import { BarChart3, Bot, CreditCard, Inbox, LayoutDashboard, LogOut, Mail, Menu, Search, Send, Settings, Users, UsersRound } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogTrigger, SheetCloseButton, SheetContent } from "@/components/ui/sheet";
@@ -26,6 +26,7 @@ const nav = [
   { href: "/app/mailboxes", label: "Mailboxes", icon: Mail },
   { href: "/app/agent", label: "Agent", icon: Bot },
   { href: "/app/team", label: "Team", icon: UsersRound },
+  { href: "/app/billing", label: "Billing", icon: CreditCard },
   { href: "/app/settings", label: "Settings", icon: Settings },
 ] as const;
 

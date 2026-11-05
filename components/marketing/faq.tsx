@@ -30,7 +30,7 @@ const faqs: { q: string; a: React.ReactNode }[] = [
   },
   {
     q: "How does an agency organise its work?",
-    a: "Invite teammates as admins or members, and give each client its own workspace with its own leads, mailboxes, campaigns, usage and do-not-contact list, then switch between them from the sidebar. Admins connect mailboxes and approve campaigns; members find leads, research and write. A read-only viewer role is planned.",
+    a: "Everyone works in one shared workspace: invite teammates as admins or members, and clients as read-only viewers. Admins connect mailboxes and approve campaigns; members find leads, research and write; viewers can look but not change anything. Saved lists, tags, notes and a do-not-contact list keep the work organised.",
   },
   {
     q: "Is this compliant with email law where I work?",

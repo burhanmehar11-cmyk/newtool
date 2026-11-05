@@ -2,7 +2,7 @@ import "server-only";
 import type { OfferProfile } from "@/lib/domain/types";
 import { offerProfileSchema, onboardingSchema } from "@/lib/domain/schemas";
 import { withUser } from "@/server/db";
-import { getActiveWorkspace, requireUser, type WorkspaceRef } from "@/server/auth";
+import { getActiveWorkspace, requireUser, type WorkspaceRef, listWorkspaces } from "@/server/auth";
 
 export type ServiceResult<T = undefined> = { ok: true; value: T } | { ok: false; error: string; fieldErrors?: Record<string, string> };
 
@@ -62,6 +62,7 @@ const UPSERT_OFFER = `insert into public.offer_profiles (workspace_id, ${COLUMNS
 /** Creates a workspace owned by the caller, plus its offer profile, in one transaction. */
 export async function createWorkspaceWithOffer(input: unknown): Promise<ServiceResult<{ workspaceId: string }>> {
   const user = await requireUser("/app/onboarding");
+  if ((await listWorkspaces()).length) return { ok: false, error: "You already have a workspace. Invite teammates from Team instead of creating another." };
   const parsed = onboardingSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Check the highlighted fields.", fieldErrors: fieldErrors(parsed.error.issues) };
   const { workspaceName, ...offer } = parsed.data;

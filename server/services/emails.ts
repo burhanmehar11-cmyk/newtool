@@ -1,4 +1,5 @@
 import "server-only";
+import { accessProblem } from "@/server/services/billing";
 import { z } from "zod";
 import { PLACE_ID } from "@/lib/discovery/google-places";
 import { requireWorkspace, isViewer, VIEW_ONLY } from "@/server/auth";
@@ -43,6 +44,10 @@ export type ResultEmails = { placeId: string } & Pick<EmailLookup, "status" | "e
 export async function findEmailsForResults(input: unknown): Promise<{ ok: true; results: ResultEmails[] } | { ok: false; error: string }> {
   const { user, workspace } = await requireWorkspace("/app/discover");
   if (isViewer(workspace)) return { ok: false, error: VIEW_ONLY };
+  {
+    const why = await accessProblem(workspace.id);
+    if (why) return { ok: false, error: why };
+  }
   const p = resultsSchema.safeParse(input);
   if (!p.success) return { ok: false, error: "Nothing to look up." };
   if (!takeLookups(user.id, p.data.length)) return { ok: false, error: "That's a lot of websites in a short time. Wait a few minutes, then continue." };
@@ -54,6 +59,10 @@ export async function findEmailsForResults(input: unknown): Promise<{ ok: true; 
 export async function findMissingLeadEmails(): Promise<{ ok: true; checked: number; found: number; remaining: number } | { ok: false; error: string }> {
   const { user, workspace } = await requireWorkspace("/app/leads");
   if (isViewer(workspace)) return { ok: false, error: VIEW_ONLY };
+  {
+    const why = await accessProblem(workspace.id);
+    if (why) return { ok: false, error: why };
+  }
   const todo = await asQ(user.id, (q) =>
     q.query<{ business_id: string; website: string; provider: string; name: string; domain_normalized: string | null }>(
       `select b.id as business_id, b.website, b.provider, b.name, b.domain_normalized from public.leads l join public.businesses b on b.id = l.business_id

@@ -1,4 +1,5 @@
 import "server-only";
+import { accessProblem } from "@/server/services/billing";
 import { emitLeadsCreated } from "@/server/services/webhooks";
 import { z } from "zod";
 import { discoveryNiches, nicheLabel } from "@/lib/discovery/niches";
@@ -55,6 +56,10 @@ const asQ = <T,>(userId: string, fn: (q: Q) => Promise<T>) => withUser(userId, (
 export async function runSearch(input: unknown): Promise<SearchOutcome> {
   const { user, workspace } = await requireWorkspace("/app/discover");
   if (isViewer(workspace)) return { ok: false, error: VIEW_ONLY };
+  {
+    const why = await accessProblem(workspace.id);
+    if (why) return { ok: false, error: why };
+  }
   const parsed = searchSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Check the highlighted fields.", fieldErrors: Object.fromEntries(parsed.error.issues.map((i) => [String(i.path[0]), i.message])) };
   const { country, state, ...rest } = parsed.data;
@@ -168,6 +173,10 @@ export async function runGoogleSearch(input: unknown): Promise<GoogleSearchOutco
 
 export async function runGoogleSearchAs({ user, workspace }: Ctx, input: unknown): Promise<GoogleSearchOutcome> {
   if (isViewer(workspace)) return { ok: false, error: VIEW_ONLY };
+  {
+    const why = await accessProblem(workspace.id);
+    if (why) return { ok: false, error: why };
+  }
   const parsed = googleSearchSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Check the highlighted fields.", fieldErrors: Object.fromEntries(parsed.error.issues.map((i) => [String(i.path[0]), i.message])) };
   const d = parsed.data;

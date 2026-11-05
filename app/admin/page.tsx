@@ -22,7 +22,7 @@ const LABELS: Record<AdminTab, string> = {
   admins: "Admins",
 };
 const PERIODS = [7, 30, 90];
-const WITH_PERIOD: AdminTab[] = ["overview", "funnel", "usage", "emails", "apis"];
+const WITH_PERIOD: AdminTab[] = ["overview", "funnel", "usage", "emails", "apis", "revenue"];
 
 export default function AdminPage({ searchParams }: PageProps<"/admin">) {
   return (
@@ -107,7 +107,7 @@ async function Admin({ searchParams }: { searchParams: PageProps<"/admin">["sear
         {d.tab === "usage" ? <UsageTab d={d} days={days} /> : null}
         {d.tab === "emails" ? <EmailsTab d={d} days={days} /> : null}
         {d.tab === "apis" ? <ApisTab d={d} days={days} /> : null}
-        {d.tab === "revenue" ? <RevenueTab d={d} /> : null}
+        {d.tab === "revenue" ? <RevenueTab d={d} days={days} /> : null}
         {d.tab === "admins" ? <AdminsTab d={d} /> : null}
       </main>
     </>

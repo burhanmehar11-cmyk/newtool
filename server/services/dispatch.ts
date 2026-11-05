@@ -1,4 +1,5 @@
 import "server-only";
+import { accessProblem } from "@/server/services/billing";
 import { randomUUID } from "node:crypto";
 import { brand } from "@/config/brand";
 import { inSendingWindow } from "@/lib/campaigns/schedule";
@@ -45,8 +46,14 @@ export async function runDispatch(opts: { workspaceId?: string | null; now?: Dat
   const campaigns = await svc((q) => runningCampaigns(q, opts.workspaceId ?? null));
   const usedMailboxes = new Set<string>();
 
+  const blocked = new Map<string, string | null>();
   for (const c of campaigns) {
     if (usedMailboxes.has(c.account_id)) continue;
+    if (!blocked.has(c.workspace_id)) blocked.set(c.workspace_id, await accessProblem(c.workspace_id));
+    if (blocked.get(c.workspace_id)) {
+      summary.skipped.push(`${c.id}: plan ended (sending resumes after subscribing)`);
+      continue;
+    }
     if (c.account_status !== "connected") {
       await svc((q) => pauseCampaign(q, c.id));
       summary.skipped.push(`${c.id}: mailbox not connected (campaign paused)`);

@@ -92,7 +92,7 @@ Google calls this **Google Auth Platform** (older screens say **OAuth consent sc
 3. When asked which environments to connect, keep **Production** and **Preview** (and **Development** if offered). Vercel adds `DATABASE_URL` and related settings automatically.
 4. Open the database's **Open in Neon** (or **Neon Console**) link → **SQL Editor**.
 5. In another tab, open GitHub → **burhanmehar11-cmyk/newtool** → branch `claude/compassionate-knuth-hewpfn` → `database/migrations/0000_auth.sql` → **Copy raw file** (two-squares icon). Paste into the SQL Editor → **Run**.
-6. Clear the editor. Do the same, one file at a time, with `database/migrations/0001_foundation.sql` → **Run**, then `0002_password_and_discovery.sql` → **Run**, then `0003_research.sql` → **Run**, then `0004_google_places.sql` → **Run**, then `0005_mailboxes.sql` → **Run**, then `0006_campaigns.sql` → **Run**, then `0007_agents.sql` → **Run**, then `0008_replies.sql` → **Run**, then `0009_team.sql` → **Run**, then `0010_followups.sql` → **Run**, then `0011_admin.sql` → **Run**, then `0012_webhooks.sql` → **Run**, then `0013_viewer.sql` → **Run**.
+6. Clear the editor. Do the same, one file at a time, with `database/migrations/0001_foundation.sql` → **Run**, then `0002_password_and_discovery.sql` → **Run**, then `0003_research.sql` → **Run**, then `0004_google_places.sql` → **Run**, then `0005_mailboxes.sql` → **Run**, then `0006_campaigns.sql` → **Run**, then `0007_agents.sql` → **Run**, then `0008_replies.sql` → **Run**, then `0009_team.sql` → **Run**, then `0010_followups.sql` → **Run**, then `0011_admin.sql` → **Run**, then `0012_webhooks.sql` → **Run**, then `0013_viewer.sql` → **Run**, then `0014_billing.sql` → **Run**.
    - Already ran some of them earlier? Run only the ones after the last you ran (for example just **0003**). Later files only add things and are safe to run on top.
 7. Check by running:
 
@@ -207,6 +207,22 @@ Lets Locenti read replies to campaign emails (only threads it started), sort the
 1. Neon SQL Editor: run `database/migrations/0012_webhooks.sql`.
 2. In the app: **Agent** → create a personal token → the **REST API** section lists every endpoint (send `Authorization: Bearer loc_…`).
 3. **Webhooks** → add an https URL, pick events, copy the signing secret (shown once), then **Send test**. Verify the `Locenti-Signature` header on your side.
+
+## Part K: Billing with Paddle (when you're ready to charge)
+
+The code is ready; nothing is charged until you do this. Start in Paddle's **sandbox** (test cards, no real money).
+
+1. Neon SQL Editor: run `database/migrations/0014_billing.sql`.
+2. Create a Paddle account (sandbox first: sandbox-vendors.paddle.com). Check during sign-up that your country is supported for payouts.
+3. **Catalog → Products:** create Starter, Growth and Agency, each with a **monthly** price. Copy each price id (`pri_…`).
+4. **Developer tools → Authentication:** create a **client-side token**.
+5. **Developer tools → Notifications → New destination:** URL `https://<your domain>/api/billing/paddle`; events `subscription.created`, `subscription.updated`, `subscription.canceled`, `transaction.completed`. Copy its **secret key**.
+6. **Checkout settings:** add your domain to the approved/default payment link domains if Paddle asks.
+7. Vercel → Environment Variables: `NEXT_PUBLIC_PADDLE_CLIENT_TOKEN`, `NEXT_PUBLIC_PADDLE_ENV=sandbox`, `PADDLE_PRICE_STARTER`, `PADDLE_PRICE_GROWTH`, `PADDLE_PRICE_AGENCY`, `PADDLE_WEBHOOK_SECRET`. Redeploy.
+8. Test: **Billing** in the app → Choose a plan → pay with a Paddle test card. Then check **/admin → Revenue** shows the payment and the workspace shows **Paid**.
+9. Go live: repeat steps 3–5 in your live Paddle account, set `NEXT_PUBLIC_PADDLE_ENV=production` with the live values, set prices in `config/plans.ts` (`monthlyPriceUsd`) and `PRICING_LIVE = true` in `config/milestone.ts`, and when you want plans enforced set `BILLING_ENFORCE=true`.
+
+The Paddle integration was written from Paddle Billing's documented formats but couldn't be checked against Paddle's live docs from the build environment, so do step 8 before charging anyone.
 
 ## Part H: Campaign sending (no setup needed; scheduler optional)
 

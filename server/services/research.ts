@@ -1,4 +1,5 @@
 import "server-only";
+import { accessProblem } from "@/server/services/billing";
 import { z } from "zod";
 import { brand } from "@/config/brand";
 import { aggregatePages, type ResearchedPage } from "@/lib/research/aggregate";
@@ -46,6 +47,10 @@ export async function researchLead(leadId: string): Promise<ResearchResult> {
 
 export async function researchLeadAs({ user, workspace }: { user: { id: string }; workspace: WorkspaceRef }, leadId: string): Promise<ResearchResult> {
   if (isViewer(workspace)) return { ok: false, error: VIEW_ONLY };
+  {
+    const why = await accessProblem(workspace.id);
+    if (why) return { ok: false, error: why };
+  }
   if (!uuid.safeParse(leadId).success) return { ok: false, error: "Lead not found." };
   const offer = await getOfferProfileFor(user.id, workspace.id);
   if (!offer) return { ok: false, error: "Add your offer profile in Settings first. Research is scored against what you sell." };

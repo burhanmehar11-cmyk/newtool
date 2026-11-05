@@ -1,10 +1,14 @@
 /**
  * Central plan configuration.
  *
- * M1: prices are intentionally null. The pricing section shows
- * "Private beta pricing coming soon". Do not add prices, discounts, annual
- * savings or "unlimited" allowances until the owner approves them (M3) and
- * entitlements are enforced server-side.
+ * Prices are null until the owner approves them: the pricing section shows
+ * "Price to be announced" and checkout shows the price set in Paddle. To go
+ * live, create one monthly price per plan in Paddle, put its id in the env
+ * var named by `priceEnv`, set `monthlyPriceUsd` to match, and flip
+ * PRICING_LIVE.
+ *
+ * `monthlyGrant`: units added to the workspace each paid month (unused units
+ * roll over). PROPOSED values — the owner should confirm them before launch.
  */
 export type PlanId = "starter" | "growth" | "agency";
 
@@ -17,6 +21,10 @@ export type Plan = {
   /** Illustrative feature groupings, not commitments. */
   groups: { title: string; items: string[] }[];
   highlight?: boolean;
+  /** Env var holding this plan's Paddle price id (pri_…). */
+  priceEnv: "PADDLE_PRICE_STARTER" | "PADDLE_PRICE_GROWTH" | "PADDLE_PRICE_AGENCY";
+  /** Units added each paid month. PROPOSED, owner to confirm. */
+  monthlyGrant: { discovery: number; verification: number; ai: number };
 };
 
 export const plans: Plan[] = [
@@ -25,6 +33,8 @@ export const plans: Plan[] = [
     name: "Starter",
     summary: "For a solo consultant testing one offer in a few markets.",
     monthlyPriceUsd: null,
+    priceEnv: "PADDLE_PRICE_STARTER",
+    monthlyGrant: { discovery: 1000, verification: 500, ai: 500 },
     groups: [
       {
         title: "Prospecting",
@@ -38,6 +48,8 @@ export const plans: Plan[] = [
     name: "Growth",
     summary: "For small outbound teams running several campaigns at once.",
     monthlyPriceUsd: null,
+    priceEnv: "PADDLE_PRICE_GROWTH",
+    monthlyGrant: { discovery: 3000, verification: 1500, ai: 1500 },
     highlight: true,
     groups: [
       { title: "Everything in Starter, plus", items: ["More discovery and verification allowance", "Multiple mailboxes", "Saved lists and tags at scale"] },
@@ -49,9 +61,11 @@ export const plans: Plan[] = [
     name: "Agency",
     summary: "For agencies managing prospecting for several clients.",
     monthlyPriceUsd: null,
+    priceEnv: "PADDLE_PRICE_AGENCY",
+    monthlyGrant: { discovery: 8000, verification: 4000, ai: 4000 },
     groups: [
-      { title: "Everything in Growth, plus", items: ["Separate client workspaces", "Owner, admin, operator and viewer roles"] },
-      { title: "Integrations (planned)", items: ["Scoped REST API and webhooks", "MCP access for AI clients"] },
+      { title: "Everything in Growth, plus", items: ["Team members with admin, member and viewer roles", "Read-only access for clients"] },
+      { title: "Integrations", items: ["REST API and signed webhooks", "MCP access for your own AI agent"] },
     ],
   },
 ];

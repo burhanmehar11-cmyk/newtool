@@ -9,6 +9,8 @@ import { emailConfigured } from "@/server/email";
 import { dailyLimit, googlePlacesConfigured } from "@/server/providers/google-places";
 import { aiWriterStatus } from "@/server/services/ai-writer";
 import * as store from "@/server/admin-store";
+import { revenue } from "@/server/billing-store";
+import { billingConfig } from "@/server/services/billing";
 
 const svc = <T,>(fn: (q: Q) => Promise<T>) => withService((q) => fn(q as unknown as Q));
 
@@ -48,8 +50,11 @@ export async function getAdminTab(tab: AdminTab, days: number, search: string) {
         return { tab, stats: await store.emailStats(q, days), daily: await store.daily(q, days), problems: await store.mailboxProblems(q), smtp: emailConfigured() };
       case "apis":
         return { tab, apis: await store.sharedApis(q, days), placesLimit: dailyLimit(), placesOn: googlePlacesConfigured(), aiOn: aiWriterStatus().configured };
-      case "revenue":
-        return { tab, overview: await store.overview(q, trial), paying: (await store.workspaces(q, trial, "")).filter((w) => w.plan === "paid" || w.plan === "comp") };
+      case "revenue": {
+        const billing = await revenue(q, days).then((r) => ({ ready: true as const, ...r })).catch(() => ({ ready: false as const }));
+        const cfg = billingConfig();
+        return { tab, overview: await store.overview(q, trial), paying: (await store.workspaces(q, trial, "")).filter((w) => w.plan === "paid" || w.plan === "comp"), billing, configured: { checkout: cfg.checkoutReady, webhook: cfg.webhookReady, environment: cfg.environment, enforce: cfg.enforce } };
+      }
       case "admins": {
         const emails = adminEmails();
         const accounts = await store.accountsFor(q, emails);
@@ -61,7 +66,7 @@ export async function getAdminTab(tab: AdminTab, days: number, search: string) {
 
 const planInput = z.object({
   workspaceId: z.string().uuid(),
-  plan: z.enum(["trial", "free", "paid", "comp"]),
+  plan: z.enum(["trial", "free", "paid", "comp", "lapsed"]),
   trialEndsAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
   note: z.string().trim().max(300).nullable(),
 });
