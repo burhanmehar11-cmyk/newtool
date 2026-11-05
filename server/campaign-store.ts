@@ -55,7 +55,7 @@ export async function createCampaign(q: Q, ws: string, userId: string, p: { name
   return id;
 }
 
-export async function saveDraft(q: Q, ws: string, userId: string, leadId: string, d: { subject: string; body: string; factIds: string[]; origin: "generated" | "edited" }): Promise<{ id: string; version: number }> {
+export async function saveDraft(q: Q, ws: string, userId: string, leadId: string, d: { subject: string; body: string; factIds: string[]; origin: "generated" | "edited" | "ai" | "agent" }): Promise<{ id: string; version: number }> {
   const r = await q.query<{ id: string; version: number }>(
     `insert into public.drafts (workspace_id, lead_id, version, subject, body, fact_ids, origin, created_by)
      values ($1, $2, coalesce((select max(version) from public.drafts where lead_id = $2), 0) + 1, $3, $4, $5::jsonb, $6, $7)

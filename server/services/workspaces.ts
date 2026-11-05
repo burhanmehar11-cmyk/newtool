@@ -80,7 +80,12 @@ export async function createWorkspaceWithOffer(input: unknown): Promise<ServiceR
 
 export async function getOfferProfile(workspace: WorkspaceRef): Promise<OfferProfile | null> {
   const user = await requireUser();
-  const r = await withUser(user.id, (q) => q.query<OfferRow>(`select ${COLUMNS} from public.offer_profiles where workspace_id = $1`, [workspace.id]));
+  return getOfferProfileFor(user.id, workspace.id);
+}
+
+/** Same, for callers that already know the user (e.g. the MCP endpoint). RLS still applies. */
+export async function getOfferProfileFor(userId: string, workspaceId: string): Promise<OfferProfile | null> {
+  const r = await withUser(userId, (q) => q.query<OfferRow>(`select ${COLUMNS} from public.offer_profiles where workspace_id = $1`, [workspaceId]));
   return r.rows[0] ? fromRow(r.rows[0]) : null;
 }
 

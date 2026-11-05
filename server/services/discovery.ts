@@ -1,7 +1,7 @@
 import "server-only";
 import { z } from "zod";
 import { discoveryNiches, nicheLabel } from "@/lib/discovery/niches";
-import { requireWorkspace } from "@/server/auth";
+import { requireWorkspace, type WorkspaceRef } from "@/server/auth";
 import { withUser } from "@/server/db";
 import type { Q } from "@/server/auth-store";
 import { geocode, searchBusinesses } from "@/server/providers/osm";
@@ -135,8 +135,13 @@ export async function googleStatus() {
  * not stored (Google's terms forbid caching Places content). The job row keeps
  * only the query, filters and count, for usage and history.
  */
+export type Ctx = { user: { id: string }; workspace: WorkspaceRef };
+
 export async function runGoogleSearch(input: unknown): Promise<GoogleSearchOutcome> {
-  const { user, workspace } = await requireWorkspace("/app/discover");
+  return runGoogleSearchAs(await requireWorkspace("/app/discover"), input);
+}
+
+export async function runGoogleSearchAs({ user, workspace }: Ctx, input: unknown): Promise<GoogleSearchOutcome> {
   const parsed = googleSearchSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Check the highlighted fields.", fieldErrors: Object.fromEntries(parsed.error.issues.map((i) => [String(i.path[0]), i.message])) };
   const f: GoogleSearchFilters = { source: "google", ...(parsed.data as Omit<GoogleSearchFilters, "source">) };
@@ -182,7 +187,10 @@ const googleSaveSchema = z.object({
 });
 
 export async function saveGoogleSearchLeads(input: unknown): Promise<{ ok: true; added: number; skipped: number } | { ok: false; error: string }> {
-  const { user, workspace } = await requireWorkspace("/app/discover");
+  return saveGoogleSearchLeadsAs(await requireWorkspace("/app/discover"), input);
+}
+
+export async function saveGoogleSearchLeadsAs({ user, workspace }: Ctx, input: unknown): Promise<{ ok: true; added: number; skipped: number } | { ok: false; error: string }> {
   const parsed = googleSaveSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Select at least one business that has a website." };
   const niche = parsed.data.niche && discoveryNiches.some((n) => n.id === parsed.data.niche) ? parsed.data.niche : null;

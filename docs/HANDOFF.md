@@ -67,6 +67,11 @@ Before launch: a dedicated least-privilege database role for the app; real-Postg
 - Store `server/campaign-store.ts` (eligibility, create, drafts, recipients, classification, approval, status, do-not-contact) and `server/dispatch-store.ts` (service-side sending bookkeeping); services `server/services/campaigns.ts`, `server/services/dispatch.ts` (`runDispatch`), `server/services/unsubscribe.ts`; routes `app/api/cron/dispatch`, `app/api/unsubscribe/[token]`; pages `app/app/campaigns` (list + do-not-contact), `campaigns/new`, `campaigns/[id]`, public `app/unsubscribe/[token]`; UI in `features/campaigns/`; helpers `lib/campaigns/schedule.ts`, `lib/campaigns/compose.ts`; draft templates `lib/drafts/template.ts`.
 - Verified in a browser against a local Postgres: sidebar links, create campaign, generated messages, edit → revision bump, unverified opt-in, approve outside sending hours (queued), send with a broken mailbox token → email put back, campaign paused, mailbox "needs reconnecting"; unsubscribe page (link alone does nothing, button suppresses and stops queued), one-click POST, cron 401 without secret, 390px layouts. **Not verified:** a real Gmail send from a campaign.
 
+## MCP for your own AI agent (M2 step 4 / M3)
+
+- `lib/mcp/protocol.ts` (JSON-RPC core), `server/mcp/tools.ts` (10 tools), `app/api/mcp/route.ts`, tokens in `server/token-store.ts` / `server/services/tokens.ts`, UI `features/settings/agents-card.tsx` (Settings → AI agents), migration `0007_agents.sql`. Services gained "as user" variants (`runGoogleSearchAs`, `saveGoogleSearchLeadsAs`, `researchLeadAs`, `getOfferProfileFor`).
+- Verified with the official MCP SDK client against the running app (401 without token, all tools, live Google search, draft + campaign creation, errors).
+
 ## Landing page
 
 `components/marketing/audience-workflow.tsx` → `HowItWorks`: 5 steps (connect mailbox, search Google Maps, research and personalise, approve and launch, handle replies). Each step's badge comes from `config/milestone.ts`, so flipping a feature's `availability` updates the page.

@@ -13,7 +13,8 @@ import type { Q } from "@/server/auth-store";
 import { contactById, leadDetail, recordDnsCheck, saveNotes, saveResearch, toBusiness, type ResearchOutcome } from "@/server/research-store";
 import { safeFetch } from "@/server/research/fetch";
 import { dnsEmailCheck } from "@/server/research/email-check";
-import { getOfferProfile } from "@/server/services/workspaces";
+import { getOfferProfileFor } from "@/server/services/workspaces";
+import type { WorkspaceRef } from "@/server/auth";
 
 const asQ = <T,>(userId: string, fn: (q: Q) => Promise<T>) => withUser(userId, (q) => fn(q as unknown as Q));
 const uuid = z.string().uuid();
@@ -37,10 +38,15 @@ export async function getLeadDetail(leadId: string) {
  * and time limits. Builds an Opportunity Brief for the current offer.
  * Uses no usage units: there is no paid provider involved.
  */
-export async function researchLead(leadId: string): Promise<{ ok: true; status: ResearchOutcome["status"]; note: string } | { ok: false; error: string }> {
-  const { user, workspace } = await requireWorkspace("/app/leads");
+export type ResearchResult = { ok: true; status: ResearchOutcome["status"]; note: string } | { ok: false; error: string };
+
+export async function researchLead(leadId: string): Promise<ResearchResult> {
+  return researchLeadAs(await requireWorkspace("/app/leads"), leadId);
+}
+
+export async function researchLeadAs({ user, workspace }: { user: { id: string }; workspace: WorkspaceRef }, leadId: string): Promise<ResearchResult> {
   if (!uuid.safeParse(leadId).success) return { ok: false, error: "Lead not found." };
-  const offer = await getOfferProfile(workspace);
+  const offer = await getOfferProfileFor(user.id, workspace.id);
   if (!offer) return { ok: false, error: "Add your offer profile in Settings first. Research is scored against what you sell." };
   const detail = await asQ(user.id, (q) => leadDetail(q, leadId));
   if (!detail) return { ok: false, error: "Lead not found." };

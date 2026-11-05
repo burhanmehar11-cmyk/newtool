@@ -10,6 +10,10 @@ import { getOfferProfile } from "@/server/services/workspaces";
 import { getProviderStatus } from "@/server/providers/status";
 import Link from "next/link";
 import { ThemeToggle } from "@/components/app/theme-toggle";
+import { AgentsCard } from "@/features/settings/agents-card";
+import { getMyTokens } from "@/server/services/tokens";
+import { brand } from "@/config/brand";
+import { configuredSiteUrl } from "@/server/env";
 import { getMailboxes } from "@/server/services/mailboxes";
 
 export const metadata: Metadata = { title: "Settings" };
@@ -25,7 +29,7 @@ export default function ProductSettingsPage({ searchParams }: PageProps<"/app/se
 async function Settings({ searchParams }: { searchParams: PageProps<"/app/settings">["searchParams"] }) {
   const { user, workspace } = await requireWorkspace("/app/settings");
   await searchParams;
-  const [offer, mailboxes] = await Promise.all([getOfferProfile(workspace), getMailboxes()]);
+  const [offer, mailboxes, tokens] = await Promise.all([getOfferProfile(workspace), getMailboxes(), getMyTokens()]);
   const providers = getProviderStatus();
   return (
     <div>
@@ -71,9 +75,14 @@ async function Settings({ searchParams }: { searchParams: PageProps<"/app/settin
             </ul>
           </SectionCard>
         </div>
+        <div className="space-y-5">
         <SectionCard title="Offer profile" description="Used to score research and write drafts.">
-          <ProductOfferForm defaultValues={offer ?? emptyOfferProfile} savedType={offer?.serviceType ?? null} />
-        </SectionCard>
+            <ProductOfferForm defaultValues={offer ?? emptyOfferProfile} savedType={offer?.serviceType ?? null} />
+          </SectionCard>
+          <SectionCard title="AI agents (MCP)" description="Bring your own AI. Tokens are personal to you and this workspace.">
+            <AgentsCard tokens={tokens} endpoint={`${configuredSiteUrl() ?? brand.siteUrl}/api/mcp`} />
+          </SectionCard>
+        </div>
       </div>
     </div>
   );
