@@ -120,7 +120,7 @@ function RecipientItem({ r, campaignId, editable, aiConfigured }: { r: Recipient
           <div className="space-y-1.5">
             <Label htmlFor={`b-${r.lead_id}`}>Message</Label>
             <Textarea id={`b-${r.lead_id}`} value={body} rows={12} disabled={!editable} onChange={(e) => setBody(e.target.value)} className="font-[inherit] text-sm leading-6" />
-            <FieldHint>Locentio adds your business address and an unsubscribe link below the message when it sends.</FieldHint>
+            <FieldHint>Locenti adds your business address and an unsubscribe link below the message when it sends.</FieldHint>
           </div>
           {msg ? (
             <Callout tone={msg.tone === "info" ? "info" : msg.tone} className="py-1.5">
@@ -454,7 +454,7 @@ function LiveCampaign({ campaign, recipients, mailboxes, canManage }: { campaign
             </div>
           ) : null}
           <p className="text-xs leading-5 text-slate">
-            Emails go out automatically during sending hours while Locentio is open in any tab (or around the clock with the optional scheduler). &quot;Send next due email&quot; sends one now, using the same limits.
+            Emails go out automatically during sending hours while Locenti is open in any tab (or around the clock with the optional scheduler). &quot;Send next due email&quot; sends one now, using the same limits.
           </p>
         </section>
       </div>

@@ -70,7 +70,7 @@ async function readWebsite(businessId: string, website: string | null, domain: s
   // robots.txt: 404 means no restrictions; an unreachable robots file means we don't crawl.
   const robots = await safeFetch(`${origin}/robots.txt`, { userAgent: ua, deadline, maxBytes: 64 * 1024, accept: "text/plain,*/*;q=0.1" });
   let rules: ReturnType<typeof parseRobots> = [];
-  if (robots.ok) rules = parseRobots(robots.body, "LocentioBot");
+  if (robots.ok) rules = parseRobots(robots.body, "LocentiBot");
   else if (!/^HTTP 4\d\d$/.test(robots.reason)) {
     return { status: "failed", note: `Couldn't reach the website (${robots.reason}).`, ...empty };
   }

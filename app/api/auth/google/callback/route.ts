@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
   const claims = checkIdTokenClaims(payload, saved.nonce);
   if (!claims.ok) return fail(claims.code);
 
-  // Private beta: only listed emails may sign in (checked on every sign-in, so removal takes effect).
+  // Invite-only: only listed emails may sign in (checked on every sign-in, so removal takes effect).
   if (!isAllowedBetaEmail(claims.email)) return fail("not_invited");
 
   let token: string;

@@ -176,7 +176,7 @@ async function Lead({ params }: { params: PageProps<"/app/leads/[id]">["params"]
           </SectionCard>
 
           {fromGoogle ? (
-            <SectionCard title="Google Maps listing" description="Found on Google Maps. Locentio stores only the place ID.">
+            <SectionCard title="Google Maps listing" description="Found on Google Maps. Locenti stores only the place ID.">
               <GoogleDetails placeId={b.provider_ref} label={b.name} />
             </SectionCard>
           ) : null}

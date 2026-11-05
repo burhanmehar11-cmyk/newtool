@@ -20,8 +20,8 @@ const errorText: Record<string, string> = {
   state: "The connection link expired or was opened in another browser. Try again.",
   exchange: "Google didn't complete the connection. Check that the Gmail redirect URI is added to the OAuth client, then try again.",
   token: "Google's answer couldn't be verified. Try again.",
-  no_send_permission: "The “Send email on your behalf” box was unticked on Google's screen, so Locentio can't send. Connect again and leave it ticked.",
-  no_refresh_token: "Google didn't grant lasting access. Remove Locentio at myaccount.google.com/permissions, then connect again.",
+  no_send_permission: "The “Send email on your behalf” box was unticked on Google's screen, so Locenti can't send. Connect again and leave it ticked.",
+  no_refresh_token: "Google didn't grant lasting access. Remove Locenti at myaccount.google.com/permissions, then connect again.",
   server: "Couldn't save the connection. Try again.",
 };
 
@@ -54,7 +54,7 @@ export function MailboxesCard({ mailboxes, canEdit, notice }: { mailboxes: Mailb
         </ul>
       ) : (
         <p className="text-sm text-slate">
-          No mailbox yet. Connect the Gmail account you send from. Locentio asks Google only for permission to send email; it can&apos;t read your inbox.
+          No mailbox yet. Connect the Gmail account you send from. Locenti asks Google only for permission to send email; it can&apos;t read your inbox.
         </p>
       )}
 
@@ -68,7 +68,7 @@ export function MailboxesCard({ mailboxes, canEdit, notice }: { mailboxes: Mailb
         <p className="text-xs text-slate">Ask a workspace owner or admin to connect a mailbox.</p>
       )}
       <p className="text-xs leading-5 text-slate">
-        While the beta is in Google&apos;s testing mode, only Gmail addresses added as test users in Google Cloud can be connected. Locentio sends nothing on its own: today the only email it can send is the test to yourself.
+        While your Google app is in testing mode, only Gmail addresses added as test users in Google Cloud can be connected. Locenti sends nothing on its own: today the only email it can send is the test to yourself.
       </p>
     </div>
   );
@@ -104,7 +104,7 @@ function MailboxItem({ m, canEdit }: { m: MailboxRow; canEdit: boolean }) {
           <span className="font-medium text-ink">Reply tracking: {hasReadScope(m.scopes) ? "on" : "off"}</span>
           {hasReadScope(m.scopes)
             ? ` · ${m.last_synced_at ? `checked ${formatDateTime(m.last_synced_at)} UTC` : "not checked yet"}`
-            : " · lets Locentio read replies to campaign emails, sort them and stop emailing people who say no"}
+            : " · lets Locenti read replies to campaign emails, sort them and stop emailing people who say no"}
         </span>
         {canEdit && !hasReadScope(m.scopes) && m.status === "connected" ? (
           <Button size="sm" variant="secondary" asChild>
@@ -158,7 +158,7 @@ function MailboxItem({ m, canEdit }: { m: MailboxRow; canEdit: boolean }) {
             variant="ghost"
             disabled={pending}
             onClick={() => {
-              if (confirm(`Disconnect ${m.email}? Locentio will stop sending from it and Google access is removed.`)) run(() => disconnectMailboxAction(m.id), "Disconnected.");
+              if (confirm(`Disconnect ${m.email}? Locenti will stop sending from it and Google access is removed.`)) run(() => disconnectMailboxAction(m.id), "Disconnected.");
             }}
           >
             <Unplug aria-hidden /> Disconnect

@@ -31,7 +31,7 @@ async function Dashboard() {
   const p = l.previous;
 
   const setup = [
-    { done: !!offer, label: "Tell Locentio what you sell", href: "/app/settings" },
+    { done: !!offer, label: "Tell Locenti what you sell", href: "/app/settings" },
     { done: l.funnel.found > 0, label: "Run your first map search", href: "/app/discover" },
     { done: l.funnel.saved > 0, label: "Save businesses as leads", href: "/app/discover" },
     { done: l.funnel.researched > 0, label: "Research a lead's website", href: "/app/leads" },

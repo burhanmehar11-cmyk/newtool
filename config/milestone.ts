@@ -42,12 +42,12 @@ export const features = {
 
 export type FeatureKey = keyof typeof features;
 
-export function availabilityLabel(a: Availability, target?: string) {
+export function availabilityLabel(a: Availability) {
   switch (a) {
     case "demo":
-      return target ? `In demo · live in ${target === "M2" ? "private beta" : "launch"}` : "In demo";
+      return "Coming soon";
     case "beta":
-      return "Private beta";
+      return "Available";
     case "live":
       return "Available";
     case "planned":

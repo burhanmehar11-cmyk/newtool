@@ -146,7 +146,7 @@ async function OutreachTab({ range }: { range: string }) {
       </div>
       <p className="flex items-start gap-2 text-xs leading-5 text-slate">
         <Info aria-hidden className="mt-0.5 size-3.5 shrink-0" />
-        Opens aren&apos;t tracked: Locentio adds no tracking pixels, which mail apps often block or flag. Replies need reply tracking turned on for the mailbox; labels are suggestions you can change in the Inbox.
+        Opens aren&apos;t tracked: Locenti adds no tracking pixels, which mail apps often block or flag. Replies need reply tracking turned on for the mailbox; labels are suggestions you can change in the Inbox.
       </p>
     </div>
   );

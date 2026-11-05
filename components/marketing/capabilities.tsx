@@ -1,16 +1,15 @@
 import { CalendarClock, FolderKanban, Gauge, MessageSquareReply, SlidersHorizontal, MailCheck, ShieldBan, Tags, Users } from "lucide-react";
-import { availabilityLabel, features, type FeatureKey } from "@/config/milestone";
+import { availabilityLabel, features, type Availability, type FeatureKey } from "@/config/milestone";
 import { EmailStatusBadge } from "@/components/product/badges";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
+const isAvailable = (a: Availability) => a === "beta" || a === "live";
+
 function Status({ k }: { k: FeatureKey }) {
   const f = features[k];
-  return (
-    <Badge tone={f.availability === "planned" ? "outline" : f.availability === "demo" ? "demo" : "green"}>
-      {availabilityLabel(f.availability, f.target)}
-    </Badge>
-  );
+  if (isAvailable(f.availability)) return null;
+  return <Badge tone="outline">{availabilityLabel(f.availability)}</Badge>;
 }
 
 function Card({ className, children }: { className?: string; children: React.ReactNode }) {
@@ -45,7 +44,7 @@ export function Capabilities() {
             <h2 className="display-2 mt-4 text-ink">The controls outreach actually needs.</h2>
           </div>
           <p className="max-w-sm text-sm leading-6 text-slate">
-            Today these run in the interactive demo with sample data. Live versions arrive with the private beta. Planned items are marked.
+            Everything you need to find, qualify and contact local businesses. Items still being built are marked.
           </p>
         </div>
 
@@ -172,7 +171,7 @@ export function Capabilities() {
                 <div key={label} className="rounded-[12px] border border-line-dark bg-midnight/50 p-4">
                   <Icon aria-hidden className="size-4 text-mint" />
                   <p className="mt-3 text-sm font-semibold text-white">{label}</p>
-                  <p className="mt-1 text-xs text-fog">{availabilityLabel(features[k].availability, features[k].target)}</p>
+                  <p className="mt-1 text-xs text-fog">{availabilityLabel(features[k].availability)}</p>
                 </div>
               ))}
             </div>

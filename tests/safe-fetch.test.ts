@@ -5,7 +5,7 @@ import { safeFetch } from "@/server/research/fetch";
 
 let server: http.Server;
 let port = 0;
-const UA = "Locentio-test";
+const UA = "Locenti-test";
 const deadline = () => Date.now() + 5000;
 
 beforeAll(async () => {

@@ -73,7 +73,7 @@ async function Thread({ params }: { params: PageProps<"/app/inbox/[id]">["params
           </li>
         ))}
       </ol>
-      <p className="mt-4 max-w-3xl text-xs text-slate">Shown as plain text with quoted history removed. Reply from Gmail; Locentio picks up the conversation on its next check.</p>
+      <p className="mt-4 max-w-3xl text-xs text-slate">Shown as plain text with quoted history removed. Reply from Gmail; Locenti picks up the conversation on its next check.</p>
     </div>
   );
 }

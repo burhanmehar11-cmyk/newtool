@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { ChevronDown } from "lucide-react";
-import { brand } from "@/config/brand";
 import { LogoMark } from "@/components/brand/logo";
 import { Button } from "@/components/ui/button";
 
@@ -11,7 +10,7 @@ const faqs: { q: string; a: React.ReactNode }[] = [
   },
   {
     q: "Where does lead data come from?",
-    a: "Business listings come from Google Maps, through Google's official Places API (never scraping), or from OpenStreetMap's free open map data. Google results are shown live and not stored, as Google's terms require. Locentio then reads each business's public website (respecting robots.txt) for contact details and research. Every fact shows its source and the date it was collected.",
+    a: "Business listings come from Google Maps, through Google's official Places API (never scraping), or from OpenStreetMap's free open map data. Google results are shown live and not stored, as Google's terms require. Locenti then reads each business's public website (respecting robots.txt) for contact details and research. Every fact shows its source and the date it was collected.",
   },
   {
     q: "What does email verification mean?",
@@ -23,7 +22,7 @@ const faqs: { q: string; a: React.ReactNode }[] = [
   },
   {
     q: "Do I connect my own mailbox?",
-    a: "Yes. The private beta starts with Gmail, connected separately from your sign-in with send-only access: Locentio can send from your address but can't read your inbox. Each mailbox has its own daily limit. Approved campaigns are next; business-hours schedules come with them. The demo has no mailbox and never sends anything.",
+    a: "Yes. Locenti works with Gmail, connected separately from your sign-in with send-only access: Locenti can send from your address but can't read your inbox. Each mailbox has its own daily limit.",
   },
   {
     q: "How is usage charged?",
@@ -47,7 +46,7 @@ export function Faq() {
           <p className="eyebrow text-green">FAQ</p>
           <h2 className="display-2 mt-4 text-ink">Straight answers.</h2>
           <p className="mt-5 text-[15px] leading-7 text-slate">
-            Answers describe the product as it stands today: an interactive demo, with the private beta in development.
+            How Locenti finds businesses, writes emails and keeps your outreach safe.
           </p>
         </div>
         <div className="divide-y divide-line border-y border-line" data-stagger="60">
@@ -75,17 +74,16 @@ export function FinalCta() {
       <div className="container-page relative" data-stagger="100">
         <h2 data-reveal className="display-2 max-w-3xl text-white">Your next client starts with the right conversation.</h2>
         <p data-reveal className="mt-5 max-w-xl text-[17px] leading-8 text-white/72">
-          Walk through the whole workflow with sample data: search, research, draft, approve and review a reply. No account needed.
+          Search Google Maps, find public emails, see what each website is missing, and send personal emails from your own Gmail.
         </p>
         <div data-reveal className="mt-8 flex flex-wrap gap-3">
           <Button asChild variant="mint" size="lg">
-            <Link href="/demo">Explore demo</Link>
+            <Link href="/sign-up">Get started</Link>
           </Button>
           <Button asChild variant="outline-dark" size="lg">
             <Link href="#how-it-works">See the workflow</Link>
           </Button>
         </div>
-        <p className="mt-6 text-sm text-fog">{brand.name} is in private development. Sign-up opens with the private beta.</p>
       </div>
     </section>
   );

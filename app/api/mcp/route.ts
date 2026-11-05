@@ -15,7 +15,7 @@ import { resolveToken } from "@/server/token-store";
 export const maxDuration = 60;
 
 const unauthorized = () =>
-  NextResponse.json({ jsonrpc: "2.0", id: null, error: { code: -32001, message: "Missing or invalid access token. Create one in Locentio: Settings → AI agents." } }, { status: 401, headers: { "www-authenticate": 'Bearer realm="locentio"' } });
+  NextResponse.json({ jsonrpc: "2.0", id: null, error: { code: -32001, message: "Missing or invalid access token. Create one in Locenti: Settings → AI agents." } }, { status: 401, headers: { "www-authenticate": 'Bearer realm="locentio"' } });
 
 export async function POST(request: NextRequest) {
   const token = request.headers.get("authorization")?.match(/^Bearer\s+(loc_[A-Za-z0-9_-]{20,100})$/)?.[1];

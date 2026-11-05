@@ -1,7 +1,7 @@
 import { discoveryNiches } from "@/lib/discovery/niches";
 import { CountUp } from "./count-up";
 
-/** Product facts (not usage metrics) and an endless strip of the business types Locentio searches. */
+/** Product facts (not usage metrics) and an endless strip of the business types Locenti searches. */
 const facts: { value: number; suffix: string; label: string; text?: string }[] = [
   { value: 20, suffix: "", label: "businesses per Google Maps search, with website, phone and rating" },
   { value: 3, suffix: "", label: "pages of each website read, with every fact linked to its source" },
@@ -12,7 +12,7 @@ const facts: { value: number; suffix: string; label: string; text?: string }[] =
 export function ProofBand() {
   const niches = [...discoveryNiches.map((n) => n.label), "Chiropractors", "Plumbers", "Restaurants", "Real estate agents", "Gyms", "Auto repair shops"];
   return (
-    <section aria-label="What Locentio does" className="border-b border-line bg-surface">
+    <section aria-label="What Locenti does" className="border-b border-line bg-surface">
       <div className="container-page grid gap-8 py-14 sm:grid-cols-2 lg:grid-cols-4" data-stagger="90">
         {facts.map((f) => (
           <div key={f.label} data-reveal>

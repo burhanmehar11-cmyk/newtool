@@ -229,7 +229,7 @@ function Conversation({ thread: t, onBack }: { thread: Thread; onBack: () => voi
                   Discard draft
                 </Button>
               </div>
-              <FieldHint>In the private beta, replies are sent from your connected mailbox in the same thread.</FieldHint>
+              <FieldHint>Replies are sent from your connected mailbox in the same thread.</FieldHint>
             </div>
           ) : (
             <div className="flex flex-wrap gap-2">

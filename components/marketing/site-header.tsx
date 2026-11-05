@@ -6,7 +6,6 @@ import { Menu } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogTrigger, SheetCloseButton, SheetContent } from "@/components/ui/sheet";
-import { SIGNUP_OPEN } from "@/config/milestone";
 
 export const marketingNav = [
   { href: "/#product", label: "Product" },
@@ -29,7 +28,7 @@ export function SiteHeader() {
         Skip to content
       </a>
       <div className="container-page flex h-16 items-center gap-6">
-        <Link href="/" className="rounded-md" aria-label="Locentio home">
+        <Link href="/" className="rounded-md" aria-label="Locenti home">
           <Logo tone="dark" />
         </Link>
         <nav aria-label="Main" className="hidden flex-1 items-center gap-1 md:flex">
@@ -44,7 +43,7 @@ export function SiteHeader() {
             Sign in
           </Link>
           <Button asChild variant="mint" size="sm" className="hidden h-9 px-4 sm:inline-flex">
-            <Link href={SIGNUP_OPEN ? "/sign-up" : "/demo"}>{SIGNUP_OPEN ? "Start free" : "Explore demo"}</Link>
+            <Link href="/sign-up">Get started</Link>
           </Button>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
@@ -69,11 +68,10 @@ export function SiteHeader() {
               </nav>
               <div className="mt-auto border-t border-white/[0.08] p-5">
                 <Button asChild variant="mint" size="lg" className="w-full">
-                  <Link href="/demo" onClick={() => setOpen(false)}>
-                    Explore demo
+                  <Link href="/sign-up" onClick={() => setOpen(false)}>
+                    Get started
                   </Link>
                 </Button>
-                <p className="mt-3 text-center text-xs text-fog">Interactive demo with fictional sample data.</p>
               </div>
             </SheetContent>
           </Dialog>

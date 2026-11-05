@@ -16,7 +16,7 @@ import {
 } from "@/server/actions/password";
 
 const URL_ERRORS: Record<string, { tone: "danger" | "warn"; text: string }> = {
-  not_invited: { tone: "warn", text: "This account isn't on the private-beta list yet. Ask the workspace owner to add your email." },
+  not_invited: { tone: "warn", text: "This email doesn't have access yet. Ask the workspace owner to add your email." },
   cancelled: { tone: "warn", text: "Google sign-in was cancelled." },
   email_not_verified: { tone: "danger", text: "Google says this email isn't verified, so it can't be used to sign in." },
   state: { tone: "danger", text: "That sign-in took too long or was opened in another browser. Please try again." },
@@ -218,7 +218,7 @@ export function SignUpForm({ emailEnabled }: { emailEnabled: boolean }) {
             placeholder="you@company.com"
             defaultValue={state.values?.email}
             error={state.fieldErrors?.email}
-            hint="Use the address your beta invite was sent to."
+            hint="Use the address your invite was sent to."
           />
           <DarkField name="password" label="Password" type="password" autoComplete="new-password" placeholder="At least 10 characters" error={state.fieldErrors?.password} />
           {state.error ? <Notice tone="danger">{state.error}</Notice> : null}

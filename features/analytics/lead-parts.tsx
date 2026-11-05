@@ -18,7 +18,7 @@ export function QuickSearch({ googleLeft, googleReady }: { googleLeft: number | 
               <MapPinned aria-hidden className="size-3.5" /> {googleReady ? "Google Maps" : "Map search"}
             </p>
             <h2 className="mt-2 font-display text-2xl font-bold tracking-tight sm:text-3xl">Find local businesses to pitch</h2>
-            <p className="mt-1 text-sm text-white/65">Search by business type and area. Locentio finds their websites, public emails and what they could improve.</p>
+            <p className="mt-1 text-sm text-white/65">Search by business type and area. Locenti finds their websites, public emails and what they could improve.</p>
           </div>
           {googleReady && googleLeft !== null ? <span className="rounded-full border border-white/12 bg-white/[0.05] px-3 py-1 text-xs text-white/75">{googleLeft} Google searches left today</span> : null}
         </div>

@@ -604,7 +604,7 @@ function SequenceStep({ c, editable }: { c: Campaign; editable: boolean }) {
 
 function MailboxStep({ c, editable }: { c: Campaign; editable: boolean }) {
   return (
-    <SectionCard title="Sending mailbox" description="Messages are sent from a mailbox you connect. Your Locentio sign-in and mailbox access are separate.">
+    <SectionCard title="Sending mailbox" description="Messages are sent from a mailbox you connect. Your Locenti sign-in and mailbox access are separate.">
       <fieldset className="space-y-2">
         <legend className="sr-only">Mailbox</legend>
         <label className={cn("flex cursor-pointer items-start gap-3 rounded-xl border p-4", c.mailboxId === "demo-mailbox" ? "border-green bg-mint-soft/40" : "border-line", !editable && "cursor-not-allowed opacity-70")}>
@@ -619,7 +619,7 @@ function MailboxStep({ c, editable }: { c: Campaign; editable: boolean }) {
         <div className="flex items-start gap-3 rounded-xl border border-dashed border-line p-4 opacity-80">
           <input type="radio" name="mailbox" className="mt-1" disabled aria-describedby="gmail-note" />
           <span>
-            <span className="text-sm font-semibold text-ink">Gmail</span> <Badge tone="outline">Private beta</Badge>
+            <span className="text-sm font-semibold text-ink">Gmail</span> <Badge tone="outline">Coming soon</Badge>
             <span id="gmail-note" className="mt-0.5 block text-[13px] leading-5 text-slate">
               Connect with Google OAuth using the narrowest permissions needed. Tokens are stored encrypted on the server. Not available in the demo.
             </span>

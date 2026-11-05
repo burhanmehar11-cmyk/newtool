@@ -9,7 +9,6 @@ const cols = [
       { href: "/#product", label: "Product" },
       { href: "/#how-it-works", label: "How it works" },
       { href: "/#pricing", label: "Pricing" },
-      { href: "/demo", label: "Interactive demo" },
     ],
   },
   {
@@ -61,7 +60,7 @@ export function SiteFooter() {
           <p>
             © {brand.copyrightYear} {brand.legalEntity ?? brand.name}. {brand.name} is a provisional product name.
           </p>
-          <p>Demo businesses, people and results are fictional.</p>
+          <p>Businesses shown in product previews are fictional.</p>
         </div>
       </div>
     </footer>

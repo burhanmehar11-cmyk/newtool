@@ -3,7 +3,7 @@
 -- Google's terms forbid caching Places content except place IDs (indefinitely)
 -- and coordinates (30 days), and forbid copying business names, addresses or
 -- reviews. So Google results are shown live and never stored; a saved lead
--- keeps only the place ID plus what Locentio reads from the business's own
+-- keeps only the place ID plus what Locenti reads from the business's own
 -- website. See docs/DECISIONS.md.
 
 -- One API key serves every workspace, so the daily call limit is global.

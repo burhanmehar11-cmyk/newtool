@@ -68,8 +68,8 @@ export async function sendTestEmail(accountId: string): Promise<{ ok: true; to: 
     buildMessage({
       from: { email: box.email, name: box.sender_name },
       to: box.email,
-      subject: "Locentio test email",
-      text: `This is a test from Locentio for the workspace "${workspace.name}".\n\nIf you're reading it, Locentio can send from ${box.email}. Nothing was sent to anyone else.`,
+      subject: "Locenti test email",
+      text: `This is a test from Locenti for the workspace "${workspace.name}".\n\nIf you're reading it, Locenti can send from ${box.email}. Nothing was sent to anyone else.`,
     }),
   );
   const sent = await sendRaw(token.token, raw);

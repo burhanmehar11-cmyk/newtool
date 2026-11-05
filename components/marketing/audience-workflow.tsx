@@ -1,6 +1,5 @@
 import type * as React from "react";
 import { Bot, Compass, Globe, Inbox, Mail, MapPinned, MessageSquareReply, Microscope, MonitorSmartphone, PenLine, Send, Sheet, TrendingUp } from "lucide-react";
-import { features, type Availability, type FeatureKey } from "@/config/milestone";
 
 const roles = [
   { icon: MapPinned, label: "Local SEO" },
@@ -72,7 +71,7 @@ export function Workflow() {
           <div className="max-w-2xl" data-reveal>
             <p className="eyebrow text-green">How it works</p>
             <h2 className="display-2 mt-4 text-ink">From a map search to a real conversation.</h2>
-            <p className="mt-5 text-[17px] leading-8 text-slate">Five steps, each one reviewed by you. Statuses show what&apos;s live in the private beta today.</p>
+            <p className="mt-5 text-[17px] leading-8 text-slate">Five steps, each one reviewed by you.</p>
           </div>
           <HowItWorks />
         </div>
@@ -81,50 +80,33 @@ export function Workflow() {
   );
 }
 
-const steps: { icon: React.ComponentType<{ className?: string }>; title: string; copy: string; status: FeatureKey[] }[] = [
+const steps: { icon: React.ComponentType<{ className?: string }>; title: string; copy: string }[] = [
   {
     icon: Mail,
     title: "Connect your mailbox",
-    copy: "Link the Gmail account you already send from, with send-only access: Locentio can't read your inbox. You set the daily limit, and messages go out from your own address.",
-    status: ["gmail"],
+    copy: "Link the Gmail account you already send from, with send-only access: Locenti can't read your inbox. You set the daily limit, and messages go out from your own address.",
   },
   {
     icon: MapPinned,
     title: "Search Google Maps",
-    copy: "Describe who you want to reach, like “dentists in Austin”. Locentio finds matching businesses on Google Maps (or free OpenStreetMap data), then reads their public websites for contact details.",
-    status: ["googleMaps", "discovery"],
+    copy: "Describe who you want to reach, like “dentists in Austin”. Locenti finds matching businesses on Google Maps (or free OpenStreetMap data), then reads their public websites for contact details.",
   },
   {
     icon: Compass,
     title: "Research and write with AI",
     copy: "Each lead gets an Opportunity Brief: what its website shows, with sources. AI writes a personal first email from those facts and your pitch, using the built-in writer or your own agent.",
-    status: ["opportunityBrief", "drafts", "mcp"],
   },
   {
     icon: Send,
     title: "Approve and launch",
     copy: "Review the exact recipients and messages, then approve. Emails go out in small, paced batches within your limits.",
-    status: ["sequences"],
   },
   {
     icon: MessageSquareReply,
     title: "Handle replies",
     copy: "Replies land in one inbox, sorted as interested, not interested or out of office. Follow-ups stop the moment someone answers.",
-    status: ["replySync"],
   },
 ];
-
-const isLive = (a: Availability) => a === "beta" || a === "live";
-
-function StepStatus({ k }: { k: FeatureKey }) {
-  const f = features[k];
-  const live = isLive(f.availability);
-  return (
-    <span className={live ? "rounded-md bg-mint-soft px-1.5 py-0.5 text-[11px] font-medium text-green" : "rounded-md bg-ink/[0.06] px-1.5 py-0.5 text-[11px] font-medium text-slate"}>
-      {live ? `${f.label}: in private beta` : `${f.label}: coming soon`}
-    </span>
-  );
-}
 
 function HowItWorks() {
   return (
@@ -134,7 +116,7 @@ function HowItWorks() {
         <div data-draw className="h-full w-full rounded-full bg-gradient-to-r from-green via-green to-mint" />
       </div>
       <ol className="relative grid gap-5 sm:grid-cols-2 lg:grid-cols-5" data-stagger="110">
-        {steps.map(({ icon: Icon, title, copy, status }, i) => (
+        {steps.map(({ icon: Icon, title, copy }, i) => (
           <li key={title} data-reveal className="flex flex-col items-center text-center">
             <span className="relative z-10 flex size-16 items-center justify-center rounded-full border-4 border-canvas bg-midnight font-mono text-lg font-bold text-mint shadow-[0_0_0_1px_rgb(18_99_74/0.25),0_12px_30px_-12px_rgb(11_18_24/0.6)]">
               {String(i + 1).padStart(2, "0")}
@@ -145,11 +127,6 @@ function HowItWorks() {
               </span>
               <h3 className="mt-4 text-lg font-bold leading-snug text-ink">{title}</h3>
               <p className="mt-2 flex-1 text-[14px] leading-6 text-slate">{copy}</p>
-              <div className="mt-4 flex flex-wrap justify-center gap-1.5">
-                {status.map((k) => (
-                  <StepStatus key={k} k={k} />
-                ))}
-              </div>
             </div>
           </li>
         ))}

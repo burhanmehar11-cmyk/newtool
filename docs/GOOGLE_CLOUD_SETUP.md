@@ -1,6 +1,6 @@
 # Free setup: "Sign in with Google" (guide for Claude Cowork)
 
-This turns on sign-in for Locentio's private beta **without paying for anything**:
+This turns on sign-in for Locenti's private beta **without paying for anything**:
 
 - **Google Cloud Console:** create a free project and an OAuth client so people can sign in with their Google (Gmail) account. No billing account is needed.
 - **Vercel:** add the free Postgres database (Neon) so workspaces can be saved, then add a few settings.
@@ -14,7 +14,7 @@ It's written so **Claude Cowork can do it in your browser**. You step in for two
 ## 1. Prompt to give Claude Cowork
 
 ```
-Please set up free Google sign-in for my app "Locentio" by following
+Please set up free Google sign-in for my app "Locenti" by following
 docs/GOOGLE_CLOUD_SETUP.md in the GitHub repo burhanmehar11-cmyk/newtool
 (branch claude/compassionate-knuth-hewpfn). Work in my browser, part by part.
 
@@ -45,17 +45,17 @@ Rules:
 
 1. Open https://console.cloud.google.com/ and check the right Google account is selected (top right).
    - On a first visit, accept the terms. **Ignore any "Start free trial" or billing offers.** They aren't needed.
-2. Project picker (top bar) → **New project** → name it `Locentio` → **Create**. Select it in the picker.
+2. Project picker (top bar) → **New project** → name it `Locenti` → **Create**. Select it in the picker.
 3. Record the **Project ID** from the dashboard.
 
-✅ Check: the top bar shows the Locentio project. No billing was added.
+✅ Check: the top bar shows the Locenti project. No billing was added.
 
 ## Part B: Consent screen (what people see when they click "Continue with Google")
 
 Google calls this **Google Auth Platform** (older screens say **OAuth consent screen**).
 
 1. Left menu → **APIs & Services → OAuth consent screen**, or search "Google Auth Platform". Click **Get started** if shown.
-2. **App information:** App name `Locentio`; User support email: the owner's email. **Next.**
+2. **App information:** App name `Locenti`; User support email: the owner's email. **Next.**
 3. **Audience:** choose **External**. **Next.**
 4. **Contact information:** the owner's email. **Next.** Agree to the policy → **Create**.
 5. Open **Audience** (left menu of Google Auth Platform):
@@ -68,7 +68,7 @@ Google calls this **Google Auth Platform** (older screens say **OAuth consent sc
 ## Part C: OAuth client (the app's Google login key)
 
 1. Google Auth Platform → **Clients** (or **APIs & Services → Credentials → Create credentials → OAuth client ID**).
-2. **Create client** → Application type **Web application** → name `Locentio web`.
+2. **Create client** → Application type **Web application** → name `Locenti web`.
 3. **Authorized JavaScript origins → Add URI:**
    - `https://newtool.vercel.app` (your real URL, no trailing slash)
    - `http://localhost:3000` (for local development)
@@ -80,14 +80,14 @@ Google calls this **Google Auth Platform** (older screens say **OAuth consent sc
    - Record the **Client ID** (it ends in `.apps.googleusercontent.com`; not secret).
    - **Stop and ask the owner** to copy the **Client secret** themselves. It goes straight into Vercel in Part E. (It can be viewed again later in the client's details.)
 
-✅ Check: Clients lists `Locentio web` with both redirect URIs.
+✅ Check: Clients lists `Locenti web` with both redirect URIs.
 
 ## Part D: Free database in Vercel
 
 1. Open https://vercel.com → your project (`newtool`) → **Storage** tab.
 2. **Create Database** → choose **Neon** (Serverless Postgres) → **Continue**.
    - Plan: **Free**. Do not pick a paid plan.
-   - Region: the one closest to your users (or the default). Name: `locentio-db`.
+   - Region: the one closest to your users (or the default). Name: `locenti-db`.
    - Accept the integration terms when asked, then **Create**.
 3. When asked which environments to connect, keep **Production** and **Preview** (and **Development** if offered). Vercel adds `DATABASE_URL` and related settings automatically.
 4. Open the database's **Open in Neon** (or **Neon Console**) link → **SQL Editor**.
@@ -131,7 +131,7 @@ Then **Deployments** → latest production deployment → **⋯ → Redeploy**. 
 Google sign-in works without this. Add it if invited people should also be able to sign in with an email and password. It sends their confirmation and password-reset emails from a Gmail account.
 
 1. The Gmail account that will send these emails needs **2-Step Verification** on: https://myaccount.google.com/security
-2. Open https://myaccount.google.com/apppasswords → app name `Locentio` → **Create**. Google shows a 16-character **App Password**. **The owner copies it; it's a secret.**
+2. Open https://myaccount.google.com/apppasswords → app name `Locenti` → **Create**. Google shows a 16-character **App Password**. **The owner copies it; it's a secret.**
 3. In Vercel, the owner adds `SMTP_URL` (mark **Sensitive**), built like this. Replace the `@` in the Gmail address with `%40`, and remove the spaces from the App Password:
 
    ```
@@ -145,7 +145,7 @@ Gmail's free sending limit (about 500 emails a day) is far more than sign-ups an
 
 ## Part E3: Google Maps search (optional, free within Google's monthly allowance)
 
-Google Maps search uses the official **Places API (New)**. Google requires a billing account on the project even for free usage, but Locentio is set up to stay inside the free allowance (Text Search with website/phone/rating: 1,000 free requests a month at the time of writing, up to 20 businesses each).
+Google Maps search uses the official **Places API (New)**. Google requires a billing account on the project even for free usage, but Locenti is set up to stay inside the free allowance (Text Search with website/phone/rating: 1,000 free requests a month at the time of writing, up to 20 businesses each).
 
 1. Google Cloud Console → ☰ → **Billing** → link the project to a billing account. Stop if it asks you to choose a paid support plan or prepay. Ask the owner before adding a card.
 2. **APIs & Services → Library** → search **Places API (New)** → **Enable**. (Not the old "Places API": new projects can't enable it, and the page keeps reloading.)
@@ -158,11 +158,11 @@ Check: in the app, **Discover** shows a **Google Maps** / **OpenStreetMap** swit
 
 ## Part G: Gmail sending (free)
 
-Uses the **same OAuth client** as sign-in. No new credential is needed. Locentio asks for Gmail access only when someone clicks **Connect Gmail**, and only for the `gmail.send` permission (send, not read).
+Uses the **same OAuth client** as sign-in. No new credential is needed. Locenti asks for Gmail access only when someone clicks **Connect Gmail**, and only for the `gmail.send` permission (send, not read).
 
 1. **APIs & Services → Library → Gmail API → Enable** (done if you already enabled it).
 2. **Google Auth Platform → Branding** (or "OAuth consent screen"):
-   - App name `Locentio`, user support email, developer contact email.
+   - App name `Locenti`, user support email, developer contact email.
    - **App logo (optional):** upload `public/brand/locentio-logo-120.png` from the repository (120×120 PNG). Google may ask for brand verification before it shows a logo to everyone; while the app is in **Testing**, that doesn't block anything. If it asks for verification and you'd rather avoid it, leave the logo empty.
    - App home page: `https://YOUR-URL`. Privacy policy: `https://YOUR-URL/legal/privacy`. Terms: `https://YOUR-URL/legal/terms`.
    - Authorised domains: your domain (for example `your-app.vercel.app`).
@@ -177,17 +177,17 @@ Check: in the app, **Settings → Sending mailboxes → Connect Gmail**. On Goog
 
 ## Part G2: Reply tracking (optional)
 
-Lets Locentio read replies to campaign emails (only threads it started), sort them, and stop emailing people who decline or bounce.
+Lets Locenti read replies to campaign emails (only threads it started), sort them, and stop emailing people who decline or bounce.
 
 1. **Google Auth Platform → Data Access → Add or remove scopes** → search `gmail.readonly` → tick `https://www.googleapis.com/auth/gmail.readonly` → **Update** → **Save**. Google lists it under **restricted** scopes.
    - Fine in **Testing** mode for your test users. Publishing the app with this scope later needs Google's verification, including a paid third-party security assessment. Keep the app in Testing for the beta.
 2. Neon SQL Editor: run `database/migrations/0008_replies.sql`.
 3. In the app: **Mailboxes** → your mailbox → **Reply tracking: Turn on** → on Google's screen, leave both boxes ticked.
-4. **Inbox** in the sidebar shows replies (checked every few minutes while Locentio is open, or click **Check for replies**).
+4. **Inbox** in the sidebar shows replies (checked every few minutes while Locenti is open, or click **Check for replies**).
 
 ## Part H: Campaign sending (no setup needed; scheduler optional)
 
-Run migration `0006_campaigns.sql` (step 3 below). That's all campaigns need: while Locentio is open in any browser tab, it sends the next due email about once a minute, within each campaign's hours and daily limit. **Send next due email** on a campaign page sends one immediately.
+Run migration `0006_campaigns.sql` (step 3 below). That's all campaigns need: while Locenti is open in any browser tab, it sends the next due email about once a minute, within each campaign's hours and daily limit. **Send next due email** on a campaign page sends one immediately.
 
 **Optional, to keep sending with no tab open:** something has to "tick" every 5 minutes. Vercel's free plan only runs scheduled jobs once a day, so use a free external scheduler:
 
@@ -203,7 +203,7 @@ Without the scheduler, campaigns still work: the campaign page has **Send next d
 
 ## Part I: Built-in AI writer (Gemini, optional)
 
-1. Go to **aistudio.google.com** → sign in → **Get API key** → **Create API key** (in your Locentio Google Cloud project or a new one). Don't paste it into chat.
+1. Go to **aistudio.google.com** → sign in → **Get API key** → **Create API key** (in your Locenti Google Cloud project or a new one). Don't paste it into chat.
 2. Vercel → Settings → Environment Variables → `GEMINI_API_KEY` = the key → Production → Save → **Redeploy**.
 3. In the app: **Agent** page shows "Ready". Open a researched lead → **Write with AI**.
 
@@ -234,7 +234,7 @@ Note: on Gemini's free tier, Google may use what's sent (lead research, your off
 ### Fixing `redirect_uri_mismatch`
 
 1. Open `https://YOUR-URL/api/auth/google/setup` in the browser (it shows no secrets). Note `authorizedRedirectUri` and `authorizedJavaScriptOrigin`.
-2. Google Cloud Console → **Google Auth Platform → Clients** → open the web client (**Locentio web**). Check that the **Client ID** starts and ends like `clientIdInUse` from step 1. If not, `GOOGLE_OAUTH_CLIENT_ID` in Vercel belongs to a different client: fix it there and redeploy.
+2. Google Cloud Console → **Google Auth Platform → Clients** → open the web client (**Locenti web**). Check that the **Client ID** starts and ends like `clientIdInUse` from step 1. If not, `GOOGLE_OAUTH_CLIENT_ID` in Vercel belongs to a different client: fix it there and redeploy.
 3. Under **Authorized redirect URIs**, add `authorizedRedirectUri` **exactly** as shown (copy and paste: `https`, the full path, no trailing slash). Under **Authorized JavaScript origins**, add `authorizedJavaScriptOrigin`. **Save.**
 4. Wait about 5 minutes. Google can take a few minutes, occasionally longer, to apply changes. Then try again in a new tab.
 5. If the address in step 1 isn't your real site (for example it shows a `-git-` preview link), set `NEXT_PUBLIC_SITE_URL` in Vercel to your real URL and redeploy. The app then always signs in through that one address.

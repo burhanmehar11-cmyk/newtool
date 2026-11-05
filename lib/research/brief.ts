@@ -74,7 +74,7 @@ function collectFacts(b: Business) {
   if (s.photoCount !== null) add("photos", `Listing has ${s.photoCount} photos.`, "listing");
   else unknowns.push("Listing photos: Unknown.");
 
-  unknowns.push("Named decision-maker: Unknown. Locentio does not guess names.");
+  unknowns.push("Named decision-maker: Unknown. Locenti does not guess names.");
   unknowns.push("Current vendors, budget and revenue: Unknown. Not observable from public pages.");
 
   return { facts, unknowns };

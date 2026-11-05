@@ -2,7 +2,7 @@ import { jwtVerify, SignJWT } from "jose";
 
 /**
  * Final email assembly at send time. The footer (sender address and an
- * unsubscribe link) is always added by Locentio and can't be edited away.
+ * unsubscribe link) is always added by Locenti and can't be edited away.
  */
 
 export function unsubscribeUrl(origin: string, token: string) {

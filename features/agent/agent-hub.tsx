@@ -114,7 +114,7 @@ function Hero({ toolCount }: { toolCount: number }) {
           <span className="rounded-full bg-mint px-2 py-0.5 text-[11px] font-bold text-midnight">MCP</span> Your AI, connected to your prospecting
         </span>
         <h1 className="mt-6 font-display text-4xl font-bold leading-[1.05] tracking-tight sm:text-6xl">
-          Run Locentio from <span className="text-shine">your own AI agent</span>
+          Run Locenti from <span className="text-shine">your own AI agent</span>
         </h1>
         <p className="mx-auto mt-6 max-w-2xl text-[16px] leading-8 text-white/70">
           Connect Claude Code, Cursor, Claude Desktop, VS Code, Windsurf or any client that speaks MCP. Ask in plain language to find businesses on Google Maps, research their websites, write
@@ -141,7 +141,7 @@ function HowItWorks() {
   const steps = [
     { icon: Plug, title: "Connect your agent", text: "Create a personal token below and paste one snippet into your AI app. No code, no SDK." },
     { icon: MessageSquare, title: "Ask in plain language", text: "“Find roofers in Denver with a website, research the top ten and draft an email for each.”" },
-    { icon: ShieldCheck, title: "You approve, Locentio sends", text: "Your agent prepares a draft campaign. You review every message and approve; Locentio sends within your limits." },
+    { icon: ShieldCheck, title: "You approve, Locenti sends", text: "Your agent prepares a draft campaign. You review every message and approve; Locenti sends within your limits." },
   ];
   return (
     <section className="card p-6 sm:p-8">
@@ -185,7 +185,7 @@ function Connect({ endpoint, tokens, fresh, setFresh, toolCount }: { endpoint: s
             <Plug aria-hidden className="size-5" />
           </span>
           <div>
-            <h2 className="font-display text-xl font-semibold text-ink">Use Locentio from your own AI app</h2>
+            <h2 className="font-display text-xl font-semibold text-ink">Use Locenti from your own AI app</h2>
             <p className="mt-0.5 text-sm text-slate">Point any MCP client at this server with a personal token.</p>
           </div>
         </div>
@@ -335,7 +335,7 @@ function Usage({ tokens, ai, google }: Pick<AgentHubProps, "tokens" | "ai" | "go
         <div className="rounded-xl border border-line p-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate">Agent AI costs</p>
           <p className="mt-1 font-display text-3xl font-semibold text-ink">Yours</p>
-          <p className="text-xs text-slate">Agents use your own AI account, not Locentio&apos;s allowance</p>
+          <p className="text-xs text-slate">Agents use your own AI account, not Locenti&apos;s allowance</p>
         </div>
       </div>
     </section>
@@ -355,16 +355,16 @@ const CLIENTS: Client[] = [
     blurb: "Anthropic's terminal agent. One command and it's connected.",
     where: "Run in your terminal",
     popular: true,
-    snippet: (u, t) => `claude mcp add --transport http locentio ${u} --header "Authorization: Bearer ${t}"`,
+    snippet: (u, t) => `claude mcp add --transport http locenti ${u} --header "Authorization: Bearer ${t}"`,
   },
   {
     id: "cursor",
     name: "Cursor",
     initial: "✦",
     color: "bg-ink",
-    blurb: "Add Locentio to Cursor's MCP settings and use it from the agent chat.",
+    blurb: "Add Locenti to Cursor's MCP settings and use it from the agent chat.",
     where: "Paste into .cursor/mcp.json (project) or ~/.cursor/mcp.json (all projects)",
-    snippet: (u, t) => JSON.stringify({ mcpServers: { locentio: { url: u, headers: { Authorization: `Bearer ${t}` } } } }, null, 2),
+    snippet: (u, t) => JSON.stringify({ mcpServers: { locenti: { url: u, headers: { Authorization: `Bearer ${t}` } } } }, null, 2),
   },
   {
     id: "claude-desktop",
@@ -373,16 +373,16 @@ const CLIENTS: Client[] = [
     color: "bg-[#a855f7]",
     blurb: "Claude's desktop app, through the mcp-remote bridge (needs Node.js).",
     where: "Settings → Developer → Edit config (claude_desktop_config.json), then restart Claude",
-    snippet: (u, t) => JSON.stringify({ mcpServers: { locentio: { command: "npx", args: ["-y", "mcp-remote", u, "--header", `Authorization:Bearer ${t}`] } } }, null, 2),
+    snippet: (u, t) => JSON.stringify({ mcpServers: { locenti: { command: "npx", args: ["-y", "mcp-remote", u, "--header", `Authorization:Bearer ${t}`] } } }, null, 2),
   },
   {
     id: "vscode",
     name: "VS Code",
     initial: "V",
     color: "bg-[#2f80ed]",
-    blurb: "Use Locentio from GitHub Copilot's agent mode.",
+    blurb: "Use Locenti from GitHub Copilot's agent mode.",
     where: "Paste into .vscode/mcp.json in your project",
-    snippet: (u, t) => JSON.stringify({ servers: { locentio: { type: "http", url: u, headers: { Authorization: `Bearer ${t}` } } } }, null, 2),
+    snippet: (u, t) => JSON.stringify({ servers: { locenti: { type: "http", url: u, headers: { Authorization: `Bearer ${t}` } } } }, null, 2),
   },
   {
     id: "windsurf",
@@ -391,7 +391,7 @@ const CLIENTS: Client[] = [
     color: "bg-[#0ea5a4]",
     blurb: "Connect Windsurf's Cascade agent to your workspace.",
     where: "Paste into ~/.codeium/windsurf/mcp_config.json",
-    snippet: (u, t) => JSON.stringify({ mcpServers: { locentio: { serverUrl: u, headers: { Authorization: `Bearer ${t}` } } } }, null, 2),
+    snippet: (u, t) => JSON.stringify({ mcpServers: { locenti: { serverUrl: u, headers: { Authorization: `Bearer ${t}` } } } }, null, 2),
   },
   {
     id: "other",
@@ -525,7 +525,7 @@ function Capabilities({ toolNames }: { toolNames: string[] }) {
 
 const LIMITS = [
   { icon: Lock, title: "Workspace-scoped tokens", text: "A token acts as you in one workspace. It stops working the moment it's revoked or you leave the workspace." },
-  { icon: Ban, title: "No sending, no approving", text: "Agents prepare drafts and draft campaigns. Only a person can approve and launch, in Locentio." },
+  { icon: Ban, title: "No sending, no approving", text: "Agents prepare drafts and draft campaigns. Only a person can approve and launch, in Locenti." },
   { icon: Timer, title: "Same limits as the app", text: "Google Maps daily searches, mailbox daily limits, sending hours and the do-not-contact list all apply. Agents can't raise them." },
   { icon: ShieldCheck, title: "Facts stay facts", text: "Research comes from the business's own website with sources. Agents can't edit research; drafts are reviewed before use." },
 ];
@@ -560,7 +560,7 @@ function BuiltIn({ ai }: Pick<AgentHubProps, "ai">) {
         </span>
         <h2 className="mt-3 font-display text-2xl font-bold tracking-tight text-ink">Built-in AI writer</h2>
         <p className="mt-2 text-[15px] leading-7 text-slate">
-          Don&apos;t use an AI agent? Locentio writes first emails for you. Click <strong className="text-ink">Write with AI</strong> on a researched lead, or <strong className="text-ink">Write all with AI</strong> on a draft campaign. It uses
+          Don&apos;t use an AI agent? Locenti writes first emails for you. Click <strong className="text-ink">Write with AI</strong> on a researched lead, or <strong className="text-ink">Write all with AI</strong> on a draft campaign. It uses
           only the lead&apos;s Opportunity Brief and your offer, and checks every result for placeholders and stray links.
         </p>
         <ul className="mt-4 space-y-2 text-sm text-ink">
@@ -587,10 +587,10 @@ function BuiltIn({ ai }: Pick<AgentHubProps, "ai">) {
 /* -------------------------------------------------------------------- FAQ */
 
 const FAQ = [
-  { q: "Can my agent send emails for me?", a: "No. Agents can write drafts and create draft campaigns, but approving and launching a campaign is always done by a person in Locentio. Sending then follows your mailbox's daily limit and sending hours." },
+  { q: "Can my agent send emails for me?", a: "No. Agents can write drafts and create draft campaigns, but approving and launching a campaign is always done by a person in Locenti. Sending then follows your mailbox's daily limit and sending hours." },
   { q: "Which AI agents can I connect?", a: "Any client that supports remote MCP servers with an Authorization header: Claude Code, Cursor, VS Code (Copilot agent mode) and Windsurf work directly. Claude Desktop and other local-only clients connect through the free mcp-remote bridge. Apps that only support MCP sign-in (OAuth), such as claude.ai connectors, aren't supported yet." },
   { q: "What can my agent actually do once connected?", a: "Search Google Maps and save leads, research websites, read Opportunity Briefs, read your offer profile, save drafts, create draft campaigns, and read campaign results and reply labels." },
-  { q: "Does it use Locentio's AI allowance?", a: "No. Your agent thinks with your own AI account. Google Maps searches it runs count against the same daily limit as searches in the app." },
+  { q: "Does it use Locenti's AI allowance?", a: "No. Your agent thinks with your own AI account. Google Maps searches it runs count against the same daily limit as searches in the app." },
   { q: "Is my data safe?", a: "A token only reaches the workspace it was created in, with your permissions. Tokens are stored as hashes, shown once, and can be revoked instantly. Data your agent reads is shared with your agent's AI provider under your own agreement with them." },
   { q: "Who can create tokens?", a: "Anyone in the workspace can create their own token. Saving drafts and creating campaigns through an agent needs an owner or admin role, as in the app." },
   { q: "How do I revoke access?", a: "Click Revoke next to the token above. Any agent using it is disconnected immediately." },

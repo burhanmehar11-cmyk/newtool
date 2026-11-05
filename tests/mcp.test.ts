@@ -11,7 +11,7 @@ const call = (msg: unknown) => handleMessage(msg, tools, { who: "ws" }, "instruc
 describe("MCP protocol core", () => {
   it("negotiates the protocol version and advertises tools", async () => {
     const r = await call({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "t", version: "1" } } });
-    expect(r?.result).toMatchObject({ protocolVersion: "2025-06-18", capabilities: { tools: {} }, serverInfo: { name: "locentio" }, instructions: "instructions" });
+    expect(r?.result).toMatchObject({ protocolVersion: "2025-06-18", capabilities: { tools: {} }, serverInfo: { name: "locenti" }, instructions: "instructions" });
     const old = await call({ jsonrpc: "2.0", id: 2, method: "initialize", params: { protocolVersion: "1999-01-01" } });
     expect((old?.result as { protocolVersion: string }).protocolVersion).toBe("2025-11-25");
   });

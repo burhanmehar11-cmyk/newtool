@@ -19,7 +19,7 @@ BASE_URL=http://localhost:3000 npm run test:e2e
 ```
 
 - Lint and typecheck clean; 192 unit and database tests pass; production build succeeds; the smoke test passes (3 widths, no overflow, no console errors, no external requests).
-- Brand renamed to Locentio. Landing page has scroll effects (`components/marketing/scroll-effects.tsx`, styles at the end of `app/globals.css`).
+- Brand renamed to Locenti. Landing page has scroll effects (`components/marketing/scroll-effects.tsx`, styles at the end of `app/globals.css`).
 
 ## M2 step 1: what exists
 
@@ -94,7 +94,7 @@ Before launch: a dedicated least-privilege database role for the app; real-Postg
 
 1. **Google Maps** is live in production (owner confirmed 2026-11-05). Make sure the key pasted in chat during development was rotated.
 2. **Gmail live check:** owner completes setup guide Part G and runs migration 0005, then Connect Gmail and send the test email.
-3. **Campaigns live check:** owner runs migrations 0006–0007, then creates a small campaign to their own second address and approves it with Locentio open (scheduler optional, skipped for now).
+3. **Campaigns live check:** owner runs migrations 0006–0007, then creates a small campaign to their own second address and approves it with Locenti open (scheduler optional, skipped for now).
 4. **M2 step 4: evidence-based drafts.** Needs `ANTHROPIC_API_KEY`; drafts must cite brief facts only.
 5. Mailbox verification provider (optional; the free DNS check stays as the floor).
 6. Add a real-Postgres CI job for concurrency tests.

@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /*
- * Locentio design tokens. Contrast for every text pairing is checked in
+ * Locenti design tokens. Contrast for every text pairing is checked in
  * tests/contrast.test.ts. Mint is an accent: never use it as small text on
  * light surfaces (1.36:1 on white).
  */

@@ -63,7 +63,7 @@ async function Settings({ searchParams }: { searchParams: PageProps<"/app/settin
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-ink">{p.label}</p>
                     <p className="text-xs text-slate">
-                      {p.configured ? "Configured" : `Not configured · needed for ${p.milestone === "M2" ? "the private beta" : "launch"}`}
+                      {p.configured ? "Configured" : "Not configured"}
                     </p>
                   </div>
                 </li>

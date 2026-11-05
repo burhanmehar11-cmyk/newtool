@@ -11,9 +11,9 @@ export function Pricing() {
       <div className="container-page">
         <div className="mx-auto max-w-2xl text-center" data-reveal>
           <p className="eyebrow text-green">Pricing</p>
-          <h2 className="display-2 mt-4 text-ink">Private beta pricing coming soon.</h2>
+          <h2 className="display-2 mt-4 text-ink">Pay for the work done.</h2>
           <p className="mt-5 text-[17px] leading-8 text-slate">
-            Plans will be based on discovery, verification and AI usage, so you pay for the work done. The groupings below are illustrative while we finalise them.
+            Plans are based on discovery, research and AI usage, so you pay for leads found and emails written, not for seats you don&apos;t use.
           </p>
         </div>
 
@@ -52,13 +52,13 @@ export function Pricing() {
                 ))}
               </div>
               <Button asChild variant={p.highlight ? "mint" : "secondary"} className="mt-8 w-full">
-                <Link href="/demo">Explore demo</Link>
+                <Link href="/sign-up">Get started</Link>
               </Button>
             </div>
           ))}
         </div>
         <p className="mx-auto mt-6 max-w-2xl text-center text-xs leading-5 text-slate">
-          No prices, limits, trial terms or discounts have been set. Nothing on this page is an offer.
+          Prices are being finalised and will be shown here. Nothing on this page is an offer.
         </p>
       </div>
     </section>

@@ -48,10 +48,9 @@ function Sidebar({ workspaceSlot, onNavigate }: { workspaceSlot: React.ReactNode
   return (
     <>
       <div className="flex h-16 items-center gap-2 px-5">
-        <Link href="/app" className="rounded-md" aria-label="Locentio workspace home" onClick={onNavigate}>
+        <Link href="/app" className="rounded-md" aria-label="Locenti workspace home" onClick={onNavigate}>
           <Logo />
         </Link>
-        <span className="rounded-md bg-mint-soft px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-green">Beta</span>
       </div>
       <div className="mx-3 mb-3">{workspaceSlot}</div>
       {/* The active item depends on the URL, which is request-time data on dynamic routes. */}

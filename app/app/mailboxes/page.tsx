@@ -26,7 +26,7 @@ async function Mailboxes({ searchParams }: { searchParams: PageProps<"/app/mailb
   };
   return (
     <div>
-      <PageHeader title="Mailboxes" description="Gmail accounts your campaigns send from. Send-only access: Locentio can't read your inbox." />
+      <PageHeader title="Mailboxes" description="Gmail accounts your campaigns send from. Send-only access: Locenti can't read your inbox." />
       <div className="max-w-2xl">
         <SectionCard title="Sending mailboxes">
           <MailboxesCard mailboxes={mailboxes} canEdit={["owner", "admin"].includes(workspace.role)} notice={notice} />

@@ -1,6 +1,6 @@
 # Brand guide
 
-Working name **Locentio** (provisional; not trademark-checked). A rendered version lives at `/brand` (not indexed).
+Working name **Locenti** (provisional; not trademark-checked). A rendered version lives at `/brand` (not indexed).
 
 ## Mark
 

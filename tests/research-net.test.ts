@@ -25,11 +25,11 @@ Disallow: /private
 Allow: /private/ok
 Disallow: /*.pdf$
 
-User-agent: Locentio
+User-agent: Locenti
 Disallow: /no-locentio
 `;
   it("uses our own group when present", () => {
-    const r = parseRobots(txt, "Locentio/0.1");
+    const r = parseRobots(txt, "Locenti/0.1");
     expect(robotsAllows(r, "/no-locentio/page")).toBe(false);
     expect(robotsAllows(r, "/private")).toBe(true); // our group doesn't block it
   });

@@ -31,7 +31,7 @@ export type FormState = {
 const email = z.string().trim().toLowerCase().email("Enter a valid email address.").max(254);
 const NOT_CONFIGURED: FormState = { error: "Sign-in isn't configured in this environment yet." };
 const NO_EMAIL: FormState = { error: "Email sign-up isn't available yet. Continue with Google instead." };
-const NOT_INVITED = "This email isn't on the private-beta list yet. Ask the workspace owner to add it.";
+const NOT_INVITED = "This email doesn't have access yet. Ask the workspace owner to add it.";
 
 const svc = <T,>(fn: (q: Q) => Promise<T>) => withService((q) => fn(q as unknown as Q));
 

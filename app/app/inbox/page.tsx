@@ -39,7 +39,7 @@ async function Inbox({ searchParams }: { searchParams: PageProps<"/app/inbox">["
       <PageHeader title="Inbox" description="Replies to your campaign emails, sorted for you. Labels are suggestions; change any of them." actions={trackingOn ? <CheckRepliesButton /> : null} />
       {!trackingOn ? (
         <EmptyState icon={<InboxIcon />} title="Reply tracking is off" action={<Button asChild><Link href="/app/mailboxes">Turn it on</Link></Button>}>
-          Turn on reply tracking for your mailbox so Locentio can read replies to campaign emails, sort them, and stop emailing people who say no or whose address bounced. It only reads threads that Locentio started.
+          Turn on reply tracking for your mailbox so Locenti can read replies to campaign emails, sort them, and stop emailing people who say no or whose address bounced. It only reads threads that Locenti started.
         </EmptyState>
       ) : (
         <>
@@ -77,7 +77,7 @@ async function Inbox({ searchParams }: { searchParams: PageProps<"/app/inbox">["
             </ul>
           ) : (
             <EmptyState icon={<InboxIcon />} title={filter === "all" ? "No replies yet" : "Nothing here"}>
-              {filter === "all" ? "Replies to campaign emails appear here a few minutes after they arrive, while Locentio is open." : "No replies with this label."}
+              {filter === "all" ? "Replies to campaign emails appear here a few minutes after they arrive, while Locenti is open." : "No replies with this label."}
             </EmptyState>
           )}
         </>

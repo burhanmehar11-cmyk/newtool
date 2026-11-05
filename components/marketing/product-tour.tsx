@@ -74,8 +74,8 @@ export function ProductTour() {
               <h3 className="text-2xl font-bold leading-tight text-ink">{active.title}</h3>
               <p className="mt-4 text-[15px] leading-7 text-slate">{active.copy}</p>
               <Button asChild variant="secondary" className="mt-6">
-                <Link href={tab === "find" ? "/demo/discover" : tab === "review" || tab === "write" ? "/demo/leads" : "/demo/inbox"}>
-                  Open this in the demo <ArrowRight aria-hidden />
+                <Link href="/sign-up">
+                  Try it in your workspace <ArrowRight aria-hidden />
                 </Link>
               </Button>
             </div>
@@ -193,7 +193,7 @@ function FindPanel() {
         <p className="text-[13px] text-slate" aria-live="polite">
           {saved ? (
             <>
-              Preview only. <Link href="/demo/discover" className="font-medium text-green underline underline-offset-2">Run this search in the demo</Link> to save leads.
+              Preview only. <Link href="/sign-up" className="font-medium text-green underline underline-offset-2">Get started</Link> to run real searches and save leads.
             </>
           ) : selected.length ? (
             `${selected.length} selected`

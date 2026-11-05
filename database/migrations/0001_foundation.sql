@@ -1,4 +1,4 @@
--- Locentio M2 foundation schema.
+-- Locenti M2 foundation schema.
 --
 -- Runs on PostgreSQL after 0000_auth.sql (auth.users,
 -- auth.uid(), roles anon / authenticated). Every workspace-owned row carries

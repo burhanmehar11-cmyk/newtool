@@ -21,7 +21,7 @@ describe("Overpass fallback", () => {
     expect(fetchMock.mock.calls[1][0]).toBe(OVERPASS_URLS[1]);
     const headers = fetchMock.mock.calls[0][1].headers as Record<string, string>;
     expect(headers.accept).toContain("*/*");
-    expect(headers["user-agent"]).toMatch(/^Locentio\//);
+    expect(headers["user-agent"]).toMatch(/^Locenti\//);
   });
 
   it("reports the last error when every instance refuses", async () => {

@@ -161,7 +161,7 @@ function SendingTab() {
               <p className="text-sm font-semibold text-ink">Gmail</p>
               <p className="text-[13px] leading-5 text-slate">Connect with Google, separately from your sign-in, using the narrowest permissions needed. Tokens are encrypted server-side and can be disconnected at any time.</p>
             </div>
-            <Badge tone="outline">Private beta</Badge>
+            <Badge tone="outline">Coming soon</Badge>
           </li>
         </ul>
         <p className="mt-4 text-xs leading-5 text-slate">Outlook and IMAP mailboxes are on the later backlog.</p>
@@ -173,7 +173,7 @@ function SendingTab() {
             "Status, approval, suppression and reply checks run again right before each send",
             "Follow-ups stop on reply, unsubscribe, hard bounce or manual exclusion",
             "A visible opt-out line in every message",
-            "No open tracking in the beta",
+            "No open tracking",
           ].map((x) => (
             <li key={x} className="flex gap-2.5">
               <span className="mt-2 size-1.5 shrink-0 rounded-full bg-green" />

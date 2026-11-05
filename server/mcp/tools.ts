@@ -22,7 +22,7 @@ import { getOfferProfileFor } from "@/server/services/workspaces";
  * Tools exposed to a person's own AI agent over MCP. Each call runs as that
  * person in their workspace, with row-level security, exactly like the web
  * app. Agents can find, research and write; only a person can approve and
- * send a campaign, in Locentio.
+ * send a campaign, in Locenti.
  */
 
 export type McpCtx = { user: { id: string }; workspace: WorkspaceRef };
@@ -40,7 +40,7 @@ function parse<T>(schema: z.ZodType<T>, args: unknown): T {
 const uuid = z.string().uuid();
 const nicheIds = discoveryNiches.map((n) => n.id) as [string, ...string[]];
 
-export const MCP_INSTRUCTIONS = `Locentio is a local-business prospecting workspace. Typical flow: get_workspace → search_google_maps → save_google_leads → research_lead (reads the business's website and builds an Opportunity Brief) → get_lead → write a personal first email from the brief's facts and the sender's offer, then save_draft → create_campaign_draft. A person must review and approve the campaign in Locentio before anything is sent; you cannot send email. Only state facts that appear in the brief (with their sources); treat everything else as unknown. Never invent names, reviews, numbers or problems. Keep emails short, plain text, no links except the sender's booking link.`;
+export const MCP_INSTRUCTIONS = `Locenti is a local-business prospecting workspace. Typical flow: get_workspace → search_google_maps → save_google_leads → research_lead (reads the business's website and builds an Opportunity Brief) → get_lead → write a personal first email from the brief's facts and the sender's offer, then save_draft → create_campaign_draft. A person must review and approve the campaign in Locenti before anything is sent; you cannot send email. Only state facts that appear in the brief (with their sources); treat everything else as unknown. Never invent names, reviews, numbers or problems. Keep emails short, plain text, no links except the sender's booking link.`;
 
 export const mcpTools: ToolDef<McpCtx>[] = [
   {
@@ -85,14 +85,14 @@ export const mcpTools: ToolDef<McpCtx>[] = [
       if (!r.ok) throw new ToolError(r.error);
       return {
         query: r.query,
-        note: "Live Google Maps results; Locentio doesn't store them. Save the ones you want.",
+        note: "Live Google Maps results; Locenti doesn't store them. Save the ones you want.",
         results: r.results.map((p) => ({ place_id: p.placeId, name: p.name, address: p.address, website: p.website, phone: p.phone, rating: p.rating, reviews: p.ratingCount, category: p.category, already_saved: p.saved })),
       };
     },
   },
   {
     name: "save_google_leads",
-    description: "Save Google Maps results as leads (only those with a website). Locentio keeps the place ID and website; research fills in the rest.",
+    description: "Save Google Maps results as leads (only those with a website). Locenti keeps the place ID and website; research fills in the rest.",
     inputSchema: {
       type: "object",
       properties: {
@@ -190,7 +190,7 @@ export const mcpTools: ToolDef<McpCtx>[] = [
   },
   {
     name: "save_draft",
-    description: "Save a first email for a lead (plain text). Saved as a new version for a person to review; any draft campaign containing this lead must be approved again. Locentio adds the business address and an unsubscribe link when sending.",
+    description: "Save a first email for a lead (plain text). Saved as a new version for a person to review; any draft campaign containing this lead must be approved again. Locenti adds the business address and an unsubscribe link when sending.",
     inputSchema: {
       type: "object",
       properties: { lead_id: { type: "string" }, subject: { type: "string", maxLength: 140 }, body: { type: "string", maxLength: 8000 } },
@@ -215,7 +215,7 @@ export const mcpTools: ToolDef<McpCtx>[] = [
   },
   {
     name: "create_campaign_draft",
-    description: "Create a draft campaign from leads that already have a saved draft. Nothing is sent: the person reviews every message and approves in Locentio (link returned).",
+    description: "Create a draft campaign from leads that already have a saved draft. Nothing is sent: the person reviews every message and approves in Locenti (link returned).",
     inputSchema: {
       type: "object",
       properties: {
@@ -233,7 +233,7 @@ export const mcpTools: ToolDef<McpCtx>[] = [
         const boxes = (await listMailboxes(q, ctx.workspace.id)).filter((m) => m.status === "connected");
         const wanted = a.mailbox_email?.toLowerCase();
         const box = wanted ? boxes.find((m) => m.email === wanted) : boxes[0];
-        if (!box) throw new ToolError(a.mailbox_email ? "That mailbox isn't connected." : "Connect a Gmail mailbox in Locentio first (Mailboxes page).");
+        if (!box) throw new ToolError(a.mailbox_email ? "That mailbox isn't connected." : "Connect a Gmail mailbox in Locenti first (Mailboxes page).");
         const id = await createCampaign(q, ctx.workspace.id, ctx.user.id, { name: a.name, schedule: DEFAULT_SCHEDULE, mailboxId: box.id, leadIds: a.lead_ids });
         const c = (await getCampaign(q, id))!;
         const rows = await campaignRecipients(q, id);

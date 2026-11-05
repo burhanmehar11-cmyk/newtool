@@ -1,12 +1,12 @@
 /**
  * Central brand configuration.
  *
- * "Locentio" is a provisional working name. Domain and trademark availability
+ * "Locenti" is a provisional working name. Domain and trademark availability
  * have NOT been checked. Change the values here and re-run `npm run brand`
  * to regenerate the wordmark SVGs.
  */
 export const brand = {
-  name: "Locentio",
+  name: "Locenti",
   /** Short descriptor used in titles and metadata. */
   category: "Local prospecting and outreach workspace",
   tagline: "Find the right local businesses. Start better conversations.",
@@ -20,7 +20,7 @@ export const brand = {
     process.env.NEXT_PUBLIC_SITE_URL ??
     (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "http://localhost:3000"),
   /** Placeholder support address on a reserved example domain until the owner sets one. */
-  supportEmail: "support@locentio.example",
+  supportEmail: "support@locenti.example",
   /** Legal entity is intentionally unset; legal pages show an owner-review notice. */
   legalEntity: null as string | null,
   /** Static to keep pages prerenderable; update yearly. */

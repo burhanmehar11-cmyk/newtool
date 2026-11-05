@@ -17,7 +17,7 @@ export function Hero() {
               <span className="absolute inline-flex size-full animate-ping rounded-full bg-mint opacity-60 motion-reduce:hidden" />
               <span className="relative inline-flex size-2 rounded-full bg-mint" />
             </span>
-            Private beta · Google Maps, AI writing and Gmail sending are live
+            New · Public emails found automatically for every Google Maps result
           </p>
           <h1 className="display-hero mt-6 text-white">
             <span data-reveal className="block">
@@ -32,8 +32,8 @@ export function Hero() {
           </p>
           <div data-reveal className="mt-8 flex flex-wrap items-center justify-center gap-3">
             <Button asChild variant="mint" size="lg">
-              <Link href="/demo">
-                Explore the demo <ArrowRight aria-hidden />
+              <Link href="/sign-up">
+                Get started <ArrowRight aria-hidden />
               </Link>
             </Button>
             <Button asChild variant="outline-dark" size="lg">
@@ -57,7 +57,7 @@ export function Hero() {
       <div className="container-page relative pb-20 sm:pb-24">
         <div data-reveal="scale" style={{ "--reveal-delay": "380ms" } as React.CSSProperties} className="mx-auto max-w-[1120px]">
           <LiveDemo />
-          <p className="mt-3 text-center text-xs text-fog">Self-playing demo with fictional businesses and sample numbers. Hover to pause; click a step to jump.</p>
+          <p className="mt-3 text-center text-xs text-fog">Product preview with fictional businesses and sample numbers. Hover to pause; click a step to jump.</p>
         </div>
       </div>
     </section>

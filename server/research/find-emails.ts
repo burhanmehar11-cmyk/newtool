@@ -28,7 +28,7 @@ export async function findEmailsOnWebsite(website: string, opts: { budgetMs?: nu
 
   const robots = await fetcher(`${origin}/robots.txt`, { userAgent: ua, deadline, maxBytes: 64 * 1024, accept: "text/plain,*/*;q=0.1" });
   let rules: ReturnType<typeof parseRobots> = [];
-  if (robots.ok) rules = parseRobots(robots.body, "LocentioBot");
+  if (robots.ok) rules = parseRobots(robots.body, "LocentiBot");
   else if (!/^HTTP 4\d\d$/.test(robots.reason)) return { status: "failed", emails: [], siteName: null, note: `Couldn't reach the website (${robots.reason}).` };
 
   const found = new Map<string, FoundEmail>();

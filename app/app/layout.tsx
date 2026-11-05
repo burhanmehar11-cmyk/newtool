@@ -7,7 +7,7 @@ import { Skeleton } from "@/components/ui/misc";
 import { SchemaBanner } from "@/features/product/schema-banner";
 
 export const metadata: Metadata = {
-  title: { default: "Workspace", template: "%s · Locentio" },
+  title: { default: "Workspace", template: "%s · Locenti" },
   robots: { index: false, follow: false },
 };
 

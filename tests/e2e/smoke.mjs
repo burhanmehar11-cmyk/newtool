@@ -75,91 +75,33 @@ await page.getByRole("tab", { name: "Handle replies" }).click();
 await page.getByText("Suggested reply").first().waitFor();
 ok("product tour tabs switch content");
 
-await page.goto(`${BASE}/demo/discover?q=${encodeURIComponent("Find dental clinics in Austin with a website and 30+ reviews.")}`, { waitUntil: "networkidle" });
-await page.waitForFunction(() => document.querySelector("#f-niche")?.value === "dental");
-ok("landing query parsed into filters (not run automatically)");
-await page.getByRole("button", { name: "Run search (simulated)" }).click();
-await page.getByText("Completed", { exact: true }).waitFor({ timeout: 15000 });
-ok("search completed with paged results");
+// The product is official: no beta wording, no demo entry points.
+const homeText = (await page.locator("body").innerText()).toLowerCase();
+if (!/\bbeta\b/.test(homeText)) ok("no beta wording on the homepage");
+else fail("homepage still mentions beta");
+if (!homeText.includes("explore demo") && !homeText.includes("explore the demo")) ok("no demo calls to action");
+else fail("homepage still links to the demo");
+const ctas = await page.locator('a:has-text("Get started")').evaluateAll((els) => els.map((e) => e.getAttribute("href")));
+if (ctas.length && ctas.every((h) => h === "/sign-up")) ok(`"Get started" buttons go to sign-up (${ctas.length})`);
+else fail(`unexpected Get started links: ${ctas.join(", ")}`);
 
-await page.getByRole("button", { name: "Bluebonnet Family Dentistry" }).click();
-const drawer = page.getByRole("dialog");
-await drawer.getByRole("button", { name: /^Research$/ }).click();
-await drawer.getByText("Observed facts").waitFor({ timeout: 10000 });
-await drawer.getByRole("button", { name: /asks visitors to call to schedule/ }).click();
-await drawer.getByText("Collected", { exact: false }).first().waitFor();
-ok("brief generated and evidence inspected");
-await page.screenshot({ path: `${OUT}/demo-lead-brief-1440.png` });
+// The hero preview plays on its own.
+await page.getByRole("list", { name: "Demo steps" }).scrollIntoViewIfNeeded(); // it pauses while off-screen
+await page.getByText(/^Dentists in/).first().waitFor({ timeout: 15000 });
+ok("hero preview types its search");
 
-await drawer.getByRole("tab", { name: "Draft" }).click();
-await drawer.getByRole("button", { name: /Generate draft/ }).click();
-const body = drawer.getByLabel("Body");
-await body.waitFor();
-await body.fill((await body.inputValue()).replace("Would a 15-minute call", "Would a short call"));
-await drawer.getByRole("button", { name: "Save changes" }).click();
-await drawer.getByText("v2 · edited by you").waitFor();
-ok("draft generated and edited (v2)");
-
-await drawer.getByRole("tab", { name: "Details" }).click();
-await drawer.getByRole("button", { name: /Verify · 1 unit/ }).click();
-await drawer.getByText("Valid", { exact: true }).waitFor({ timeout: 10000 });
-ok("email verified (simulated)");
-
-await drawer.getByRole("button", { name: "Add to campaign" }).first().click();
-const addDialog = page.getByRole("dialog", { name: /Add 1 lead/ });
-await addDialog.getByLabel("Campaign name").fill("Smoke test · Austin dental");
-await addDialog.getByRole("button", { name: "Add to campaign" }).click();
-await page.waitForURL("**/demo/campaigns");
-await page.getByRole("heading", { name: "Smoke test · Austin dental" }).waitFor();
-ok("added to a draft campaign explicitly");
-
-await page.getByRole("button", { name: /Mailbox/ }).click();
-await page.getByLabel(/Demo mailbox/).check();
-await page.getByRole("button", { name: /Review & launch/ }).click();
-await page.getByRole("button", { name: /Approve revision/ }).click();
-await page.getByText(/Approved revision/).first().waitFor();
-await page.screenshot({ path: `${OUT}/demo-campaign-review-1440.png` });
-await page.getByRole("button", { name: "Simulate launch" }).click();
-await page.getByText("Simulated reply received").waitFor({ timeout: 15000 });
-ok("simulated launch produced a simulated reply");
-
-await page.getByRole("link", { name: /Inbox/ }).first().click();
-await page.waitForURL("**/demo/inbox");
-await page.getByRole("button", { name: /Bluebonnet Family Dentistry/ }).first().click();
-await page.getByText("Simulated reply", { exact: true }).first().waitFor();
-await page.getByRole("button", { name: /Suggest a reply/ }).click();
-await page.getByLabel("Your reply").waitFor();
-ok("reply opened; suggestion stays a draft");
-await page.screenshot({ path: `${OUT}/demo-inbox-1440.png` });
-
-await page.getByRole("link", { name: "Overview" }).first().click();
-await page.getByText("7/7").waitFor();
-ok("guided checklist complete (7/7)");
-
-// Dialog focus management: Escape closes the reset dialog.
-await page.getByRole("button", { name: "Reset demo" }).first().click();
-await page.getByRole("dialog", { name: "Reset the demo" }).waitFor();
-await page.keyboard.press("Escape");
-if ((await page.getByRole("dialog").count()) === 0) ok("Escape closes dialogs");
-else fail("dialog did not close on Escape");
-
-// Persistence across refresh.
-await page.reload({ waitUntil: "networkidle" });
-await page.getByText("7/7").waitFor();
-ok("demo state persists across refresh");
+// Old demo links land on the homepage.
+await page.goto(`${BASE}/demo/discover`, { waitUntil: "networkidle" });
+if (new URL(page.url()).pathname === "/") ok("/demo redirects to the homepage");
+else fail(`/demo went to ${page.url()}`);
 const storage = await ctx.storageState();
 
 /* ----------------------------------------------------- responsive pass */
 const pages = [
   ["home", "/"],
-  ["demo-overview", "/demo"],
-  ["demo-discover", "/demo/discover"],
-  ["demo-leads", "/demo/leads"],
-  ["demo-campaigns", "/demo/campaigns"],
-  ["demo-inbox", "/demo/inbox"],
-  ["demo-settings", "/demo/settings"],
-  ["demo-onboarding", "/demo/onboarding"],
   ["sign-in", "/sign-in"],
+  ["sign-up", "/sign-up"],
+  ["forgot-password", "/forgot-password"],
   ["legal-terms", "/legal/terms"],
   ["brand", "/brand"],
 ];
