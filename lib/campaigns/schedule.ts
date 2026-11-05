@@ -47,6 +47,8 @@ export function localParts(now: Date, timezone: string): { weekday: number; hour
 }
 
 export function inSendingWindow(now: Date, s: Schedule): boolean {
+  // A malformed schedule never sends.
+  if (!s || !Array.isArray(s.days) || !isValidTimezone(s.timezone ?? "")) return false;
   const { weekday, hour } = localParts(now, s.timezone);
   return s.days.includes(weekday) && hour >= s.startHour && hour < s.endHour;
 }

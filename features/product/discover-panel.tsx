@@ -3,7 +3,7 @@
 import * as React from "react";
 import { SectionCard } from "@/components/app/page-header";
 import { DiscoverForm } from "@/features/product/discover-form";
-import { GoogleCredit, GoogleResults, GoogleSearchForm } from "@/features/product/google-search";
+import { GoogleCredit, GoogleResults, GoogleSearchForm, type SearchPrefill } from "@/features/product/google-search";
 import type { GoogleSearchOutcome } from "@/server/services/discovery";
 import { cn } from "@/lib/utils";
 
@@ -13,10 +13,12 @@ export function DiscoverPanel({
   available,
   google,
   recent,
+  prefill,
 }: {
   available: number;
   google: { configured: boolean; remainingToday?: number | null };
   recent: React.ReactNode;
+  prefill?: SearchPrefill;
 }) {
   const [source, setSource] = React.useState<"google" | "osm">(google.configured ? "google" : "osm");
   const [result, setResult] = React.useState<Done | null>(null);
@@ -51,7 +53,7 @@ export function DiscoverPanel({
           }
         >
           {source === "google" ? (
-            <GoogleSearchForm available={available} remainingToday={google.remainingToday ?? null} onResult={setResult} />
+            <GoogleSearchForm available={available} remainingToday={google.remainingToday ?? null} onResult={setResult} prefill={prefill} />
           ) : (
             <DiscoverForm available={available} />
           )}

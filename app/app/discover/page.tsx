@@ -40,6 +40,11 @@ async function Discover({ searchParams }: { searchParams: PageProps<"/app/discov
       <DiscoverPanel
         available={available}
         google={google}
+        prefill={{
+          niche: typeof sp.niche === "string" ? sp.niche.slice(0, 40) : undefined,
+          place: typeof sp.place === "string" ? sp.place.slice(0, 100) : undefined,
+          runId: typeof sp.run === "string" && /^[0-9a-z]{1,20}$/i.test(sp.run) ? sp.run : undefined,
+        }}
         recent={
         <SectionCard title="Recent searches" bodyClassName="p-0">
           {recent.length ? (

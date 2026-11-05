@@ -29,7 +29,24 @@ export function GoogleCredit() {
   );
 }
 
-export function GoogleSearchForm({ available, remainingToday, onResult }: { available: number; remainingToday: number | null; onResult: (r: Done | null) => void }) {
+export type SearchPrefill = { niche?: string; place?: string; runId?: string };
+
+export function GoogleSearchForm({ available, remainingToday, onResult, prefill }: { available: number; remainingToday: number | null; onResult: (r: Done | null) => void; prefill?: SearchPrefill }) {
+  const formRef = React.useRef<HTMLFormElement>(null);
+  const ran = React.useRef(false);
+  React.useEffect(() => {
+    // Search started from the dashboard: run it once per run id (remembered in this tab, so a reload doesn't spend another Google request).
+    const id = prefill?.runId;
+    if (!id || !prefill?.place || ran.current) return;
+    ran.current = true;
+    try {
+      if (sessionStorage.getItem("locentio.lastRun") === id) return;
+      sessionStorage.setItem("locentio.lastRun", id);
+    } catch {
+      // storage blocked: still run once for this page view
+    }
+    formRef.current?.requestSubmit();
+  }, [prefill?.runId, prefill?.place]);
   const router = useRouter();
   const [pending, start] = React.useTransition();
   const [error, setError] = React.useState<string | null>(null);
@@ -41,6 +58,7 @@ export function GoogleSearchForm({ available, remainingToday, onResult }: { avai
 
   return (
     <form
+      ref={formRef}
       className="space-y-5"
       noValidate
       onSubmit={(e) => {
@@ -64,7 +82,7 @@ export function GoogleSearchForm({ available, remainingToday, onResult }: { avai
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label htmlFor="g-niche">Business type</Label>
-          <Select id="g-niche" name="niche" defaultValue="dental">
+          <Select id="g-niche" name="niche" defaultValue={prefill?.niche ?? "dental"}>
             {discoveryNiches.map((n) => (
               <option key={n.id} value={n.id}>
                 {n.label}
@@ -74,7 +92,7 @@ export function GoogleSearchForm({ available, remainingToday, onResult }: { avai
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="g-place">City or area</Label>
-          <Input id="g-place" name="place" placeholder="e.g. Austin, TX" autoComplete="off" aria-invalid={!!fieldErrors.place} required />
+          <Input id="g-place" name="place" defaultValue={prefill?.place} placeholder="e.g. Austin, TX" autoComplete="off" aria-invalid={!!fieldErrors.place} required />
           {fieldErrors.place ? <FieldError>{fieldErrors.place}</FieldError> : <FieldHint>Searched like you would on Google Maps: “dentists in Austin, TX”.</FieldHint>}
         </div>
         <div className="space-y-1.5">
