@@ -10,7 +10,7 @@ import { featured } from "./sample-data";
  * pieces' look rather than a video: a Google Maps search types itself,
  * results stream in, a lead is researched, the email writes itself, and a
  * campaign launches. All businesses and numbers are fictional sample data.
- * Pauses on hover and when off-screen; reduced-motion visitors get the
+ * Pauses when off-screen; reduced-motion visitors get the
  * finished state without animation.
  */
 
@@ -44,7 +44,6 @@ export function LiveDemo() {
   const [factsShown, setFactsShown] = React.useState(0);
   const [draftChars, setDraftChars] = React.useState(0);
   const [stat, setStat] = React.useState(0); // 0..1 progress of the count-up
-  const [paused, setPaused] = React.useState(false);
   const [visible, setVisible] = React.useState(false);
   const [reduced, setReduced] = React.useState(false);
 
@@ -61,7 +60,7 @@ export function LiveDemo() {
     };
   }, []);
 
-  const running = visible && !paused && !reduced;
+  const running = visible && !reduced;
 
   // One timer per tick; each phase advances its own counter, then hands over.
   React.useEffect(() => {
@@ -70,30 +69,30 @@ export function LiveDemo() {
     const next = (ms: number, fn: () => void) => (t = window.setTimeout(fn, ms));
     switch (phase) {
       case "typing":
-        if (typed < QUERY.length) next(typed === 0 ? 700 : 55 + Math.random() * 45, () => setTyped((n) => n + 1));
-        else next(450, () => setPhase("searching"));
+        if (typed < QUERY.length) next(typed === 0 ? 350 : 32 + Math.random() * 22, () => setTyped((n) => n + 1));
+        else next(250, () => setPhase("searching"));
         break;
       case "searching":
-        next(1300, () => setPhase("results"));
+        next(650, () => setPhase("results"));
         break;
       case "results":
-        if (shown < rows.length) next(230, () => setShown((n) => n + 1));
-        else next(900, () => setPhase("brief"));
+        if (shown < rows.length) next(130, () => setShown((n) => n + 1));
+        else next(550, () => setPhase("brief"));
         break;
       case "brief":
-        if (factsShown < facts.length) next(factsShown === 0 ? 500 : 650, () => setFactsShown((n) => n + 1));
-        else next(1600, () => setPhase("draft"));
+        if (factsShown < facts.length) next(factsShown === 0 ? 280 : 380, () => setFactsShown((n) => n + 1));
+        else next(950, () => setPhase("draft"));
         break;
       case "draft":
-        if (draftChars < draftText.length) next(14, () => setDraftChars((n) => Math.min(draftText.length, n + 3)));
-        else next(1600, () => setPhase("launch"));
+        if (draftChars < draftText.length) next(16, () => setDraftChars((n) => Math.min(draftText.length, n + 6)));
+        else next(1100, () => setPhase("launch"));
         break;
       case "launch":
-        if (stat < 1) next(40, () => setStat((s) => Math.min(1, s + 0.025)));
-        else next(3200, () => setPhase("done"));
+        if (stat < 1) next(16, () => setStat((s) => Math.min(1, s + 0.02)));
+        else next(2200, () => setPhase("done"));
         break;
       case "done":
-        next(300, () => {
+        next(200, () => {
           setTyped(0);
           setShown(0);
           setFactsShown(0);
@@ -124,7 +123,7 @@ export function LiveDemo() {
   const selected = v.phase !== "typing" && v.phase !== "searching" && v.phase !== "results";
 
   return (
-    <div ref={root} className="relative" onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
+    <div ref={root} className="relative">
       <div aria-hidden className="demo-glow pointer-events-none absolute -inset-px rounded-[20px]" />
       <div className="relative overflow-hidden rounded-[20px] border border-white/10 bg-[#0e171f] shadow-dark">
         {/* Window bar */}
@@ -160,7 +159,7 @@ export function LiveDemo() {
           <div className="border-b border-white/[0.07] p-4 sm:p-5 lg:border-b-0 lg:border-r">
             <div className="flex items-center gap-2.5 rounded-xl border border-white/12 bg-white/[0.04] px-3.5 py-2.5">
               <Search aria-hidden className="size-4 shrink-0 text-mint" />
-              <span className="min-w-0 flex-1 truncate text-[14.5px] text-white">
+              <span data-demo-query className="min-w-0 flex-1 truncate text-[14.5px] text-white">
                 {QUERY.slice(0, v.typed)}
                 {v.phase === "typing" ? <span aria-hidden className="demo-caret ml-px inline-block h-[1.05em] w-[2px] translate-y-[2px] bg-mint" /> : null}
                 {v.typed === 0 ? <span className="text-white/35">Describe who you want to reach</span> : null}

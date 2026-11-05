@@ -1,6 +1,7 @@
 import { Hero } from "@/components/marketing/hero";
 import { ProofBand } from "@/components/marketing/proof-band";
 import { AiSection } from "@/components/marketing/ai-section";
+import { ReplyFlow } from "@/components/marketing/reply-flow";
 import { AudienceStrip, Workflow } from "@/components/marketing/audience-workflow";
 import { ProductTour } from "@/components/marketing/product-tour";
 import { Signature } from "@/components/marketing/signature";
@@ -18,6 +19,7 @@ export default function HomePage() {
       <Workflow />
       <AiSection />
       <ProductTour />
+      <ReplyFlow />
       <Signature />
       <Capabilities />
       <UseCases />

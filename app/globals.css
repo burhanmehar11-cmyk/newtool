@@ -434,3 +434,43 @@ html[data-theme="dark"] ::selection {
   --chart-1: #0f8a5f;
   --chart-2: #2f6fd6;
 }
+
+/* Reply flow diagram: pulse around the centre node. Dots and pulse are off for reduced motion. */
+.flow-pulse {
+  animation: flow-pulse 2.4s ease-out infinite;
+}
+@keyframes flow-pulse {
+  from {
+    opacity: 0.8;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.35);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .flow-dot {
+    display: none;
+  }
+  .flow-pulse {
+    animation: none;
+    opacity: 0;
+  }
+}
+
+/* Sample campaign chart: the line draws in and the fill fades in when the card is revealed. */
+.draw-line {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+  transition: stroke-dashoffset 1.6s var(--ease-out-soft) 0.3s;
+}
+.draw-fade {
+  transition: opacity 0.6s ease-out 1.4s;
+}
+.fx [data-reveal]:not([data-shown]) .draw-line {
+  stroke-dashoffset: 1;
+}
+.fx [data-reveal]:not([data-shown]) .draw-fade {
+  opacity: 0;
+}

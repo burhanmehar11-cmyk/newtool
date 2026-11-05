@@ -86,9 +86,8 @@ if (ctas.length && ctas.every((h) => h === "/sign-up")) ok(`"Get started" button
 else fail(`unexpected Get started links: ${ctas.join(", ")}`);
 
 // The hero preview plays on its own.
-await page.getByRole("list", { name: "Demo steps" }).scrollIntoViewIfNeeded(); // it pauses while off-screen…
-await page.mouse.move(2, 2); // …and while hovered
-await page.getByText(/^Dentists in/).first().waitFor({ timeout: 20000 });
+await page.getByRole("list", { name: "Demo steps" }).scrollIntoViewIfNeeded(); // it pauses while off-screen
+await page.locator("[data-demo-query]", { hasText: /^Dentists in/ }).first().waitFor({ timeout: 15000 });
 ok("hero preview types its search");
 
 // Old demo links land on the homepage.
