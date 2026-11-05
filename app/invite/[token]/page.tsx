@@ -55,7 +55,7 @@ async function Body({ params }: Pick<PageProps<"/invite/[token]">, "params">) {
       </span>
       <h1 className="mt-4 font-display text-xl font-semibold text-ink">Join {invite.workspaceName}</h1>
       <p className="mt-2 text-sm text-slate">
-        You&apos;re invited as {invite.role === "admin" ? "an admin" : "a member"}. The invite is for <span className="font-medium text-ink">{invite.email}</span>.
+        You&apos;re invited as {invite.role === "admin" ? "an admin" : invite.role === "viewer" ? "a viewer (read-only)" : "a member"}. The invite is for <span className="font-medium text-ink">{invite.email}</span>.
       </p>
       {!user ? (
         <div className="mt-6 flex flex-col gap-2">

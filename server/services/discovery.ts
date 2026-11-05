@@ -2,7 +2,7 @@ import "server-only";
 import { emitLeadsCreated } from "@/server/services/webhooks";
 import { z } from "zod";
 import { discoveryNiches, nicheLabel } from "@/lib/discovery/niches";
-import { requireWorkspace, type WorkspaceRef } from "@/server/auth";
+import { requireWorkspace, type WorkspaceRef, isViewer, VIEW_ONLY } from "@/server/auth";
 import { withUser } from "@/server/db";
 import type { Q } from "@/server/auth-store";
 import { geocode, searchBusinesses } from "@/server/providers/osm";
@@ -54,6 +54,7 @@ const asQ = <T,>(userId: string, fn: (q: Q) => Promise<T>) => withUser(userId, (
  */
 export async function runSearch(input: unknown): Promise<SearchOutcome> {
   const { user, workspace } = await requireWorkspace("/app/discover");
+  if (isViewer(workspace)) return { ok: false, error: VIEW_ONLY };
   const parsed = searchSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Check the highlighted fields.", fieldErrors: Object.fromEntries(parsed.error.issues.map((i) => [String(i.path[0]), i.message])) };
   const { country, state, ...rest } = parsed.data;
@@ -112,6 +113,7 @@ export async function getRecentSearches() {
 
 export async function saveSearchLeads(ids: unknown): Promise<{ ok: true; added: number } | { ok: false; error: string }> {
   const { user, workspace } = await requireWorkspace("/app/discover");
+  if (isViewer(workspace)) return { ok: false, error: VIEW_ONLY };
   const parsed = z.array(z.string().uuid()).min(1).max(100).safeParse(ids);
   if (!parsed.success) return { ok: false, error: "Select at least one business." };
   const since = new Date();
@@ -165,6 +167,7 @@ export async function runGoogleSearch(input: unknown): Promise<GoogleSearchOutco
 }
 
 export async function runGoogleSearchAs({ user, workspace }: Ctx, input: unknown): Promise<GoogleSearchOutcome> {
+  if (isViewer(workspace)) return { ok: false, error: VIEW_ONLY };
   const parsed = googleSearchSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Check the highlighted fields.", fieldErrors: Object.fromEntries(parsed.error.issues.map((i) => [String(i.path[0]), i.message])) };
   const d = parsed.data;
@@ -238,6 +241,7 @@ export async function saveGoogleSearchLeads(input: unknown): Promise<{ ok: true;
 }
 
 export async function saveGoogleSearchLeadsAs({ user, workspace }: Ctx, input: unknown): Promise<{ ok: true; added: number; skipped: number } | { ok: false; error: string }> {
+  if (isViewer(workspace)) return { ok: false, error: VIEW_ONLY };
   const parsed = googleSaveSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Select at least one business that has a website." };
   const niche = parsed.data.niche && discoveryNiches.some((n) => n.id === parsed.data.niche) ? parsed.data.niche : null;

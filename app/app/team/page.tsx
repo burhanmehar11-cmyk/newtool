@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { KeyRound, ShieldCheck, UserRound, UsersRound } from "lucide-react";
+import { Eye, KeyRound, ShieldCheck, UserRound, UsersRound } from "lucide-react";
 import { SectionCard } from "@/components/app/page-header";
 import { PageHero } from "@/components/app/page-hero";
 import { PageLoading } from "@/features/product/page-loading";
@@ -13,6 +13,7 @@ const roles = [
   { icon: ShieldCheck, title: "Owner", text: "Created the workspace. Everything an admin can do; can't be removed." },
   { icon: KeyRound, title: "Admin", text: "Invites and removes people, connects mailboxes, creates and approves campaigns." },
   { icon: UserRound, title: "Member", text: "Searches, saves and researches leads, writes drafts and works the Inbox." },
+  { icon: Eye, title: "Viewer", text: "Sees leads, campaigns, the Inbox and analytics, but can't change anything. Good for clients." },
 ];
 
 export default function TeamPage() {

@@ -6,7 +6,7 @@ import { businessEmails, extractPage, pickFollowUpPages } from "@/lib/research/e
 import { parseRobots, robotsAllows } from "@/lib/research/robots";
 import { researchBusiness } from "@/lib/research/brief";
 import type { OfferType } from "@/lib/domain/types";
-import { requireWorkspace } from "@/server/auth";
+import { requireWorkspace, isViewer, VIEW_ONLY } from "@/server/auth";
 import { withUser } from "@/server/db";
 import { configuredSiteUrl } from "@/server/env";
 import type { Q } from "@/server/auth-store";
@@ -45,6 +45,7 @@ export async function researchLead(leadId: string): Promise<ResearchResult> {
 }
 
 export async function researchLeadAs({ user, workspace }: { user: { id: string }; workspace: WorkspaceRef }, leadId: string): Promise<ResearchResult> {
+  if (isViewer(workspace)) return { ok: false, error: VIEW_ONLY };
   if (!uuid.safeParse(leadId).success) return { ok: false, error: "Lead not found." };
   const offer = await getOfferProfileFor(user.id, workspace.id);
   if (!offer) return { ok: false, error: "Add your offer profile in Settings first. Research is scored against what you sell." };
@@ -118,7 +119,8 @@ async function readWebsite(businessId: string, website: string | null, domain: s
 
 /** Free DNS-based check. Can mark an address invalid; otherwise "unknown", never "valid". */
 export async function checkContactEmail(contactId: string): Promise<{ ok: true; status: string; detail: string } | { ok: false; error: string }> {
-  const { user } = await requireWorkspace("/app/leads");
+  const { user, workspace } = await requireWorkspace("/app/leads");
+  if (isViewer(workspace)) return { ok: false, error: VIEW_ONLY };
   if (!uuid.safeParse(contactId).success) return { ok: false, error: "Contact not found." };
   const contact = await asQ(user.id, (q) => contactById(q, contactId));
   if (!contact) return { ok: false, error: "Contact not found." };
@@ -129,8 +131,8 @@ export async function checkContactEmail(contactId: string): Promise<{ ok: true; 
 }
 
 export async function updateLeadNotes(leadId: string, notes: string) {
-  const { user } = await requireWorkspace("/app/leads");
-  if (!uuid.safeParse(leadId).success) return false;
+  const { user, workspace } = await requireWorkspace("/app/leads");
+  if (isViewer(workspace) || !uuid.safeParse(leadId).success) return false;
   return asQ(user.id, (q) => saveNotes(q, leadId, String(notes ?? "")));
 }
 

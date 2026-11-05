@@ -16,7 +16,7 @@ const TOKEN_RE = /^[A-Za-z0-9_-]{43}$/;
 
 const MESSAGES: Record<string, string> = {
   forbidden: "Only the owner or an admin can do that.",
-  bad_role: "Choose Admin or Member.",
+  bad_role: "Choose Admin, Member or Viewer.",
   bad_email: "Enter a valid email address.",
   already_member: "That person is already in this workspace.",
   too_many: "There are 50 open invites. Revoke some first.",
@@ -36,7 +36,7 @@ export async function getTeam() {
   return { me: user.id, workspace, canManage, members, invites, emailOn: emailConfigured() };
 }
 
-const inviteInput = z.object({ email: z.string().trim().toLowerCase().email("Enter a valid email address.").max(254), role: z.enum(["admin", "member"]) });
+const inviteInput = z.object({ email: z.string().trim().toLowerCase().email("Enter a valid email address.").max(254), role: z.enum(["admin", "member", "viewer"]) });
 
 /** Creates an invite link (valid 7 days). Emails it when SMTP is set up; the link is always returned to copy. */
 export async function inviteToTeam(input: unknown): Promise<Result<{ link: string; emailed: boolean }>> {
@@ -56,7 +56,7 @@ export async function inviteToTeam(input: unknown): Promise<Result<{ link: strin
       await sendEmail(
         p.data.email,
         `Join ${workspace.name} on ${brand.name}`,
-        `${user.email ?? "A teammate"} invited you to join "${workspace.name}" on ${brand.name} as ${p.data.role === "admin" ? "an admin" : "a member"}.\n\nAccept the invite (valid for 7 days):\n${link}\n\nSign in with this email address (${p.data.email}). If you weren't expecting this, you can ignore it.`,
+        `${user.email ?? "A teammate"} invited you to join "${workspace.name}" on ${brand.name} as ${p.data.role === "admin" ? "an admin" : p.data.role === "viewer" ? "a viewer (read-only)" : "a member"}.\n\nAccept the invite (valid for 7 days):\n${link}\n\nSign in with this email address (${p.data.email}). If you weren't expecting this, you can ignore it.`,
       );
       emailed = true;
     } catch {
@@ -74,8 +74,8 @@ export async function revokeTeamInvite(id: string): Promise<Result> {
 
 export async function changeMemberRole(userId: string, role: unknown): Promise<Result> {
   const { user, workspace } = await requireWorkspace("/app/team");
-  const r = z.enum(["admin", "member"]).safeParse(role);
-  if (!r.success || !z.string().uuid().safeParse(userId).success) return { ok: false, error: "Choose Admin or Member." };
+  const r = z.enum(["admin", "member", "viewer"]).safeParse(role);
+  if (!r.success || !z.string().uuid().safeParse(userId).success) return { ok: false, error: "Choose Admin, Member or Viewer." };
   try {
     return (await asQ(user.id, (q) => setMemberRole(q, workspace.id, userId, r.data))) ? { ok: true, value: undefined } : { ok: false, error: "The owner's role can't be changed." };
   } catch (e) {

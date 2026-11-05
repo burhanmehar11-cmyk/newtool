@@ -47,7 +47,7 @@ Build order: auth and workspaces → one real search-to-saved-lead flow → enri
 - Google app verification: Search Console ownership (`GOOGLE_SITE_VERIFICATION`), then submit without `gmail.readonly` (that scope needs a CASA assessment).
 - Rotate the Places API key that was pasted in chat during development.
 
-## M3: teams, more automation, paid launch (in progress)
+## M3: teams, more automation, paid launch (built except billing)
 
 | Item | Status | Notes |
 | --- | --- | --- |
@@ -57,5 +57,5 @@ Build order: auth and workspaces → one real search-to-saved-lead flow → enri
 | Admin panel (`/admin`) | **Built, tested against Postgres and in the browser** | Platform owners only (`ADMIN_EMAILS`; everyone else gets a 404). Tabs: overview, sign-up funnel and sources (first-party, see privacy policy), people, workspaces and plans (set by hand, audited), product usage, emails, shared APIs (Google Maps quota, built-in AI, agent tokens), revenue (none until billing exists, shown as such), admins and audit log. Migration `0011_admin.sql`. |
 | Public API and webhooks | **Built, tested against Postgres and over HTTP** | REST API at `/api/v1` (workspace, search, leads, research, drafts, campaigns, replies) using the same personal tokens and rules as MCP; JSON errors. Signed webhooks (`lead.created`, `email.sent`, `reply.received`, `campaign.completed`): HMAC-SHA256 `Locenti-Signature`, https-only public URLs with the SSRF-safe client, retries 1 min → 6 h, endpoints switched off after 30 straight failures, test button, delivery log. Migration `0012_webhooks.sql`. Real endpoint delivery not run from this sandbox (outbound network blocked). |
 | Real-Postgres CI job | Not started | Runs the database tests on a Postgres service container to cover real lock contention. |
-| Viewer role | Not started | Read-only access needs write restrictions in every table's policies. |
+| Viewer role | **Built, tested against Postgres** | Invite or switch someone to Viewer: they see everything in the workspace but change nothing. Enforced by row-level security (every workspace table's policy split into read for all members, write for owners, admins and members; migration `0013_viewer.sql`) and in the app, which shows "view-only" instead of failing. |
 | Billing | Waiting on the owner | Needs owner-approved prices, trial policy, limits and a billing provider before payments are enabled. Nothing paid is set up. |

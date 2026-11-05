@@ -71,3 +71,7 @@ export async function requireWorkspace(next = "/app") {
   if (!workspace) redirect("/app/onboarding");
   return { user, workspace };
 }
+
+/** Viewers can see everything in a workspace but change nothing (enforced again by row-level security). */
+export const VIEW_ONLY = "You have view-only access to this workspace. Ask an owner or admin for edit access.";
+export const isViewer = (w: { role: string }) => w.role === "viewer";

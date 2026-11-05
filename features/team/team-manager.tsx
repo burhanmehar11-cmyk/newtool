@@ -11,7 +11,7 @@ import { changeRoleAction, inviteAction, removeMemberAction, revokeInviteAction 
 import type { InviteRow, MemberRow } from "@/server/team-store";
 import { formatDate } from "@/lib/utils";
 
-const roleTone = { owner: "green", admin: "info", member: "outline" } as const;
+const roleTone = { owner: "green", admin: "info", member: "outline", viewer: "neutral" } as const;
 const roleLabel = (r: string) => r.charAt(0).toUpperCase() + r.slice(1);
 
 function CopyLink({ link }: { link: string }) {
@@ -39,7 +39,7 @@ function CopyLink({ link }: { link: string }) {
 export function InviteForm({ emailOn }: { emailOn: boolean }) {
   const router = useRouter();
   const [email, setEmail] = React.useState("");
-  const [role, setRole] = React.useState<"member" | "admin">("member");
+  const [role, setRole] = React.useState<"member" | "admin" | "viewer">("member");
   const [error, setError] = React.useState<string | null>(null);
   const [made, setMade] = React.useState<{ email: string; link: string; emailed: boolean } | null>(null);
   const [pending, start] = React.useTransition();
@@ -66,9 +66,10 @@ export function InviteForm({ emailOn }: { emailOn: boolean }) {
         </div>
         <div>
           <Label htmlFor="invite-role">Role</Label>
-          <Select id="invite-role" value={role} onChange={(e) => setRole(e.target.value as "member" | "admin")}>
+          <Select id="invite-role" value={role} onChange={(e) => setRole(e.target.value as "member" | "admin" | "viewer")}>
             <option value="member">Member</option>
             <option value="admin">Admin</option>
+            <option value="viewer">Viewer (read-only)</option>
           </Select>
         </div>
         <Button type="submit" disabled={pending || !email}>
@@ -133,6 +134,7 @@ export function MemberList({ members, me, canManage }: { members: MemberRow[]; m
                 >
                   <option value="member">Member</option>
                   <option value="admin">Admin</option>
+                  <option value="viewer">Viewer</option>
                 </Select>
               ) : (
                 <Badge tone={roleTone[m.role as keyof typeof roleTone] ?? "outline"}>{roleLabel(m.role)}</Badge>

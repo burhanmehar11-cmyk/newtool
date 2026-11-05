@@ -42,7 +42,7 @@ export function PendingInvites({ invites }: { invites: MyInvite[] }) {
           <li key={i.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
             <span>
               <span className="block text-sm font-medium text-ink">{i.workspace_name}</span>
-              <span className="block text-xs text-slate">as {i.role === "admin" ? "an admin" : "a member"}</span>
+              <span className="block text-xs text-slate">as {i.role === "admin" ? "an admin" : i.role === "viewer" ? "a viewer (read-only)" : "a member"}</span>
             </span>
             <Button
               size="sm"

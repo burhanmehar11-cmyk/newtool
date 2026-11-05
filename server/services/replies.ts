@@ -6,7 +6,7 @@ import { z } from "zod";
 import { hasReadScope } from "@/lib/gmail/oauth";
 import { classifyReply, type ReplyKind } from "@/lib/replies/classify";
 import { parseMessage } from "@/lib/replies/gmail-thread";
-import { requireWorkspace } from "@/server/auth";
+import { requireWorkspace, isViewer, VIEW_ONLY } from "@/server/auth";
 import type { Q } from "@/server/auth-store";
 import { addSuppression } from "@/server/campaign-store";
 import { withService, withUser } from "@/server/db";
@@ -129,7 +129,8 @@ export async function getThreadDetail(id: string) {
 const kinds = z.enum(["interested", "not_interested", "out_of_office", "bounce", "unclassified"]);
 
 export async function labelThread(id: string, kind: string): Promise<{ ok: true } | { ok: false; error: string }> {
-  const { user } = await requireWorkspace("/app/inbox");
+  const { user, workspace } = await requireWorkspace("/app/inbox");
+  if (isViewer(workspace)) return { ok: false, error: VIEW_ONLY };
   const k = kinds.safeParse(kind);
   if (!z.string().uuid().safeParse(id).success || !k.success) return { ok: false, error: "Not found." };
   await asQ(user.id, (q) => setThreadState(q, id, { classification: k.data }));
@@ -137,7 +138,7 @@ export async function labelThread(id: string, kind: string): Promise<{ ok: true 
 }
 
 export async function markThreadRead(id: string) {
-  const { user } = await requireWorkspace("/app/inbox");
-  if (!z.string().uuid().safeParse(id).success) return;
+  const { user, workspace } = await requireWorkspace("/app/inbox");
+  if (isViewer(workspace) || !z.string().uuid().safeParse(id).success) return;
   await asQ(user.id, (q) => setThreadState(q, id, { unread: false }));
 }

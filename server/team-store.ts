@@ -6,7 +6,7 @@ import type { Q } from "@/server/auth-store";
  */
 
 export type MemberRow = { user_id: string; email: string; full_name: string | null; role: string; joined_at: string };
-export type InviteRow = { id: string; email: string; role: "admin" | "member"; created_at: string; expires_at: string };
+export type InviteRow = { id: string; email: string; role: "admin" | "member" | "viewer"; created_at: string; expires_at: string };
 export type InvitePreview = { workspaceName: string; email: string; role: string; status: "pending" | "expired" | "used" | "revoked" };
 
 export async function listMembers(q: Q, ws: string): Promise<MemberRow[]> {

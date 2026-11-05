@@ -113,6 +113,6 @@ Order: hero with self-playing product preview (`live-demo.tsx`, ~13 s loop, paus
 ## Next actions
 
 1. **Owner live checks** (listed at the end of the M2 section in `docs/MILESTONES.md`): a small real campaign, reply tracking, optional Gemini key, Google app verification, rotating the Places key.
-2. **M3** (see `docs/MILESTONES.md`): team invites, follow-ups, admin panel, public API and webhooks are built (owner runs migrations up to `0012_webhooks.sql`); left: viewer role, optional real-Postgres CI, real-Postgres CI job; billing only after the owner approves prices and a provider.
+2. **M3** (see `docs/MILESTONES.md`): team invites, follow-ups, admin panel, public API and webhooks are built (owner runs migrations up to `0012_webhooks.sql`); plus the viewer role (owner runs migrations up to `0013_viewer.sql`); left: billing (owner decisions), optional real-Postgres CI, real-Postgres CI job; billing only after the owner approves prices and a provider.
 3. Decide when to open sign-up (`BETA_ALLOWED_EMAILS` keeps it invite-only; the Google Maps and Gemini allowances are shared).
 4. Remove the old demo code under `demo/` and the `features/*-view.tsx` demo views once nothing links to them (the marketing page still uses `demo/fixtures` for its fictional sample data).

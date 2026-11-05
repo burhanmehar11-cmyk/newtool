@@ -20,6 +20,7 @@ const MARKERS: { file: string; sql: string }[] = [
   { file: "0010_followups.sql", sql: "select 1 from information_schema.columns where table_schema = 'public' and table_name = 'dispatches' and column_name = 'rfc_message_id'" },
   { file: "0011_admin.sql", sql: "select 1 from information_schema.tables where table_schema = 'app' and table_name = 'site_visits'" },
   { file: "0012_webhooks.sql", sql: "select 1 from information_schema.tables where table_schema = 'public' and table_name = 'webhook_endpoints'" },
+  { file: "0013_viewer.sql", sql: "select 1 from pg_policies where schemaname = 'public' and policyname = 'leads_member_read'" },
 ];
 
 export const LATEST_MIGRATION = MARKERS.at(-1)!.file;
