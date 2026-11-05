@@ -139,7 +139,7 @@ export function ProofBand() {
                 {tiles.map((t) => {
                   const Icon = t.icon;
                   return (
-                    <div key={t.label} className="rounded-2xl border border-line bg-canvas/70 p-3.5">
+                    <div key={t.label} data-count-group className="cursor-default rounded-2xl border border-line bg-canvas/70 p-3.5 transition-[transform,box-shadow,border-color] duration-300 hover:-translate-y-0.5 hover:border-green/40 hover:shadow-[var(--shadow-card)]">
                       <dt className="flex items-center gap-1.5 text-xs font-medium text-slate">
                         <Icon aria-hidden className="size-3.5 text-green" />
                         {t.label}
@@ -163,7 +163,7 @@ export function ProofBand() {
                 </div>
               </div>
 
-              <dl className="mt-4 grid grid-cols-3 divide-x divide-line rounded-2xl border border-line">
+              <dl className="mt-4 grid grid-cols-3 divide-x divide-line overflow-hidden rounded-2xl border border-line">
                 {[
                   { icon: TrendingUp, label: "Reply rate", node: <><CountUp to={REPLY_RATE} decimals={1} />%</> },
                   { icon: Sparkles, label: "Interested", node: <CountUp to={INTERESTED} /> },
@@ -171,7 +171,7 @@ export function ProofBand() {
                 ].map((m) => {
                   const Icon = m.icon;
                   return (
-                    <div key={m.label} className="px-3 py-3 sm:px-4">
+                    <div key={m.label} data-count-group className="cursor-default px-3 py-3 transition-colors duration-300 hover:bg-mint-soft/50 sm:px-4">
                       <dt className="flex items-center gap-1.5 text-[11px] font-medium text-slate sm:text-xs">
                         <Icon aria-hidden className="size-3.5 shrink-0 text-green max-sm:hidden" />
                         <span className="leading-4">{m.label}</span>
