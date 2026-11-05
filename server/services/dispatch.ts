@@ -12,6 +12,7 @@ import { sendRaw } from "@/server/gmail/google";
 import { accessTokenFor } from "@/server/services/mailboxes";
 import { claimDispatch, completeFinished, isSuppressedEmail, mailboxUsage, nextDue, pauseCampaign, recordAccepted, recordFailure, runningCampaigns } from "@/server/dispatch-store";
 import { markMailbox } from "@/server/mailbox-store";
+import { emitWebhook } from "@/server/services/webhooks";
 
 const svc = <T,>(fn: (q: Q) => Promise<T>) => withService((q) => fn(q as unknown as Q));
 
@@ -26,6 +27,14 @@ export type DispatchSummary = { sent: number; skipped: string[]; failed: number 
  * per pass, only inside each campaign's sending window, within the mailbox's
  * daily limit, at least MIN_GAP_MS apart, and never to a suppressed address.
  */
+/** Completes a campaign with nothing left to send, and tells webhooks once. */
+async function finish(c: { id: string; workspace_id: string }) {
+  if (await svc((q) => completeFinished(q, c.id))) {
+    const name = (await svc((q) => q.query<{ name: string }>("select name from public.campaigns where id = $1", [c.id]))).rows[0]?.name ?? "";
+    await emitWebhook(c.workspace_id, "campaign.completed", c.id, { campaign_id: c.id, name, url: `${configuredSiteUrl() ?? brand.siteUrl}/app/campaigns/${c.id}` });
+  }
+}
+
 export async function runDispatch(opts: { workspaceId?: string | null; now?: Date; ignoreGap?: boolean } = {}): Promise<DispatchSummary> {
   const now = opts.now ?? new Date();
   const secret = sessionSecret();
@@ -59,7 +68,7 @@ export async function runDispatch(opts: { workspaceId?: string | null; now?: Dat
 
     const due = await svc((q) => nextDue(q, c.id));
     if (!due) {
-      await svc((q) => completeFinished(q, c.id));
+      await finish(c);
       continue;
     }
     const dispatchId = await svc((q) => claimDispatch(q, c.workspace_id, c.id, due.id, c.account_id, due.step));
@@ -113,7 +122,8 @@ export async function runDispatch(opts: { workspaceId?: string | null; now?: Dat
         recordAccepted(q, { ws: c.workspace_id, dispatchId, enrollmentId: due.id, leadId: due.lead_id, campaignId: c.id, accountId: c.account_id, messageId: sent.id, threadId: sent.threadId, from: c.account_email, to: due.email, subject, body, step: due.step, rfcMessageId }),
       );
       summary.sent++;
-      await svc((q) => completeFinished(q, c.id));
+      await emitWebhook(c.workspace_id, "email.sent", dispatchId, { campaign_id: c.id, lead_id: due.lead_id, to: due.email, subject, step: due.step, follow_up: isFollowUp, sent_at: new Date().toISOString() });
+      await finish(c);
     } else if (sent.code === "network") {
       await svc((q) => recordFailure(q, dispatchId, due.id, "ambiguous", sent.message, due.step));
       summary.failed++;

@@ -69,7 +69,7 @@ Before launch: a dedicated least-privilege database role for the app; real-Postg
 
 ## MCP for your own AI agent (M2 step 4 / M3)
 
-- `lib/mcp/protocol.ts` (JSON-RPC core), `server/mcp/tools.ts` (10 tools), `app/api/mcp/route.ts`, tokens in `server/token-store.ts` / `server/services/tokens.ts`, UI `features/settings/agents-card.tsx` (Settings → AI agents), migration `0007_agents.sql`. Services gained "as user" variants (`runGoogleSearchAs`, `saveGoogleSearchLeadsAs`, `researchLeadAs`, `getOfferProfileFor`).
+- `lib/mcp/protocol.ts` (JSON-RPC core), `server/mcp/tools.ts` (11 tools, incl. `list_replies`), `app/api/mcp/route.ts`, tokens in `server/token-store.ts` / `server/services/tokens.ts`, UI `features/settings/agents-card.tsx` (Settings → AI agents), migration `0007_agents.sql`. Services gained "as user" variants (`runGoogleSearchAs`, `saveGoogleSearchLeadsAs`, `researchLeadAs`, `getOfferProfileFor`).
 - Verified with the official MCP SDK client against the running app (401 without token, all tools, live Google search, draft + campaign creation, errors).
 
 ## Built-in AI writer (Gemini)
@@ -96,6 +96,11 @@ Before launch: a dedicated least-privilege database role for the app; real-Postg
 - `/admin` (`app/admin/page.tsx`, tabs in `features/admin/sections.tsx`), gated by `requireAdmin()` in `server/services/admin.ts` (`ADMIN_EMAILS`, exact emails; others get `notFound()`). Queries in `server/admin-store.ts` on the service connection; plan changes via `setPlanAction` write `app.admin_audit`.
 - Sign-up sources: `components/attribution-capture.tsx` (session storage + anonymous `/api/visit` beacon), `lib/attribution.ts`, `server/attribution-store.ts`; saved at Google sign-up (short-lived cookie through the OAuth step) and password sign-up (hidden field). Migration `0011_admin.sql` (plans on `workspaces`, members can only update `name`; `app.signup_attribution`, `app.site_visits`, `app.admin_audit`). Tests `tests/attribution.test.ts`, `tests/db/admin.test.ts`.
 
+## Public API and webhooks (M3)
+
+- REST: `app/api/v1/[...path]/route.ts` maps routes onto the MCP tool handlers (one implementation, same validation and RLS). Docs on the Agent page (`features/agent/developers.tsx`).
+- Webhooks: `lib/webhooks.ts` (events, signing, retry timing, URL rules), `server/webhook-store.ts` (endpoints, queue with per-event dedupe, claim/mark), `server/services/webhooks.ts` (`emitWebhook`, `emitLeadsCreated`, `deliverDueWebhooks`, management), `safePost` in `server/research/fetch.ts`. Emitted from lead saves, the sending pass (`email.sent`, `campaign.completed`) and reply sync; delivered by the open-tab tick and the cron route. Secrets encrypted with the mailbox-token key. Migration `0012_webhooks.sql`. Tests `tests/webhooks.test.ts`, `tests/db/webhooks.test.ts`.
+
 ## Dashboard, Analytics, migration banner
 
 - `server/analytics-store.ts` + `server/services/analytics.ts`; UI `features/analytics/` (KPI tiles, trend chart, pipeline, campaign table, breakdowns, activity); pages `app/app/page.tsx` (Dashboard) and `app/app/analytics`.
@@ -108,6 +113,6 @@ Order: hero with self-playing product preview (`live-demo.tsx`, ~13 s loop, paus
 ## Next actions
 
 1. **Owner live checks** (listed at the end of the M2 section in `docs/MILESTONES.md`): a small real campaign, reply tracking, optional Gemini key, Google app verification, rotating the Places key.
-2. **M3** (see `docs/MILESTONES.md`): team invites and follow-up emails are built (owner runs `0009_team.sql` and `0010_followups.sql`); next public API and webhooks, real-Postgres CI job; billing only after the owner approves prices and a provider.
+2. **M3** (see `docs/MILESTONES.md`): team invites, follow-ups, admin panel, public API and webhooks are built (owner runs migrations up to `0012_webhooks.sql`); left: viewer role, optional real-Postgres CI, real-Postgres CI job; billing only after the owner approves prices and a provider.
 3. Decide when to open sign-up (`BETA_ALLOWED_EMAILS` keeps it invite-only; the Google Maps and Gemini allowances are shared).
 4. Remove the old demo code under `demo/` and the `features/*-view.tsx` demo views once nothing links to them (the marketing page still uses `demo/fixtures` for its fictional sample data).

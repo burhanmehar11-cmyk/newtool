@@ -156,11 +156,12 @@ export async function pauseCampaign(q: Q, campaignId: string) {
 }
 
 /** Marks running campaigns with nothing left to send (no first emails, no follow-ups waiting) as completed. */
-export async function completeFinished(q: Q, campaignId: string) {
-  await q.query(
+export async function completeFinished(q: Q, campaignId: string): Promise<boolean> {
+  const r = await q.query(
     `update public.campaigns set status = 'completed' where id = $1 and status = 'running'
        and not exists (select 1 from public.enrollments e where e.campaign_id = $1
-         and (e.state = 'queued' or (e.state = 'sent' and e.step > 0 and e.next_send_at is not null)))`,
+         and (e.state = 'queued' or (e.state = 'sent' and e.step > 0 and e.next_send_at is not null))) returning id`,
     [campaignId],
   );
+  return r.rows.length > 0;
 }

@@ -106,3 +106,43 @@ export async function safeFetch(
   }
   return { ok: false, url: current, reason: "too many redirects" };
 }
+
+export type PostResult = { ok: true; status: number } | { ok: false; status: number | null; reason: string };
+
+/**
+ * POSTs a small JSON body to a public https URL (webhooks), with the same
+ * address checks as safeFetch. Redirects are not followed; 2xx counts as
+ * delivered. The response body is read up to 4 KB and discarded.
+ */
+export function safePost(raw: string, body: string, headers: Record<string, string>, timeoutMs = 8000): Promise<PostResult> {
+  const check = checkFetchUrl(raw);
+  if (!check.ok) return Promise.resolve({ ok: false, status: null, reason: check.reason });
+  if (check.url.protocol !== "https:") return Promise.resolve({ ok: false, status: null, reason: "only https URLs are allowed" });
+  return new Promise((resolve) => {
+    const req = https.request(
+      check.url,
+      {
+        method: "POST",
+        headers: { ...headers, "content-type": "application/json", "content-length": Buffer.byteLength(body).toString(), "user-agent": "Locenti-Webhooks/1.0" },
+        lookup: guardedLookup as unknown as typeof dns.lookup,
+        timeout: timeoutMs,
+      },
+      (res) => {
+        let size = 0;
+        res.on("data", (c: Buffer) => {
+          size += c.length;
+          if (size > 4096) res.destroy();
+        });
+        const done = () => {
+          const status = res.statusCode ?? 0;
+          resolve(status >= 200 && status < 300 ? { ok: true, status } : { ok: false, status, reason: `HTTP ${status}` });
+        };
+        res.on("end", done);
+        res.on("close", done);
+      },
+    );
+    req.on("timeout", () => req.destroy(new Error("timed out")));
+    req.on("error", (e) => resolve({ ok: false, status: null, reason: (e as Error).message.slice(0, 200) }));
+    req.end(body);
+  });
+}

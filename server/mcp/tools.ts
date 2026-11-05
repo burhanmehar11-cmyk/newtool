@@ -17,6 +17,7 @@ import { leadDetail } from "@/server/research-store";
 import { runGoogleSearchAs, saveGoogleSearchLeadsAs } from "@/server/services/discovery";
 import { researchLeadAs } from "@/server/services/research";
 import { getOfferProfileFor } from "@/server/services/workspaces";
+import { inboxThreads } from "@/server/replies-store";
 
 /**
  * Tools exposed to a person's own AI agent over MCP. Each call runs as that
@@ -294,6 +295,39 @@ export const mcpTools: ToolDef<McpCtx>[] = [
           url: `${origin()}/app/campaigns/${a.campaign_id}`,
         };
       });
+    },
+  },
+  {
+    name: "list_replies",
+    description: "Replies to campaign emails, newest first, with the suggested label (interested, not_interested, out_of_office, bounce, unclassified = needs a look). Read-only; you can't reply on the person's behalf.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        label: { type: "string", enum: ["all", "interested", "not_interested", "out_of_office", "bounce", "unclassified"], default: "all" },
+        limit: { type: "number", minimum: 1, maximum: 200, default: 50 },
+      },
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true },
+    run: async (args, ctx) => {
+      const a = parse(z.object({ label: z.enum(["all", "interested", "not_interested", "out_of_office", "bounce", "unclassified"]).default("all"), limit: z.number().int().min(1).max(200).default(50) }), args);
+      const rows = await asQ(ctx, (q) => inboxThreads(q, ctx.workspace.id, a.label));
+      return {
+        replies: rows.slice(0, a.limit).map((t) => ({
+          thread_id: t.id,
+          business: t.name,
+          from: t.last_from,
+          subject: t.subject,
+          snippet: t.last_text,
+          label: t.classification,
+          labelled_by: t.classification_source === "user" ? "person" : "suggested",
+          unread: t.unread,
+          received_at: t.last_inbound_at,
+          lead_id: t.lead_id,
+          campaign_id: t.campaign_id,
+          url: `${origin()}/app/inbox/${t.id}`,
+        })),
+      };
     },
   },
 ];

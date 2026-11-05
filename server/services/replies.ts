@@ -1,4 +1,7 @@
 import "server-only";
+import { brand } from "@/config/brand";
+import { configuredSiteUrl } from "@/server/env";
+import { emitWebhook } from "@/server/services/webhooks";
 import { z } from "zod";
 import { hasReadScope } from "@/lib/gmail/oauth";
 import { classifyReply, type ReplyKind } from "@/lib/replies/classify";
@@ -59,6 +62,17 @@ async function syncMailbox(box: MailboxForSync, summary: SyncSummary) {
       );
       if (!added) continue;
       summary.newReplies++;
+      await emitWebhook(t.workspace_id, "reply.received", m.id, {
+        thread_id: t.id,
+        campaign_id: t.campaign_id,
+        lead_id: t.lead_id,
+        from: m.from,
+        subject: m.subject,
+        text: m.text.slice(0, 2000),
+        label: c.kind,
+        received_at: m.date.toISOString(),
+        url: `${configuredSiteUrl() ?? brand.siteUrl}/app/inbox/${t.id}`,
+      });
       // Opt-outs and bounces go on the do-not-contact list for the address we emailed.
       if (c.kind === "bounce" || c.stopRequested) {
         await svc(async (q) => {

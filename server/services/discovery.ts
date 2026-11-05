@@ -1,4 +1,5 @@
 import "server-only";
+import { emitLeadsCreated } from "@/server/services/webhooks";
 import { z } from "zod";
 import { discoveryNiches, nicheLabel } from "@/lib/discovery/niches";
 import { requireWorkspace, type WorkspaceRef } from "@/server/auth";
@@ -113,7 +114,10 @@ export async function saveSearchLeads(ids: unknown): Promise<{ ok: true; added: 
   const { user, workspace } = await requireWorkspace("/app/discover");
   const parsed = z.array(z.string().uuid()).min(1).max(100).safeParse(ids);
   if (!parsed.success) return { ok: false, error: "Select at least one business." };
-  return { ok: true, added: await asQ(user.id, (q) => saveLeads(q, workspace.id, user.id, parsed.data)) };
+  const since = new Date();
+  const added = await asQ(user.id, (q) => saveLeads(q, workspace.id, user.id, parsed.data));
+  if (added) await emitLeadsCreated(workspace.id, since);
+  return { ok: true, added };
 }
 
 export async function getLeads() {
@@ -237,7 +241,9 @@ export async function saveGoogleSearchLeadsAs({ user, workspace }: Ctx, input: u
   const parsed = googleSaveSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Select at least one business that has a website." };
   const niche = parsed.data.niche && discoveryNiches.some((n) => n.id === parsed.data.niche) ? parsed.data.niche : null;
+  const since = new Date();
   const r = await asQ(user.id, (q) => saveGoogleLeads(q, workspace.id, user.id, parsed.data.items, niche));
+  if (r.added) await emitLeadsCreated(workspace.id, since);
   return { ok: true, ...r };
 }
 
