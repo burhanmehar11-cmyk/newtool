@@ -210,3 +210,17 @@ export async function removeDoNotContact(id: string): Promise<R> {
   const ok = await asQ(user.id, (q) => removeSuppression(q, id));
   return ok ? { ok: true } : { ok: false, error: "Unsubscribes can't be removed; only manual entries can." };
 }
+
+/**
+ * "Auto-send while open": an open app tab calls this about once a minute.
+ * Runs one sending pass for this workspace (same limits as the scheduler)
+ * only when a campaign is running. Cheap no-op otherwise.
+ */
+export async function autoSendTick(): Promise<{ sent: number }> {
+  const { user, workspace } = await requireWorkspace("/app");
+  if (!canManage(workspace.role)) return { sent: 0 };
+  const running = await asQ(user.id, (q) => q.query("select 1 from public.campaigns where workspace_id = $1 and status = 'running' limit 1", [workspace.id]));
+  if (!running.rows.length) return { sent: 0 };
+  const r = await runDispatch({ workspaceId: workspace.id });
+  return { sent: r.sent };
+}

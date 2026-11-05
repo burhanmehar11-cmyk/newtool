@@ -175,9 +175,11 @@ Uses the **same OAuth client** as sign-in. No new credential is needed. Locentio
 
 Check: in the app, **Settings → Sending mailboxes → Connect Gmail**. On Google's screen, leave "Send email on your behalf" ticked. You'll see "This app isn't verified" in Testing; choose **Continue**. Then click **Send test email to myself**; it arrives in that inbox.
 
-## Part H: Campaign sending scheduler (free)
+## Part H: Campaign sending (no setup needed; scheduler optional)
 
-Approved campaigns send one email per mailbox every few minutes during the sending hours you choose. Something has to "tick" every 5 minutes. Vercel's free plan only runs scheduled jobs once a day, so use a free external scheduler:
+Run migration `0006_campaigns.sql` (step 3 below). That's all campaigns need: while Locentio is open in any browser tab, it sends the next due email about once a minute, within each campaign's hours and daily limit. **Send next due email** on a campaign page sends one immediately.
+
+**Optional, to keep sending with no tab open:** something has to "tick" every 5 minutes. Vercel's free plan only runs scheduled jobs once a day, so use a free external scheduler:
 
 1. Vercel → Settings → Environment Variables → add `CRON_SECRET` = a long random string (e.g. from a password generator, 32+ characters) → Production → Save → **Redeploy**.
 2. Create a free account at **cron-job.org** (no card needed). **Create cronjob**:

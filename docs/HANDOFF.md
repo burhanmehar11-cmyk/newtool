@@ -84,7 +84,7 @@ Before launch: a dedicated least-privilege database role for the app; real-Postg
 
 1. **Google Maps** is live in production (owner confirmed 2026-11-05). Make sure the key pasted in chat during development was rotated.
 2. **Gmail live check:** owner completes setup guide Part G and runs migration 0005, then Connect Gmail and send the test email.
-3. **Campaigns live check:** owner runs migration 0006, sets `CRON_SECRET` and the cron-job.org job (setup guide Part H), then creates a small campaign to their own second address and approves it.
+3. **Campaigns live check:** owner runs migrations 0006–0007, then creates a small campaign to their own second address and approves it with Locentio open (scheduler optional, skipped for now).
 4. **M2 step 4: evidence-based drafts.** Needs `ANTHROPIC_API_KEY`; drafts must cite brief facts only.
 5. Mailbox verification provider (optional; the free DNS check stays as the floor).
 6. Add a real-Postgres CI job for concurrency tests.

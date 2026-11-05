@@ -11,6 +11,7 @@ import {
   removeDoNotContact,
   saveCampaignSettings,
   sendDueNow,
+  autoSendTick,
 } from "@/server/services/campaigns";
 
 const refresh = () => revalidatePath("/app", "layout");
@@ -58,5 +59,12 @@ export async function addDoNotContactAction(value: string) {
 export async function removeDoNotContactAction(id: string) {
   const r = await removeDoNotContact(id);
   refresh();
+  return r;
+}
+
+/** Called by open app tabs about once a minute; revalidates only when something was sent. */
+export async function autoSendTickAction() {
+  const r = await autoSendTick();
+  if (r.sent) refresh();
   return r;
 }

@@ -79,7 +79,7 @@ Sign-in is **"Continue with Google"** through a Google OAuth client. It's free a
 3. Vercel variables: `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `SESSION_SECRET` (32+ characters), `NEXT_PUBLIC_SITE_URL`, `BETA_ALLOWED_EMAILS`; then redeploy.
 4. Optional email + password sign-in: `SMTP_URL` (free with a Gmail App Password) for confirmation and reset emails.
 5. Optional Gmail sending: same OAuth client plus the `gmail.send` scope, redirect URI `/api/gmail/callback` and test users (guide Part G).
-6. Campaign scheduler: `CRON_SECRET` plus a free cron-job.org job calling `/api/cron/dispatch` every 5 minutes (guide Part H).
+6. Campaigns send while Locentio is open in a tab; an optional scheduler (`CRON_SECRET` + cron-job.org) keeps sending with no tab open (guide Part H).
 7. Optional Google Maps search: `GOOGLE_PLACES_API_KEY` (Places API (New); free within Google's monthly allowance, billing account required). Guide Part E3.
 
 How sign-in works:

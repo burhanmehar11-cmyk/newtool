@@ -442,7 +442,7 @@ function LiveCampaign({ campaign, recipients, mailboxes, canManage }: { campaign
             </div>
           ) : null}
           <p className="text-xs leading-5 text-slate">
-            Emails go out automatically every few minutes during sending hours when the scheduler is set up (see the Campaigns page). &quot;Send next due email&quot; sends one now, using the same limits.
+            Emails go out automatically during sending hours while Locentio is open in any tab (or around the clock with the optional scheduler). &quot;Send next due email&quot; sends one now, using the same limits.
           </p>
         </section>
       </div>

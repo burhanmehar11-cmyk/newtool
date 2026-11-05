@@ -10,6 +10,7 @@ import { Dialog, DialogTrigger, SheetCloseButton, SheetContent } from "@/compone
 import { cn } from "@/lib/utils";
 import { signOutAction } from "@/server/actions/auth";
 import { ThemeToggle, useAppTheme } from "@/components/app/theme-toggle";
+import { AutoSender } from "@/components/app/auto-sender";
 
 /**
  * Shell for the live product. Only shipped areas appear in the navigation;
@@ -33,6 +34,7 @@ export function ProductShell({ workspaceSlot, children }: { workspaceSlot: React
         <Sidebar workspaceSlot={workspaceSlot} />
       </aside>
       <MobileBar workspaceSlot={workspaceSlot} />
+      <AutoSender />
       <main id="main" className="mx-auto w-full max-w-[1280px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
         {children}
       </main>
