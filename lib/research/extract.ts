@@ -17,6 +17,8 @@ export type PageSignals = {
   pdfForms: { excerpt: string } | null;
   contactForm: boolean;
   emails: string[];
+  /** Emails the page links to with mailto: (the business chose to show these). */
+  mailto: string[];
   links: { href: string; text: string }[]; // same-site links, for picking pages to visit
 };
 
@@ -140,7 +142,14 @@ export function extractPage(html: string, pageUrl: string, now = new Date()): Pa
   const contactForm = /<form\b[\s\S]*?(type\s*=\s*["']?email|<textarea)[\s\S]*?<\/form>/i.test(html);
 
   const emails = new Set<string>();
-  for (const a of anchors) if (a.href.toLowerCase().startsWith("mailto:")) emails.add(decodeURIComponent(a.href.slice(7).split("?")[0]).toLowerCase());
+  const mailto = new Set<string>();
+  for (const a of anchors)
+    if (a.href.toLowerCase().startsWith("mailto:")) {
+      const e = safeDecode(a.href.slice(7).split("?")[0]).trim().toLowerCase();
+      emails.add(e);
+      mailto.add(e);
+    }
+  for (const e of hiddenEmails(html, text)) emails.add(e);
   for (const m of text.matchAll(EMAIL_RE)) emails.add(m[0].toLowerCase());
 
   const host = base.hostname.replace(/^www\./, "");
@@ -163,7 +172,8 @@ export function extractPage(html: string, pageUrl: string, now = new Date()): Pa
     phoneOnly,
     pdfForms,
     contactForm,
-    emails: [...emails].filter((e) => /^[^@\s]+@[^@\s]+\.[a-z]{2,24}$/i.test(e) && !/\.(png|jpe?g|gif|svg|webp)$/i.test(e)).slice(0, 10),
+    emails: [...emails].filter(plausibleEmail).slice(0, 15),
+    mailto: [...mailto].filter(plausibleEmail),
     links,
   };
 }
@@ -173,6 +183,32 @@ const PAGE_PRIORITY: [RegExp, number][] = [
   [/contact/i, 2],
   [/form|new[- ]?patient|intake|paperwork/i, 2],
 ];
+
+const CONTACT_PRIORITY: [RegExp, number][] = [
+  [/contact|kontakt|contacto|contatti|get[- ]in[- ]touch|reach[- ]us/i, 4],
+  [/impressum|imprint|legal[- ]notice|mentions/i, 3],
+  [/about|team|staff|people|who[- ]we[- ]are|our[- ]story|company/i, 2],
+  [/privacy|terms|legal/i, 1],
+];
+
+/** Same-site pages most likely to show a contact email, best first (contact, impressum, about/team, privacy). */
+export function pickContactPages(home: PageSignals, max = 3): string[] {
+  const scored = new Map<string, number>();
+  for (const l of home.links) {
+    let u: URL;
+    try {
+      u = new URL(l.href);
+    } catch {
+      continue;
+    }
+    u.hash = "";
+    u.search = "";
+    if (/\.(pdf|jpe?g|png|gif|zip|docx?)$/i.test(u.pathname) || u.pathname === new URL(home.url).pathname) continue;
+    const score = CONTACT_PRIORITY.reduce((s, [re, w]) => Math.max(s, re.test(`${l.text} ${u.pathname}`) ? w : 0), 0);
+    if (score > 0) scored.set(u.toString(), Math.max(score, scored.get(u.toString()) ?? 0));
+  }
+  return [...scored.entries()].sort((a, b) => b[1] - a[1]).slice(0, max).map(([u]) => u);
+}
 
 /** Picks up to `max` same-site pages worth checking after the homepage. */
 export function pickFollowUpPages(home: PageSignals, max = 2): string[] {
@@ -190,11 +226,80 @@ export function pickFollowUpPages(home: PageSignals, max = 2): string[] {
 const ROLE_LOCALS = /^(info|hello|contact|office|admin|frontdesk|front\.desk|reception|appointments?|booking|bookings|service|sales|support|team|enquiries|inquiries|mail|care|help|clinic)$/i;
 const FREE_MAIL = /@(gmail|googlemail|outlook|hotmail|live|yahoo|icloud|me|aol|proton|protonmail)\.[a-z.]+$/i;
 
-/** Keeps emails that plausibly belong to this business: its own domain, or a common free mailbox. */
-export function businessEmails(emails: string[], domain: string | null): { email: string; kind: "role" | "named" }[] {
+const JUNK_DOMAINS = /@(example\.(com|org|net)|domain\.com|yourdomain\.|email\.com|sentry\.io|[a-z0-9-]*\.?sentry\.|wixpress\.com|sentry-next\.wixpress\.com|godaddy\.com|squarespace\.com|wordpress\.(com|org)|schema\.org|w3\.org|test\.com|company\.com|website\.com|mysite\.com|sitename\.com)$/i;
+const PLACEHOLDER_LOCALS = /^(name|yourname|your\.name|email|youremail|user|username|firstname|first\.last|john|jane|johndoe|john\.doe|someone|test|example)$/i;
+
+function plausibleEmail(e: string) {
+  return /^[^@\s]+@[^@\s]+\.[a-z]{2,24}$/i.test(e) && !/\.(png|jpe?g|gif|svg|webp|css|js)$/i.test(e) && !JUNK_DOMAINS.test(e) && !PLACEHOLDER_LOCALS.test(e.split("@")[0]);
+}
+
+function safeDecode(v: string) {
+  try {
+    return decodeURIComponent(v);
+  } catch {
+    return v;
+  }
+}
+
+/** Cloudflare's email protection: hex string, first byte is the XOR key. */
+export function decodeCfEmail(hex: string): string | null {
+  if (!/^[0-9a-f]{4,}$/i.test(hex) || hex.length % 2) return null;
+  const key = parseInt(hex.slice(0, 2), 16);
+  let out = "";
+  for (let i = 2; i < hex.length; i += 2) out += String.fromCharCode(parseInt(hex.slice(i, i + 2), 16) ^ key);
+  return /^[^@\s]+@[^@\s]+\.[a-z]{2,24}$/i.test(out) ? out.toLowerCase() : null;
+}
+
+/** Emails a page shows in ways a plain search misses: Cloudflare protection, structured data, "name [at] domain [dot] com". */
+export function hiddenEmails(html: string, text: string): string[] {
+  const out = new Set<string>();
+  for (const m of html.matchAll(/data-cfemail=["']([0-9a-f]+)["']/gi)) {
+    const e = decodeCfEmail(m[1]);
+    if (e) out.add(e);
+  }
+  for (const m of html.matchAll(/\/cdn-cgi\/l\/email-protection#([0-9a-f]+)/gi)) {
+    const e = decodeCfEmail(m[1]);
+    if (e) out.add(e);
+  }
+  for (const m of html.matchAll(/"email"\s*:\s*"(?:mailto:)?([^"\s]{3,254})"/gi)) out.add(m[1].toLowerCase());
+  for (const m of html.matchAll(/itemprop=["']email["'][^>]*?(?:content|href)=["'](?:mailto:)?([^"'\s]{3,254})["']/gi)) out.add(m[1].toLowerCase());
+  // Only bracketed forms: plain "team at Austin dot com" is too often an ordinary sentence.
+  const AT = String.raw`\s*(?:\[\s*at\s*\]|\(\s*at\s*\)|\{\s*at\s*\})\s*`;
+  const DOT = String.raw`\s*(?:\[\s*dot\s*\]|\(\s*dot\s*\)|\{\s*dot\s*\}|\s+dot\s+|\.)\s*`;
+  const obf = new RegExp(String.raw`([a-z0-9._%+-]{1,64})${AT}([a-z0-9-]{1,63}(?:${DOT}[a-z0-9-]{1,63}){1,3})`, "gi");
+  for (const m of text.matchAll(obf)) {
+    const domain = m[2].replace(new RegExp(DOT, "gi"), ".").toLowerCase();
+    if (/\.[a-z]{2,24}$/.test(domain)) out.add(`${m[1].toLowerCase()}@${domain}`);
+  }
+  return [...out];
+}
+
+/** "influence-media.co.uk" → "influencemedia": the name part of a domain, for spotting related domains. */
+function brandOf(domain: string) {
+  const parts = domain.toLowerCase().replace(/^www\./, "").split(".");
+  const core = parts.length > 2 && /^(co|com|org|net|gov|ac|edu)$/.test(parts[parts.length - 2]) ? parts[parts.length - 3] : parts[parts.length - 2] ?? parts[0];
+  return (core ?? "").replace(/[^a-z0-9]/g, "");
+}
+
+/**
+ * Keeps emails that plausibly belong to this business: its own domain (or a
+ * related one with the same name, like influence-media.com for
+ * influencemedia.co.uk), a common free mailbox, or a role address (info@,
+ * hello@…) the site links to with mailto:.
+ */
+export function businessEmails(emails: string[], domain: string | null, mailto: string[] = []): { email: string; kind: "role" | "named" }[] {
   const d = (domain ?? "").toLowerCase();
+  const brand = d ? brandOf(d) : "";
+  const linked = new Set(mailto);
   return [...new Set(emails)]
-    .filter((e) => (d && (e.endsWith(`@${d}`) || e.endsWith(`.${d}`))) || FREE_MAIL.test(e))
+    .filter(plausibleEmail)
+    .filter((e) => {
+      const ed = e.split("@")[1];
+      if (d && (ed === d || ed.endsWith(`.${d}`))) return true;
+      if (FREE_MAIL.test(e)) return true;
+      if (brand.length >= 4 && brandOf(ed) === brand) return true;
+      return linked.has(e) && ROLE_LOCALS.test(e.split("@")[0]);
+    })
     .slice(0, 5)
     .map((email) => ({ email, kind: ROLE_LOCALS.test(email.split("@")[0]) ? "role" : "named" }));
 }

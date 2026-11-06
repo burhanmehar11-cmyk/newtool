@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { businessEmails, extractPage, pickFollowUpPages, visibleText } from "@/lib/research/extract";
+import { businessEmails, decodeCfEmail, extractPage, hiddenEmails, pickContactPages, pickFollowUpPages, visibleText } from "@/lib/research/extract";
 
 const NOW = new Date("2026-11-02T00:00:00Z");
 const home = `<!doctype html><html><head><title>Riverside Dental | Austin</title>
@@ -58,5 +58,43 @@ describe("page extraction", () => {
       { email: "dr.ana@riverside.example", kind: "named" },
       { email: "owner@gmail.com", kind: "named" },
     ]);
+  });
+});
+
+describe("emails sites hide from simple readers", () => {
+  it("decodes Cloudflare-protected addresses", () => {
+    expect(decodeCfEmail("422a272e2e2d02212726233026272c36232e6c273a232f322e27")).toBe("hello@cedardental.example");
+    expect(decodeCfEmail("zz")).toBeNull();
+    expect(decodeCfEmail("4243")).toBeNull(); // decodes to junk, not an address
+  });
+
+  it("finds Cloudflare, structured-data and [at]/[dot] addresses", () => {
+    const html = `<a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="422a272e2e2d02212726233026272c36232e6c273a232f322e27">[email&#160;protected]</a>
+      <script type="application/ld+json">{"@type":"LocalBusiness","email":"mailto:Office@CedarDental.example"}</script>
+      <span itemprop="email" content="care@cedardental.example"></span>`;
+    const text = "Write to bookings [at] cedardental [dot] example, or meet us at the clinic.";
+    expect(hiddenEmails(html, text).sort()).toEqual(["bookings@cedardental.example", "care@cedardental.example", "hello@cedardental.example", "office@cedardental.example"]);
+  });
+
+  it("doesn't read plain sentences with 'at' as addresses", () => {
+    expect(hiddenEmails("", "Meet the team at Austin dot com events, open at 9.")).toEqual([]);
+  });
+
+  it("picks contact, impressum, about and privacy pages, best first", () => {
+    const page = extractPage(
+      `<a href="/privacy-policy">Privacy</a> <a href="/about-us">About us</a> <a href="/services">Services</a> <a href="/kontakt?ref=nav#form">Kontakt</a> <a href="/impressum">Impressum</a> <a href="/logo.png">Contact card</a>`,
+      "https://cedar.example/",
+      NOW,
+    );
+    expect(pickContactPages(page, 3)).toEqual(["https://cedar.example/kontakt", "https://cedar.example/impressum", "https://cedar.example/about-us"]);
+  });
+
+  it("keeps addresses on a related domain with the same name, and mailto role addresses", () => {
+    const kept = businessEmails(
+      ["team@influence-media.example", "hi@influencemedia.co.uk", "info@studio-partner.example", "bob@studio-partner.example", "you@example.com", "name@influencemedia.example", "logo@2x.png"],
+      "influencemedia.example",
+      ["info@studio-partner.example"],
+    );
+    expect(kept.map((e) => e.email)).toEqual(["team@influence-media.example", "hi@influencemedia.co.uk", "info@studio-partner.example"]);
   });
 });

@@ -57,6 +57,34 @@ describe("finding public emails on a business website", () => {
   });
 });
 
+describe("harder websites", () => {
+  it("decodes a Cloudflare-protected address on the contact page", async () => {
+    const s = fakeSite({
+      "/": { status: 200, body: home('<a href="/about">About</a> <a href="/contact">Contact</a>') },
+      "/contact": { status: 200, body: home('<a class="__cf_email__" data-cfemail="422a272e2e2d02212726233026272c36232e6c273a232f322e27">[email protected]</a>') },
+      "/about": { status: 200, body: home("We are a family practice.") },
+    });
+    const r = await findEmailsOnWebsite("https://cedardental.example", { fetcher: s.fetcher });
+    expect(r.emails.map((e) => e.email)).toEqual(["hello@cedardental.example"]);
+  });
+
+  it("tries /contact when the menu links to nothing readable (built by scripts)", async () => {
+    const s = fakeSite({
+      "/": { status: 200, body: home('<div id="app"></div>') },
+      "/contact": { status: 200, body: home("Email hello@cedardental.example") },
+    });
+    const r = await findEmailsOnWebsite("https://cedardental.example", { fetcher: s.fetcher });
+    expect(r.status).toBe("found");
+    expect(s.visited).toEqual(expect.arrayContaining(["/contact", "/contact-us"]));
+  });
+
+  it("accepts the business's address on a related domain (influence-media vs influencemedia)", async () => {
+    const s = fakeSite({ "/": { status: 200, body: home('<a href="mailto:team@influence-media.example">Email us</a>') } });
+    const r = await findEmailsOnWebsite("https://influencemedia.example", { fetcher: s.fetcher });
+    expect(r.emails.map((e) => e.email)).toEqual(["team@influence-media.example"]);
+  });
+});
+
 describe("emails sent back when saving", () => {
   it("keeps only emails found on the business's own site", () => {
     const out = trustedEmails(

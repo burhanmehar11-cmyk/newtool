@@ -184,7 +184,15 @@ export const googleSearchSchema = z.object({
 export type GoogleResult = GooglePlace & { saved: boolean; emails: FoundEmail[]; siteName: string | null };
 type FoundEmail = EmailLookup["emails"][number];
 export type GoogleSearchOutcome =
-  | { ok: true; jobId: string; query: string; niche: string | null; results: GoogleResult[]; filteredOut: number; requests: number; scanned: number; noWebsite: number; noEmail: number; noPhone: number; fewReviews: number; closed: number }
+  | {
+      ok: true;
+      jobId: string;
+      query: string;
+      niche: string | null;
+      results: GoogleResult[];
+      /** Businesses with a website that showed no email we could find: shown (not charged) so nothing silently disappears. */
+      withoutEmail: GoogleResult[];
+      filteredOut: number; requests: number; scanned: number; noWebsite: number; noEmail: number; noPhone: number; fewReviews: number; closed: number }
   | { ok: false; error: string; fieldErrors?: Record<string, string> };
 
 export async function googleStatus() {
@@ -244,6 +252,7 @@ export async function runGoogleSearchAs({ user, workspace }: Ctx, input: unknown
   // there are enough. People are charged only for the businesses returned.
   const target = f.maxResults;
   const results: GoogleResult[] = [];
+  const withoutEmail: GoogleResult[] = [];
   const seen = new Set<string>();
   let token: string | null = null;
   let requests = 0;
@@ -273,14 +282,18 @@ export async function runGoogleSearchAs({ user, workspace }: Ctx, input: unknown
     });
     const lookups = await pool(candidates, 20, async (p) => {
       if (!p.website) return null;
-      const l = await findEmailsOnWebsite(p.website, { budgetMs: 7_000 }).catch(() => null);
+      const l = await findEmailsOnWebsite(p.website, { budgetMs: 9_000 }).catch(() => null);
       // Keep only addresses whose domain can actually receive email (free DNS check).
       return l ? { ...l, emails: await deliverableEmails(l.emails) } : null;
     });
     candidates.forEach((p, i) => {
       const l = lookups[i];
       const emails = l?.emails ?? [];
-      if (f.requireEmail && !emails.length) return void noEmail++;
+      if (f.requireEmail && !emails.length) {
+        noEmail++;
+        withoutEmail.push({ ...p, saved: false, emails, siteName: l?.siteName ?? null });
+        return;
+      }
       results.push({ ...p, saved: false, emails, siteName: l?.siteName ?? null });
     });
     token = r.value.nextPageToken;
@@ -294,7 +307,8 @@ export async function runGoogleSearchAs({ user, workspace }: Ctx, input: unknown
     return { ok: false, error: lastError ?? "Couldn't search Google Maps. Try again." };
   }
   const kept = results.slice(0, target);
-  const saved = new Set(await asQ(user.id, (q) => savedPlaceIds(q, workspace.id, kept.map((p) => p.placeId))));
+  const extra = withoutEmail.slice(0, 60);
+  const saved = new Set(await asQ(user.id, (q) => savedPlaceIds(q, workspace.id, [...kept, ...extra].map((p) => p.placeId))));
   await asQ(user.id, async (q) => {
     await settle(q, workspace.id, jobId, kept.length);
     await finishJob(q, jobId, "completed", kept.length, null);
@@ -305,6 +319,7 @@ export async function runGoogleSearchAs({ user, workspace }: Ctx, input: unknown
     query,
     niche: f.niche,
     results: kept.map((p) => ({ ...p, saved: saved.has(p.placeId) })),
+    withoutEmail: extra.map((p) => ({ ...p, saved: saved.has(p.placeId) })),
     filteredOut: noWebsite + noEmail + noPhone + fewReviews + closed,
     requests,
     scanned,

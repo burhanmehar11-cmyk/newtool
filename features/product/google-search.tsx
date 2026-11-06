@@ -53,7 +53,8 @@ export function GoogleSearchForm({ available, remainingToday, onResult, prefill 
   const [pending, start] = React.useTransition();
   const [error, setError] = React.useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = React.useState<Record<string, string>>({});
-  const [maxResults, setMaxResults] = React.useState(20);
+  // As many as Google gives (60), unless the remaining units only cover fewer.
+  const [maxResults, setMaxResults] = React.useState(() => [60, 40, 20].find((m) => m <= available) ?? 20);
   const [requireEmail, setRequireEmail] = React.useState(true);
   const [requirePhone, setRequirePhone] = React.useState(false);
   const [requireWebsite, setRequireWebsite] = React.useState(false);
@@ -188,7 +189,7 @@ function download(filename: string, text: string) {
 export function GoogleResults({ result }: { result: Done }) {
   const router = useRouter();
   const leftOut = [
-    result.noEmail ? `${result.noEmail} without an email` : "",
+    result.noEmail ? `${result.noEmail} without an email${result.withoutEmail?.length ? " (listed below)" : ""}` : "",
     result.noWebsite ? `${result.noWebsite} without a website` : "",
     result.noPhone ? `${result.noPhone} without a phone` : "",
     result.fewReviews ? `${result.fewReviews} with too few reviews` : "",
@@ -196,15 +197,17 @@ export function GoogleResults({ result }: { result: Done }) {
   ]
     .filter(Boolean)
     .join(", ");
-  const [rows, setRows] = React.useState<GoogleResult[]>(result.results);
+  // Matches first, then businesses whose website showed no email we could find (listed so nothing silently disappears; not charged, not preselected).
+  const [rows, setRows] = React.useState<GoogleResult[]>(() => [...result.results, ...(result.withoutEmail ?? [])]);
+  const matches = result.results.length;
   // Saving needs a website (research reads it), so rows without one can't be selected.
   const selectable = rows.filter((r) => r.website).map((r) => r.placeId);
-  const [selected, setSelected] = React.useState<string[]>(() => rows.filter((r) => !r.saved && r.website).map((r) => r.placeId));
+  const [selected, setSelected] = React.useState<string[]>(() => result.results.filter((r) => !r.saved && r.website).map((r) => r.placeId));
   const [pending, start] = React.useTransition();
   const [busy, setBusy] = React.useState<null | "save" | "csv" | "campaign">(null);
   const [status, setStatus] = React.useState<{ tone: "green" | "danger" | "info"; text: string; href?: string; link?: string } | null>(null);
 
-  if (!rows.length)
+  if (!matches && !rows.length)
     return (
       <div className="p-5">
         <EmptyState icon={<MapPinned />} title="No businesses with a public email here">
@@ -243,7 +246,7 @@ export function GoogleResults({ result }: { result: Done }) {
       <div className="flex flex-wrap items-center gap-3 border-b border-line px-5 py-2.5 text-sm text-slate">
         <Mail aria-hidden className="size-3.5 text-green" />
         <span>
-          <span className="font-medium tabular-nums text-ink">{rows.length}</span> matching businesses
+          <span className="font-medium tabular-nums text-ink">{matches}</span> matching business{matches === 1 ? "" : "es"}
           <span className="text-xs"> · checked {result.scanned} on Google Maps{leftOut ? `; left out and not charged: ${leftOut}` : ""}</span>
         </span>
       </div>
@@ -321,10 +324,18 @@ export function GoogleResults({ result }: { result: Done }) {
             </tr>
           </thead>
           <tbody>
-            {rows.map((r) => {
+            {rows.map((r, i) => {
               const on = selected.includes(r.placeId);
               return (
-                <tr key={r.placeId} className={cn("border-b border-line last:border-b-0", on && "bg-mint-soft/30")}>
+                <React.Fragment key={r.placeId}>
+                {i === matches ? (
+                  <tr className="border-b border-line bg-canvas/60">
+                    <td colSpan={7} className="px-5 py-2.5 text-xs text-slate">
+                      <span className="font-medium text-ink">{rows.length - matches} {matches ? "more" : rows.length - matches === 1 ? "business" : "businesses"} with a website, but no email we could find on it.</span> Not charged. Open their site or call them, or save them to try research later.
+                    </td>
+                  </tr>
+                ) : null}
+                <tr className={cn("border-b border-line last:border-b-0", on && "bg-mint-soft/30")}>
                   <td className="px-5 py-3">
                     <Checkbox aria-label={`Select ${r.name}`} checked={on} disabled={!r.website} title={r.website ? undefined : "No website, so it can't be saved or researched"} onChange={() => setSelected((xs) => (on ? xs.filter((x) => x !== r.placeId) : [...xs, r.placeId]))} />
                   </td>
@@ -363,6 +374,7 @@ export function GoogleResults({ result }: { result: Done }) {
                   <td className="whitespace-nowrap py-3 pr-3 text-xs text-slate">{r.phone ?? "Not listed"}</td>
                   <td className="py-3 pr-5 text-right">{r.saved ? <Badge tone="green">In leads</Badge> : <Badge tone="outline">New</Badge>}</td>
                 </tr>
+                </React.Fragment>
               );
             })}
           </tbody>
@@ -433,7 +445,7 @@ export function GoogleDetails({ placeId, label }: { placeId: string; label: stri
 
 function EmailCell({ r }: { r: GoogleResult }) {
   const first = r.emails[0];
-  if (!first) return <span className="text-slate">None shown</span>;
+  if (!first) return <span className="text-slate">None found</span>;
   return (
     <span className="block">
       <a href={first.url} target="_blank" rel="noopener noreferrer nofollow" title={`Shown on ${first.url}`} className="block truncate font-mono text-ink hover:text-green hover:underline">

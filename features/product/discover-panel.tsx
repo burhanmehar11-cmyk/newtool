@@ -76,7 +76,7 @@ export function DiscoverPanel({
         <SectionCard
           className="mt-5"
           title={result.query}
-          description={`${result.results.length} businesses from ${result.requests} Google request${result.requests === 1 ? "" : "s"}${result.filteredOut ? ` · ${result.filteredOut} hidden by your filters` : ""}. Save the ones you want; they aren't kept otherwise.`}
+          description={`${result.results.length} with an email${result.withoutEmail?.length ? `, plus ${result.withoutEmail.length} without` : ""}, from ${result.requests} Google request${result.requests === 1 ? "" : "s"}. Save the ones you want; they aren't kept otherwise.`}
           bodyClassName="p-0"
         >
           <GoogleResults key={result.jobId} result={result} />

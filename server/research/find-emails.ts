@@ -1,6 +1,6 @@
 import "server-only";
 import { brand } from "@/config/brand";
-import { businessEmails, extractPage, pickFollowUpPages } from "@/lib/research/extract";
+import { businessEmails, extractPage, pickContactPages } from "@/lib/research/extract";
 import { parseRobots, robotsAllows } from "@/lib/research/robots";
 import { normalizeWebsite } from "@/lib/discovery/osm";
 import { configuredSiteUrl } from "@/server/env";
@@ -8,7 +8,7 @@ import { safeFetch } from "@/server/research/fetch";
 
 /**
  * Finds public email addresses a business shows on its own website: the
- * homepage, then up to two contact-style pages it links to. Respects
+ * homepage, then up to three contact/impressum/about/privacy pages it links to. Respects
  * robots.txt, uses the SSRF-safe fetcher, and stops after `budgetMs`.
  * Never guesses addresses (no "info@" patterns): only what the site shows.
  */
@@ -39,7 +39,7 @@ export async function findEmailsOnWebsite(website: string, opts: { budgetMs?: nu
     const r = await fetcher(url, { userAgent: ua, deadline, allowTypes: /text\/html|application\/xhtml\+xml/i });
     if (!r.ok) return null;
     const page = extractPage(r.body, r.url);
-    for (const e of businessEmails(page.emails, site.domain)) if (!found.has(e.email)) found.set(e.email, { ...e, url: r.url });
+    for (const e of businessEmails(page.emails, site.domain, page.mailto)) if (!found.has(e.email)) found.set(e.email, { ...e, url: r.url });
     return page;
   };
 
@@ -47,14 +47,15 @@ export async function findEmailsOnWebsite(website: string, opts: { budgetMs?: nu
   const home = await visit(site.website);
   if (!home) return { status: "failed", emails: [], siteName: null, note: "Couldn't read the homepage." };
   siteName = home.siteName;
-  // Contact pages first; stop as soon as an address is found.
-  const next = pickFollowUpPages(home, 3).sort((a, b) => Number(/contact|about/i.test(b)) - Number(/contact|about/i.test(a))).slice(0, 2);
-  for (const url of next) {
-    if (found.size || Date.now() > deadline - 1500) break;
-    await visit(url);
-  }
+  // Contact, impressum, about/team, then privacy pages.
+  // Sites whose menu is built by scripts link to nothing readable, so try the usual contact addresses.
+  const linked = pickContactPages(home, 3);
+  const homeOrigin = new URL(home.url).origin;
+  const next = linked.length ? linked : [`${homeOrigin}/contact`, `${homeOrigin}/contact-us`];
+  // Read them side by side (faster), unless the homepage already showed an address.
+  if (!found.size && Date.now() < deadline - 1500) await Promise.all(next.map((url) => visit(url).catch(() => null)));
   const emails = [...found.values()].sort((a, b) => Number(a.kind === "named") - Number(b.kind === "named")).slice(0, 5);
   return emails.length
     ? { status: "found", emails, siteName, note: `Found on ${new URL(emails[0].url).pathname || "/"}` }
-    : { status: "none", emails: [], siteName, note: "No email shown on the homepage or contact page." };
+    : { status: "none", emails: [], siteName, note: linked.length ? "No email shown on the homepage or its contact/about pages." : "No email shown on the homepage, and it links to no contact page." };
 }

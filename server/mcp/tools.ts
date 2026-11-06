@@ -107,6 +107,8 @@ export const mcpTools: ToolDef<McpCtx>[] = [
         query: r.query,
         note: "Live Google Maps results; Locenti doesn't store them. Save the ones you want.",
         results: r.results.map((p) => ({ place_id: p.placeId, name: p.name, address: p.address, website: p.website, phone: p.phone, emails: p.emails.map((e) => e.email), rating: p.rating, reviews: p.ratingCount, category: p.category, already_saved: p.saved })),
+        // Had a website, but no email could be found on it (not charged).
+        without_email: r.withoutEmail.map((p) => ({ place_id: p.placeId, name: p.name, address: p.address, website: p.website, phone: p.phone, rating: p.rating, reviews: p.ratingCount, category: p.category, already_saved: p.saved })),
       };
     },
   },
