@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createRemoteJWKSet, jwtVerify } from "jose";
-import { GOOGLE_ISSUERS, GOOGLE_JWKS_URL, GOOGLE_TOKEN_URL, SESSION_COOKIE, SIGNUP_SOURCE_COOKIE, STATE_COOKIE } from "@/lib/auth/constants";
+import { GOOGLE_ISSUERS, GOOGLE_JWKS_URL, GOOGLE_TOKEN_URL, SESSION_COOKIE, SIGNED_IN_COOKIE, SIGNUP_SOURCE_COOKIE, STATE_COOKIE } from "@/lib/auth/constants";
 import { parseAttribution } from "@/lib/attribution";
 import { recordAttribution } from "@/server/attribution-store";
 import { callbackUrl, checkIdTokenClaims, resolveAppOrigin } from "@/lib/auth/oidc";
@@ -9,7 +9,7 @@ import { mayUseLocenti } from "@/server/access";
 import { accountsConfigured, configuredSiteUrl, googleOAuth, sessionSecret } from "@/server/env";
 import { withService } from "@/server/db";
 import { googleSignIn, type Q } from "@/server/auth-store";
-import { newSessionToken, sessionCookieOptions } from "@/server/session";
+import { newSessionToken, sessionCookieOptions, signedInHintOptions } from "@/server/session";
 
 const googleKeys = createRemoteJWKSet(new URL(GOOGLE_JWKS_URL));
 
@@ -75,5 +75,6 @@ export async function GET(request: NextRequest) {
   res.cookies.delete({ name: STATE_COOKIE, path: "/api/auth/google" });
   res.cookies.delete({ name: SIGNUP_SOURCE_COOKIE, path: "/api/auth/google" });
   res.cookies.set(SESSION_COOKIE, token, sessionCookieOptions);
+  res.cookies.set(SIGNED_IN_COOKIE, "1", signedInHintOptions);
   return res;
 }

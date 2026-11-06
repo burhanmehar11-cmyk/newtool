@@ -1,11 +1,20 @@
 import "server-only";
 import { cookies, headers } from "next/headers";
-import { SESSION_COOKIE, SESSION_IDLE_S, SESSION_MAX_AGE_S } from "@/lib/auth/constants";
+import { SESSION_COOKIE, SESSION_IDLE_S, SESSION_MAX_AGE_S, SIGNED_IN_COOKIE } from "@/lib/auth/constants";
 import { signSession } from "@/lib/auth/tokens";
 import { resolveAppOrigin } from "@/lib/auth/oidc";
 import { configuredSiteUrl, sessionSecret } from "@/server/env";
 import { withService } from "@/server/db";
 import { AUTH_SQL } from "@/server/db-sql";
+
+/** Options for the readable signed-in hint (no secret in it; the session cookie stays httpOnly). */
+export const signedInHintOptions = {
+  httpOnly: false,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: "lax" as const,
+  path: "/",
+  maxAge: SESSION_MAX_AGE_S,
+};
 
 export const sessionCookieOptions = {
   httpOnly: true,
@@ -24,7 +33,9 @@ export async function newSessionToken(userId: string, userAgent: string | null) 
 /** For server actions and route handlers that use next/headers cookies. */
 export async function startSession(userId: string) {
   const h = await headers();
-  (await cookies()).set(SESSION_COOKIE, await newSessionToken(userId, h.get("user-agent")), sessionCookieOptions);
+  const jar = await cookies();
+  jar.set(SESSION_COOKIE, await newSessionToken(userId, h.get("user-agent")), sessionCookieOptions);
+  jar.set(SIGNED_IN_COOKIE, "1", signedInHintOptions);
 }
 
 /** The app's canonical origin, for links in emails. */

@@ -39,7 +39,11 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
 
 export async function requireUser(next = "/app"): Promise<CurrentUser> {
   const user = await getCurrentUser();
-  if (!user) redirect(`/sign-in?next=${encodeURIComponent(next)}`);
+  if (!user) {
+    // A cookie that no longer works (expired or signed out elsewhere): say so, so the sign-in page doesn't send it back.
+    const stale = !!(await cookies()).get(SESSION_COOKIE)?.value;
+    redirect(`/sign-in?next=${encodeURIComponent(next)}${stale ? "&reauth=1" : ""}`);
+  }
   return user;
 }
 

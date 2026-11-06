@@ -12,3 +12,6 @@ export const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
 
 /** Short-lived cookie carrying a new account's sign-up source through the Google sign-in step. */
 export const SIGNUP_SOURCE_COOKIE = "locenti_src";
+
+/** Readable "you're signed in" hint for static pages (the header shows "Open dashboard"). Not a credential. */
+export const SIGNED_IN_COOKIE = "locenti_in";

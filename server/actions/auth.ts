@@ -2,7 +2,7 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { SESSION_COOKIE } from "@/lib/auth/constants";
+import { SESSION_COOKIE, SIGNED_IN_COOKIE } from "@/lib/auth/constants";
 import { getCurrentUser } from "@/server/auth";
 import { withService } from "@/server/db";
 import { AUTH_SQL } from "@/server/db-sql";
@@ -13,6 +13,8 @@ export async function signOutAction() {
   if (user) {
     await withService((q) => q.query(AUTH_SQL.revokeSession, [user.sessionId])).catch(() => undefined);
   }
-  (await cookies()).delete(SESSION_COOKIE);
+  const jar = await cookies();
+  jar.delete(SESSION_COOKIE);
+  jar.delete(SIGNED_IN_COOKIE);
   redirect("/");
 }

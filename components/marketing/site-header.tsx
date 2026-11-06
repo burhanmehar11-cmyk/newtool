@@ -4,6 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { Menu } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
+import { SIGNED_IN_COOKIE } from "@/lib/auth/constants";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogTrigger, SheetCloseButton, SheetContent } from "@/components/ui/sheet";
 
@@ -14,8 +15,13 @@ export const marketingNav = [
   { href: "/#pricing", label: "Pricing" },
 ];
 
+const noop = () => () => {};
+const hasSignedInHint = () => document.cookie.split("; ").includes(`${SIGNED_IN_COOKIE}=1`);
+
 export function SiteHeader() {
   const [open, setOpen] = React.useState(false);
+  // Set at sign-in next to the session cookie (which scripts can't read), so a returning visitor sees their dashboard link.
+  const signedIn = React.useSyncExternalStore(noop, hasSignedInHint, () => false);
   // Close the menu if this page is hidden by a navigation.
   React.useLayoutEffect(() => () => setOpen(false), []);
 
@@ -39,12 +45,20 @@ export function SiteHeader() {
           ))}
         </nav>
         <div className="ml-auto flex items-center gap-2">
-          <Link href="/sign-in" className="hidden rounded-lg px-3 py-2 text-sm text-white/75 transition-colors duration-200 hover:text-white sm:inline-flex">
-            Sign in
-          </Link>
-          <Button asChild variant="mint" size="sm" className="hidden h-9 px-4 sm:inline-flex">
-            <Link href="/sign-up">Get started</Link>
-          </Button>
+          {signedIn ? (
+            <Button asChild variant="mint" size="sm" className="hidden h-9 px-4 sm:inline-flex">
+              <Link href="/app">Open dashboard</Link>
+            </Button>
+          ) : (
+            <>
+              <Link href="/sign-in" className="hidden rounded-lg px-3 py-2 text-sm text-white/75 transition-colors duration-200 hover:text-white sm:inline-flex">
+                Sign in
+              </Link>
+              <Button asChild variant="mint" size="sm" className="hidden h-9 px-4 sm:inline-flex">
+                <Link href="/sign-up">Get started</Link>
+              </Button>
+            </>
+          )}
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button variant="ghost-dark" size="icon" className="md:hidden" aria-label="Open menu">
@@ -62,14 +76,16 @@ export function SiteHeader() {
                     {n.label}
                   </Link>
                 ))}
-                <Link href="/sign-in" onClick={() => setOpen(false)} className="rounded-lg px-3 py-3 text-base text-white/85 hover:bg-white/[0.06] hover:text-white">
-                  Sign in
-                </Link>
+                {signedIn ? null : (
+                  <Link href="/sign-in" onClick={() => setOpen(false)} className="rounded-lg px-3 py-3 text-base text-white/85 hover:bg-white/[0.06] hover:text-white">
+                    Sign in
+                  </Link>
+                )}
               </nav>
               <div className="mt-auto border-t border-white/[0.08] p-5">
                 <Button asChild variant="mint" size="lg" className="w-full">
-                  <Link href="/sign-up" onClick={() => setOpen(false)}>
-                    Get started
+                  <Link href={signedIn ? "/app" : "/sign-up"} onClick={() => setOpen(false)}>
+                    {signedIn ? "Open dashboard" : "Get started"}
                   </Link>
                 </Button>
               </div>
