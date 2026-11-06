@@ -22,6 +22,7 @@ const MARKERS: { file: string; sql: string }[] = [
   { file: "0012_webhooks.sql", sql: "select 1 from information_schema.tables where table_schema = 'public' and table_name = 'webhook_endpoints'" },
   { file: "0013_viewer.sql", sql: "select 1 from pg_policies where schemaname = 'public' and policyname = 'leads_member_read'" },
   { file: "0014_billing.sql", sql: "select 1 from information_schema.tables where table_schema = 'app' and table_name = 'billing_accounts'" },
+  { file: "0015_campaign_delete.sql", sql: "select 1 from information_schema.columns where table_schema = 'public' and table_name = 'campaigns' and column_name = 'deleted_at'" },
 ];
 
 export const LATEST_MIGRATION = MARKERS.at(-1)!.file;

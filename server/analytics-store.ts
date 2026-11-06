@@ -70,7 +70,7 @@ export async function campaignStats(q: Q, ws: string): Promise<CampaignStat[]> {
          (select count(*)::int from public.threads t where t.campaign_id = c.id and t.last_inbound_at is not null and t.classification not in ('out_of_office', 'bounce')) as replied,
          (select count(*)::int from public.threads t where t.campaign_id = c.id and t.classification = 'interested') as interested,
          (select count(*)::int from public.threads t where t.campaign_id = c.id and t.classification = 'bounce') as bounced
-       from public.campaigns c where c.workspace_id = $1 and c.status <> 'draft'
+       from public.campaigns c where c.workspace_id = $1 and c.status <> 'draft' and c.deleted_at is null
        order by c.launched_at desc nulls last limit 50`,
       [ws],
     )

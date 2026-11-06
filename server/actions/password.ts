@@ -57,10 +57,10 @@ export async function signUpWithPasswordAction(_: FormState, form: FormData): Pr
   if (!accountsConfigured()) return NOT_CONFIGURED;
   if (!(await emailAvailable())) return NO_EMAIL;
   const parsed = z
-    .object({ name: z.string().trim().min(2, "Add your name.").max(120), email, password: z.string() })
-    .safeParse({ name: form.get("name"), email: form.get("email"), password: form.get("password") });
+    .object({ email, password: z.string() })
+    .safeParse({ email: form.get("email"), password: form.get("password") });
   const fieldErrors: Record<string, string> = parsed.success ? {} : Object.fromEntries(parsed.error.issues.map((i) => [String(i.path[0]), i.message]));
-  const values = { email: String(form.get("email") ?? "").slice(0, 254), name: String(form.get("name") ?? "").slice(0, 120) };
+  const values = { email: String(form.get("email") ?? "").slice(0, 254) };
   const pw = String(form.get("password") ?? "");
   const pwProblem = passwordProblem(pw);
   if (pwProblem) fieldErrors.password = pwProblem;
@@ -68,7 +68,7 @@ export async function signUpWithPasswordAction(_: FormState, form: FormData): Pr
   if (!(await mayUseLocenti(parsed.data.email))) return { values, error: NOT_INVITED };
 
   const origin = await appOrigin();
-  const r = await svc((q) => passwordSignUp(q, parsed.data.email, pw, parsed.data.name));
+  const r = await svc((q) => passwordSignUp(q, parsed.data.email, pw, parsed.data.email.split("@")[0].slice(0, 120)));
   const src = parseAttribution(form.get("src"));
   if (r.kind === "verify" && src) await svc((q) => recordAttribution(q, r.userId, src)).catch(() => undefined);
   try {

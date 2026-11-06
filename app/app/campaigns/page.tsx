@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/misc";
 import { PageLoading } from "@/features/product/page-loading";
 import { DoNotContact } from "@/features/campaigns/do-not-contact";
+import { CampaignRowActions } from "@/features/campaigns/campaign-row-actions";
 import { requireWorkspace } from "@/server/auth";
 import { getCampaignsOverview } from "@/server/services/campaigns";
 import { formatDate } from "@/lib/utils";
@@ -70,7 +71,7 @@ async function Campaigns() {
         {campaigns.length ? (
           <div className="card overflow-hidden">
             <div className="overflow-x-auto scrollbar-thin">
-              <table className="w-full min-w-[760px] text-left text-sm">
+              <table className="w-full min-w-[880px] text-left text-sm">
                 <caption className="sr-only">Campaigns</caption>
                 <thead className="border-b border-line bg-canvas/60 text-xs text-slate">
                   <tr>
@@ -80,7 +81,8 @@ async function Campaigns() {
                     <th scope="col" className="py-2.5 pr-3 text-right font-medium">Sent</th>
                     <th scope="col" className="py-2.5 pr-3 text-right font-medium">Queued</th>
                     <th scope="col" className="py-2.5 pr-3 text-right font-medium">Replies</th>
-                    <th scope="col" className="py-2.5 pr-5 text-right font-medium">Interested</th>
+                    <th scope="col" className="py-2.5 pr-3 text-right font-medium">Interested</th>
+                    {canManage ? <th scope="col" className="py-2.5 pr-5 text-right font-medium"><span className="sr-only">Actions</span></th> : null}
                   </tr>
                 </thead>
                 <tbody>
@@ -99,7 +101,12 @@ async function Campaigns() {
                       <td className="py-3 pr-3 text-right tabular-nums">{c.sent}</td>
                       <td className="py-3 pr-3 text-right tabular-nums">{c.queued}</td>
                       <td className="py-3 pr-3 text-right tabular-nums">{c.replied}</td>
-                      <td className="py-3 pr-5 text-right tabular-nums text-green">{c.interested}</td>
+                      <td className="py-3 pr-3 text-right tabular-nums text-green">{c.interested}</td>
+                      {canManage ? (
+                        <td className="py-3 pr-5 text-right">
+                          <CampaignRowActions id={c.id} status={c.status} name={c.name} />
+                        </td>
+                      ) : null}
                     </tr>
                   ))}
                 </tbody>

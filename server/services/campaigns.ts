@@ -17,6 +17,9 @@ import {
   getCampaign,
   listCampaigns,
   listFollowUps,
+  updateLiveSettings,
+  reopenAsDraft,
+  deleteCampaign,
   saveFollowUps,
   listSuppressions,
   removeRecipient,
@@ -258,6 +261,41 @@ export async function changeCampaignStatus(campaignId: string, action: "pause" |
         : setCampaignStatus(q, campaignId, ["draft", "running", "paused"], "cancelled"),
   );
   return ok ? { ok: true } : { ok: false, error: "That change isn't possible in the campaign's current state." };
+}
+
+const liveSchema = z.object({
+  name: z.string().trim().min(2, "Give the campaign a name.").max(120),
+  timezone: z.string().refine(isValidTimezone, "Unknown time zone."),
+  days: z.array(z.number().int().min(0).max(6)).min(1, "Pick at least one day."),
+  startHour: z.number().int().min(0).max(23),
+  endHour: z.number().int().min(1).max(24),
+});
+
+/** Renames a running or paused campaign, or changes its sending days and hours. */
+export async function editLiveCampaign(campaignId: string, input: unknown): Promise<R> {
+  const { user, workspace } = await requireWorkspace(`/app/campaigns/${campaignId}`);
+  if (!canManage(workspace.role) || !uuid.safeParse(campaignId).success) return { ok: false, error: "Only workspace owners and admins can change campaigns." };
+  const p = liveSchema.safeParse(input);
+  if (!p.success) return { ok: false, error: p.error.issues[0].message };
+  if (p.data.endHour <= p.data.startHour) return { ok: false, error: "The end hour must be after the start hour." };
+  const schedule: Schedule = { timezone: p.data.timezone, days: [...new Set(p.data.days)].sort(), startHour: p.data.startHour, endHour: p.data.endHour };
+  const ok = await asQ(user.id, (q) => updateLiveSettings(q, campaignId, { name: p.data.name, schedule }));
+  return ok ? { ok: true } : { ok: false, error: "Only running or paused campaigns can be changed this way." };
+}
+
+/** Back to draft (paused campaigns only) so messages and recipients can be edited; needs a new approval. */
+export async function reopenCampaign(campaignId: string): Promise<R> {
+  const { user, workspace } = await requireWorkspace(`/app/campaigns/${campaignId}`);
+  if (!canManage(workspace.role) || !uuid.safeParse(campaignId).success) return { ok: false, error: "Only workspace owners and admins can change campaigns." };
+  const ok = await asQ(user.id, (q) => reopenAsDraft(q, campaignId));
+  return ok ? { ok: true } : { ok: false, error: "Pause the campaign first, then edit its messages." };
+}
+
+export async function removeCampaign(campaignId: string): Promise<R> {
+  const { user, workspace } = await requireWorkspace("/app/campaigns");
+  if (!canManage(workspace.role) || !uuid.safeParse(campaignId).success) return { ok: false, error: "Only workspace owners and admins can delete campaigns." };
+  const ok = await asQ(user.id, (q) => deleteCampaign(q, campaignId));
+  return ok ? { ok: true } : { ok: false, error: "Campaign not found." };
 }
 
 /** Runs one sending pass for this workspace now (same rules as the scheduler). */

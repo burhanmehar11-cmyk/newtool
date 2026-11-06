@@ -221,7 +221,6 @@ export function SignUpForm({ emailEnabled }: { emailEnabled: boolean }) {
       {emailEnabled ? (
         <form action={action} className="space-y-5" noValidate>
           <input ref={srcRef} type="hidden" name="src" defaultValue="" />
-          <DarkField name="name" label="Your name" autoComplete="name" placeholder="Alex Morgan" defaultValue={state.values?.name} error={state.fieldErrors?.name} />
           <DarkField
             name="email"
             label="Work email"

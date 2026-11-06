@@ -1,7 +1,7 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PGlite } from "@electric-sql/pglite";
 import type { Q } from "@/server/auth-store";
-import { addSuppression, approveCampaign, createCampaign, getCampaign, saveDraft, saveFollowUps, setCampaignStatus, updateCampaignSettings } from "@/server/campaign-store";
+import { addSuppression, approveCampaign, createCampaign, deleteCampaign, getCampaign, listCampaigns, reopenAsDraft, saveDraft, saveFollowUps, setCampaignStatus, updateCampaignSettings, updateLiveSettings } from "@/server/campaign-store";
 import type { FollowUp } from "@/lib/campaigns/followups";
 import { upsertMailbox } from "@/server/mailbox-store";
 import { recordInbound } from "@/server/replies-store";
@@ -353,5 +353,52 @@ describe("follow-ups", () => {
     const c = await runningCampaign(["fulocked@shop.example"], FU);
     expect(await as(db, A, () => saveFollowUps(q, ws, c.id, []))).toBe(false);
     expect((await db.query<{ n: number }>("select count(*)::int as n from public.campaign_steps where campaign_id = $1 and kind = 'follow_up'", [c.id])).rows[0].n).toBe(2);
+  });
+});
+
+describe("editing and deleting campaigns", () => {
+  it("renames and reschedules a running campaign without touching what was approved", async () => {
+    const c = await runningCampaign(["edit1@shop.example"]);
+    const before = await as(db, A, () => getCampaign(q, c.id));
+    expect(await as(db, A, () => updateLiveSettings(q, c.id, { name: "Renamed", schedule: { ...ALWAYS, startHour: 8 } }))).toBe(true);
+    const after = await as(db, A, () => getCampaign(q, c.id));
+    expect(after).toMatchObject({ name: "Renamed", status: "running", revision: before!.revision });
+    expect(after!.schedule.startHour).toBe(8);
+  });
+
+  it("goes back to draft from paused, keeps sent emails sent, and never sends them twice after re-approval", async () => {
+    const c = await runningCampaign(["re1@shop.example", "re2@shop.example"]);
+    await only(c.id);
+    await runDispatch({ workspaceId: ws, ignoreGap: true }); // one sent
+    await as(db, A, () => setCampaignStatus(q, c.id, ["running"], "paused"));
+    expect(await as(db, A, () => reopenAsDraft(q, c.id))).toBe(true);
+    expect(await status(c.id)).toBe("draft");
+    expect((await enrollments(c.id)).map((e) => e.state)).toEqual(["sent"]); // the unsent one waits for approval
+    const d = await as(db, A, () => getCampaign(q, c.id));
+    await as(db, A, () => approveCampaign(q, ws, A, c.id, d!.revision));
+    await runDispatch({ workspaceId: ws, ignoreGap: true });
+    await runDispatch({ workspaceId: ws, ignoreGap: true });
+    expect(h.send).toHaveBeenCalledTimes(2); // each address exactly once
+    expect(await as(db, A, () => reopenAsDraft(q, c.id))).toBe(false); // only from paused
+  });
+
+  it("deletes: hidden from the list, queued emails stopped, leads free for a new campaign, history kept", async () => {
+    const c = await runningCampaign(["del1@shop.example", "del2@shop.example"]);
+    await only(c.id);
+    await runDispatch({ workspaceId: ws, ignoreGap: true }); // one sent
+    expect(await as(db, A, () => deleteCampaign(q, c.id))).toBe(true);
+    expect(await as(db, A, () => getCampaign(q, c.id))).toBeNull();
+    expect((await as(db, A, () => listCampaigns(q, ws))).some((x) => x.id === c.id)).toBe(false);
+    expect((await enrollments(c.id)).every((e) => e.state === "stopped")).toBe(true);
+    expect(await dispatches(c.id)).toEqual(["accepted"]); // sent history stays
+    await runDispatch({ workspaceId: ws, ignoreGap: true });
+    expect(h.send).toHaveBeenCalledTimes(1);
+    // The same leads can join a new campaign.
+    const again = await as(db, A, async () => {
+      const id = await createCampaign(q, ws, A, { name: "Again", schedule: ALWAYS, mailboxId: c.mailbox, leadIds: c.leadIds });
+      const x = await getCampaign(q, id);
+      return approveCampaign(q, ws, A, id, x!.revision);
+    });
+    expect(again).toEqual({ enrolled: 2 });
   });
 });

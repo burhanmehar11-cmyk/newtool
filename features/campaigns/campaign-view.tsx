@@ -2,14 +2,14 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, Loader2, Pause, Play, Send, Sparkles, Trash2, X } from "lucide-react";
+import { ChevronDown, Loader2, Pause, Pencil, Play, Send, Sparkles, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox, FieldHint, Input, Label, Select, Textarea } from "@/components/ui/field";
 import { Callout } from "@/components/ui/misc";
-import { describeSchedule, TIMEZONES } from "@/lib/campaigns/schedule";
+import { DEFAULT_SCHEDULE, describeSchedule, TIMEZONES } from "@/lib/campaigns/schedule";
 import { writeCampaignDraftsAction, writeDraftAction } from "@/server/actions/ai";
-import { approveAction, campaignStatusAction, dropRecipientAction, editDraftAction, saveCampaignSettingsAction, sendDueNowAction } from "@/server/actions/campaigns";
+import { approveAction, campaignStatusAction, deleteCampaignAction, dropRecipientAction, editDraftAction, editLiveCampaignAction, reopenCampaignAction, saveCampaignSettingsAction, sendDueNowAction } from "@/server/actions/campaigns";
 import type { CampaignRow, RecipientRow } from "@/server/campaign-store";
 import type { FollowUp } from "@/lib/campaigns/followups";
 import { FollowUpsEditor, FollowUpsSummary } from "@/features/campaigns/follow-ups";
@@ -88,6 +88,11 @@ function DraftCampaign({ campaign, recipients, mailboxes, canManage, aiConfigure
       <div className="space-y-5">
         <ApprovePanel campaign={campaign} willSend={willSend.length} total={recipients.length} canManage={canManage} mailboxes={mailboxes} />
         <FollowUpsEditor key={`${campaign.revision}`} campaignId={campaign.id} initial={followUps} canManage={canManage} />
+        {canManage ? (
+          <div className="flex justify-end">
+            <DeleteCampaignButton id={campaign.id} draft />
+          </div>
+        ) : null}
         <SettingsForm campaign={campaign} mailboxes={mailboxes} canManage={canManage} />
       </div>
     </div>
@@ -221,15 +226,25 @@ function ApprovePanel({ campaign, willSend, total, canManage, mailboxes }: { cam
 }
 
 function SettingsForm({ campaign, mailboxes, canManage }: { campaign: CampaignRow; mailboxes: MailboxRow[]; canManage: boolean }) {
-  const s = campaign.schedule;
+  // Fall back to the default for an incomplete schedule, so the form always works.
+  const s = campaign.schedule && Array.isArray(campaign.schedule.days) && campaign.schedule.timezone ? campaign.schedule : DEFAULT_SCHEDULE;
   const [days, setDays] = React.useState<number[]>(s.days);
   const { pending, msg, run } = useAction();
+  // Running or paused: only the name and sending days/hours can change (they don't change what was approved).
+  const live = campaign.status === "running" || campaign.status === "paused";
   return (
     <form
       className="card space-y-4 p-5"
       onSubmit={(e) => {
         e.preventDefault();
         const fd = new FormData(e.currentTarget);
+        if (live) {
+          run(
+            () => editLiveCampaignAction(campaign.id, { name: String(fd.get("name")), timezone: String(fd.get("timezone")), days, startHour: Number(fd.get("startHour")), endHour: Number(fd.get("endHour")) }),
+            "Saved. The new sending hours apply from the next email.",
+          );
+          return;
+        }
         run(
           () =>
             saveCampaignSettingsAction(campaign.id, {
@@ -246,13 +261,14 @@ function SettingsForm({ campaign, mailboxes, canManage }: { campaign: CampaignRo
         );
       }}
     >
-      <h2 className="font-display text-base font-semibold text-ink">Settings</h2>
+      <h2 className="font-display text-base font-semibold text-ink">{live ? "Edit campaign" : "Settings"}</h2>
+      {live ? <p className="-mt-2 text-xs text-slate">Rename it or change when it sends. To change messages or recipients, pause it and choose Edit messages.</p> : null}
       <fieldset disabled={!canManage} className="space-y-4">
         <div className="space-y-1.5">
           <Label htmlFor="cs-name">Name</Label>
           <Input id="cs-name" name="name" defaultValue={campaign.name} maxLength={120} />
         </div>
-        <div className="space-y-1.5">
+        <div className={cn("space-y-1.5", live && "hidden")}>
           <Label htmlFor="cs-box">Send from</Label>
           <Select id="cs-box" name="mailboxId" defaultValue={campaign.sending_account_id ?? ""}>
             <option value="">Choose a mailbox</option>
@@ -314,14 +330,14 @@ function SettingsForm({ campaign, mailboxes, canManage }: { campaign: CampaignRo
             </Select>
           </div>
         </div>
-        <label className="flex items-start gap-2.5 text-sm text-ink">
+        <label className={cn("flex items-start gap-2.5 text-sm text-ink", live && "hidden")}>
           <Checkbox name="includeUnknown" defaultChecked={campaign.policy.includeUnknown} className="mt-0.5" />
           <span>
             Include addresses found on business websites
             <span className="block text-xs text-slate">Published by the business on its own site, and its domain accepts email. Bounces are stopped and blocked automatically.</span>
           </span>
         </label>
-        <label className="flex items-start gap-2.5 text-sm text-ink">
+        <label className={cn("flex items-start gap-2.5 text-sm text-ink", live && "hidden")}>
           <Checkbox name="includeCatchAll" defaultChecked={campaign.policy.includeCatchAll} className="mt-0.5" />
           <span>Include catch-all domains</span>
         </label>
@@ -333,7 +349,7 @@ function SettingsForm({ campaign, mailboxes, canManage }: { campaign: CampaignRo
       ) : null}
       {canManage ? (
         <Button type="submit" variant="secondary" disabled={pending}>
-          {pending ? <Loader2 aria-hidden className="animate-spin" /> : null} Save settings
+          {pending ? <Loader2 aria-hidden className="animate-spin" /> : null} {live ? "Save changes" : "Save settings"}
         </Button>
       ) : null}
     </form>
@@ -449,26 +465,59 @@ function LiveCampaign({ campaign, recipients, mailboxes, canManage, followUps }:
                   <Play aria-hidden /> Resume
                 </Button>
               ) : null}
-              {campaign.status === "running" || campaign.status === "paused" ? (
+              {campaign.status === "paused" ? (
                 <Button
                   size="sm"
-                  variant="ghost"
+                  variant="secondary"
                   disabled={pending}
                   onClick={() => {
-                    if (confirm("Cancel this campaign? Queued emails won't be sent. Emails already sent stay sent.")) run(() => campaignStatusAction(campaign.id, "cancel"), "Cancelled.");
+                    if (confirm("Edit messages and recipients? The campaign goes back to draft and needs approving again. Emails already sent stay sent and are never sent twice.")) run(() => reopenCampaignAction(campaign.id), "Back to draft: edit and approve again.");
                   }}
                 >
-                  <Trash2 aria-hidden /> Cancel
+                  <Pencil aria-hidden /> Edit messages
                 </Button>
               ) : null}
+              <DeleteCampaignButton id={campaign.id} />
             </div>
           ) : null}
           <p className="text-xs leading-5 text-slate">
             Emails go out automatically during sending hours while Locenti is open in any tab (or around the clock with the optional scheduler). &quot;Send next due email&quot; sends one now, using the same limits.
           </p>
         </section>
+        {canManage && (campaign.status === "running" || campaign.status === "paused") ? <SettingsForm campaign={campaign} mailboxes={mailboxes} canManage={canManage} /> : null}
         <FollowUpsSummary steps={followUps} />
       </div>
     </div>
+  );
+}
+
+/** Deletes the campaign (after confirming) and goes back to the list. */
+export function DeleteCampaignButton({ id, draft }: { id: string; draft?: boolean }) {
+  const router = useRouter();
+  const [pending, start] = React.useTransition();
+  const [error, setError] = React.useState<string | null>(null);
+  return (
+    <span className="inline-flex flex-col items-end">
+      <Button
+        size="sm"
+        variant="ghost"
+        className="text-danger-fg hover:bg-danger-bg"
+        disabled={pending}
+        onClick={() => {
+          const text = draft
+            ? "Delete this draft campaign? Nothing has been sent from it."
+            : "Delete this campaign? Anything not sent yet is stopped. Emails already sent stay in your history and replies stay in the Inbox.";
+          if (!confirm(text)) return;
+          start(async () => {
+            const r = await deleteCampaignAction(id);
+            if (r.ok) router.push("/app/campaigns");
+            else setError(r.error);
+          });
+        }}
+      >
+        {pending ? <Loader2 aria-hidden className="animate-spin" /> : <Trash2 aria-hidden />} Delete campaign
+      </Button>
+      {error ? <span className="text-xs text-danger-fg">{error}</span> : null}
+    </span>
   );
 }

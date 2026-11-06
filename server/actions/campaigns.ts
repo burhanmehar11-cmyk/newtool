@@ -9,9 +9,13 @@ import {
   dropRecipient,
   editRecipientDraft,
   removeDoNotContact,
-  saveCampaignFollowUps, saveCampaignSettings,
+  saveCampaignFollowUps,
+  saveCampaignSettings,
   sendDueNow,
   autoSendTick,
+  editLiveCampaign,
+  reopenCampaign,
+  removeCampaign,
 } from "@/server/services/campaigns";
 
 const refresh = () => revalidatePath("/app", "layout");
@@ -48,6 +52,21 @@ export async function approveAction(campaignId: string, revision: number, confir
 }
 export async function campaignStatusAction(campaignId: string, action: "pause" | "resume" | "cancel") {
   const r = await changeCampaignStatus(campaignId, action);
+  refresh();
+  return r;
+}
+export async function editLiveCampaignAction(campaignId: string, input: unknown) {
+  const r = await editLiveCampaign(campaignId, input);
+  refresh();
+  return r;
+}
+export async function reopenCampaignAction(campaignId: string) {
+  const r = await reopenCampaign(campaignId);
+  refresh();
+  return r;
+}
+export async function deleteCampaignAction(campaignId: string) {
+  const r = await removeCampaign(campaignId);
   refresh();
   return r;
 }

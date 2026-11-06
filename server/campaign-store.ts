@@ -91,14 +91,14 @@ export async function listCampaigns(q: Q, ws: string): Promise<CampaignListRow[]
          (select count(*)::int from public.enrollments e where e.campaign_id = c.id and e.state = 'queued') as queued,
          (select count(*)::int from public.enrollments e where e.campaign_id = c.id and e.state = 'replied') as replied,
          (select count(*)::int from public.threads t where t.campaign_id = c.id and t.classification = 'interested' and t.last_inbound_at is not null) as interested
-       from public.campaigns c where c.workspace_id = $1 order by c.created_at desc limit 100`,
+       from public.campaigns c where c.workspace_id = $1 and c.deleted_at is null order by c.created_at desc limit 100`,
       [ws],
     )
   ).rows;
 }
 
 export async function getCampaign(q: Q, id: string): Promise<CampaignRow | null> {
-  return (await q.query<CampaignRow>(`select ${CAMPAIGN_COLS} from public.campaigns where id = $1`, [id])).rows[0] ?? null;
+  return (await q.query<CampaignRow>(`select ${CAMPAIGN_COLS} from public.campaigns where id = $1 and deleted_at is null`, [id])).rows[0] ?? null;
 }
 
 export type RecipientRow = {
@@ -264,6 +264,52 @@ export async function setCampaignStatus(q: Q, campaignId: string, from: Campaign
     await q.query("update public.enrollments set next_send_at = null, reason = 'Campaign cancelled', updated_at = now() where campaign_id = $1 and state = 'sent' and next_send_at is not null", [campaignId]);
   }
   return r.rows.length > 0;
+}
+
+/* ------------------------------------------------------ editing and deleting */
+
+/** Name and sending days/hours can change at any time: they don't change what was approved. */
+export async function updateLiveSettings(q: Q, campaignId: string, p: { name: string; schedule: Schedule }) {
+  const r = await q.query(
+    "update public.campaigns set name = $2, schedule = $3::jsonb where id = $1 and status in ('running', 'paused') and deleted_at is null returning id",
+    [campaignId, p.name, JSON.stringify(p.schedule)],
+  );
+  return r.rows.length > 0;
+}
+
+/**
+ * Turns a paused campaign back into a draft so its messages and recipients can
+ * change. Emails already sent stay sent (and are never sent again); unsent
+ * ones wait for a new approval.
+ */
+export async function reopenAsDraft(q: Q, campaignId: string) {
+  const r = await q.query("update public.campaigns set status = 'draft', revision = revision + 1 where id = $1 and status = 'paused' and deleted_at is null returning id", [campaignId]);
+  if (!r.rows.length) return false;
+  await q.query(
+    `delete from public.enrollments e where e.campaign_id = $1 and e.state = 'queued'
+       and not exists (select 1 from public.dispatches x where x.enrollment_id = e.id)`,
+    [campaignId],
+  );
+  return true;
+}
+
+/**
+ * Deletes a campaign from view: anything still waiting stops, and its leads
+ * are free to join another campaign. Sent emails and replies stay in the
+ * history.
+ */
+export async function deleteCampaign(q: Q, campaignId: string) {
+  const r = await q.query(
+    `update public.campaigns set deleted_at = now(), status = case when status in ('draft', 'running', 'paused') then 'cancelled' else status end
+     where id = $1 and deleted_at is null returning id`,
+    [campaignId],
+  );
+  if (!r.rows.length) return false;
+  await q.query(
+    "update public.enrollments set state = 'stopped', next_send_at = null, reason = 'Campaign deleted', updated_at = now() where campaign_id = $1 and state in ('queued', 'sent')",
+    [campaignId],
+  );
+  return true;
 }
 
 /* ------------------------------------------------------- do-not-contact list */

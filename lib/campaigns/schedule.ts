@@ -54,6 +54,7 @@ export function inSendingWindow(now: Date, s: Schedule): boolean {
 }
 
 export function describeSchedule(s: Schedule) {
+  if (!s || !Array.isArray(s.days) || !s.timezone) return "no sending hours set";
   const names = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const days = s.days.length === 5 && [1, 2, 3, 4, 5].every((d) => s.days.includes(d)) ? "Mon–Fri" : s.days.map((d) => names[d]).join(", ");
   return `${days}, ${String(s.startHour).padStart(2, "0")}:00–${String(s.endHour).padStart(2, "0")}:00 (${s.timezone.replace(/_/g, " ")})`;
