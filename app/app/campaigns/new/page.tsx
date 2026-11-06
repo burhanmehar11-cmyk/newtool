@@ -9,6 +9,9 @@ import { getNewCampaignData } from "@/server/services/campaigns";
 
 export const metadata: Metadata = { title: "New campaign" };
 
+// Creating a campaign reads unresearched leads' websites first.
+export const maxDuration = 60;
+
 export default function NewCampaignPage() {
   return (
     <Suspense fallback={<PageLoading />}>
@@ -24,7 +27,7 @@ async function NewCampaign() {
       <Link href="/app/campaigns" className="mb-4 inline-flex items-center gap-1.5 text-sm text-slate hover:text-ink">
         <ArrowLeft aria-hidden className="size-4" /> All campaigns
       </Link>
-      <PageHeader title="New campaign" description="Pick researched leads and a mailbox. You'll review every message before anything is sent." />
+      <PageHeader title="New campaign" description="Pick leads and a mailbox. You'll review every message before anything is sent." />
       <div className="max-w-3xl">
         <SectionCard>
           <NewCampaignForm leads={leads} mailboxes={mailboxes} hasOffer={hasOffer} />

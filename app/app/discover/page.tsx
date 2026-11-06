@@ -17,6 +17,9 @@ import { formatDateTime } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Discover" };
 
+// A Google Maps search reads each result's website for a public email (up to 60 sites).
+export const maxDuration = 60;
+
 export default function DiscoverPage({ searchParams }: PageProps<"/app/discover">) {
   return (
     <Suspense fallback={<PageLoading />}>

@@ -107,6 +107,20 @@ async function call(url: string, init: RequestInit & { fieldMask: string }): Pro
   return err("upstream_error", `Google Maps returned an error (HTTP ${res.status}).`, res.status >= 500);
 }
 
+/** One page of Text Search (up to 20 places, one API request). For display only; never stored. */
+export async function searchPage(p: { query: string; pageToken?: string | null; minRating?: number | null; regionCode?: string | null }): Promise<Result<{ places: GooglePlace[]; nextPageToken: string | null }>> {
+  if (!placesApiKey()) return err("not_configured", "Google Maps search isn't set up. Add GOOGLE_PLACES_API_KEY on the server.", false);
+  if (!(await takeSlots(1))) return err("quota_exceeded", `Today's Google Maps limit (${dailyLimit()} searches) is used up. It resets at midnight UTC. OpenStreetMap search still works.`, false);
+  const r = await call(`${BASE}/places:searchText`, {
+    method: "POST",
+    fieldMask: TEXT_SEARCH_FIELD_MASK,
+    body: JSON.stringify(buildTextSearchBody({ query: p.query, pageToken: p.pageToken ?? null, minRating: p.minRating, regionCode: p.regionCode })),
+  });
+  if (!r.ok) return r;
+  const parsed = parseTextSearch(r.value);
+  return { ok: true, value: { places: parsed.places, nextPageToken: parsed.nextPageToken } };
+}
+
 /**
  * Up to `maxResults` places (pages of 20; one API request per page). Results
  * are returned for display only and must not be stored.

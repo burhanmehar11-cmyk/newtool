@@ -20,9 +20,9 @@ const SUPPRESSED = (contact: string) => `exists (
 export type EligibleLead = { lead_id: string; name: string; domain: string | null; email: string; contact_id: string; email_status: string };
 
 /**
- * Leads that can join a campaign: researched (have a brief), with a public
- * address that isn't marked invalid, not on the do-not-contact list and not
- * already in an active campaign.
+ * Leads that can join a campaign: with a public address that isn't marked
+ * invalid, not on the do-not-contact list and not already in an active
+ * campaign. Unresearched leads are researched when the campaign is created.
  */
 export async function eligibleLeads(q: Q, ws: string): Promise<EligibleLead[]> {
   return (
@@ -32,7 +32,6 @@ export async function eligibleLeads(q: Q, ws: string): Promise<EligibleLead[]> {
        join public.businesses b on b.id = l.business_id
        join lateral (select * from public.contacts c where c.business_id = b.id and c.status <> 'invalid' order by c.created_at limit 1) c on true
        where l.workspace_id = $1
-         and exists (select 1 from public.briefs br where br.business_id = b.id)
          and not ${SUPPRESSED("c")}
          and not exists (select 1 from public.enrollments e where e.contact_id = c.id and e.state in ('queued', 'sent'))
        order by l.created_at desc limit 300`,

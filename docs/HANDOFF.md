@@ -106,6 +106,11 @@ Before launch: a dedicated least-privilege database role for the app; real-Postg
 - `lib/billing/paddle.ts` (signature check, event normaliser, status → plan), `server/billing-store.ts` (events once, subscription state, unit grants, revenue), `server/services/billing.ts` (`billingConfig`, `accessProblem` enforcement, `getBilling`, `handlePaddleWebhook`), route `app/api/billing/paddle`, page `app/app/billing`, checkout `features/billing/checkout-button.tsx`, Admin → Revenue. Enforcement checks sit in search, research, email finding, the AI writer, campaign approval and the sending pass. Migration `0014_billing.sql`. Tests `tests/billing.test.ts`, `tests/db/billing.test.ts`. Setup: `docs/GOOGLE_CLOUD_SETUP.md` Part K.
 - One workspace per person: onboarding redirects anyone who has one, and creating a second is refused; teammates join via Team invites. The admin panel is reached at `/admin` only (no sidebar link).
 
+## Email-only search, CSV, campaign from search
+
+- `runGoogleSearchAs` (server/services/discovery.ts) pages through `searchPage` (server/providers/google-places.ts), reads websites with `findEmailsOnWebsite`, returns only results with emails and settles units for those. UI: `features/product/google-search.tsx` (Save to leads, Save & download CSV, Start campaign).
+- CSV: `lib/csv.ts`, `server/services/leads-io.ts` (export, import, place → lead lookup), `server/actions/leads-io.ts`, Leads page buttons `features/product/leads-csv.tsx`. Campaign from search: `startCampaignFromLeads` and `researchMissing` in server/services/campaigns.ts. Tests `tests/csv-leads.test.ts`, `tests/db/leads-io.test.ts`.
+
 ## Dashboard, Analytics, migration banner
 
 - `server/analytics-store.ts` + `server/services/analytics.ts`; UI `features/analytics/` (KPI tiles, trend chart, pipeline, campaign table, breakdowns, activity); pages `app/app/page.tsx` (Dashboard) and `app/app/analytics`.

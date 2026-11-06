@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ExternalLink, Loader2, Mail, MapPinned, Star } from "lucide-react";
+import { BookmarkPlus, Download, ExternalLink, Loader2, Mail, MapPinned, Send, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox, FieldError, FieldHint, Input, Label, Select } from "@/components/ui/field";
@@ -12,7 +12,7 @@ import { discoveryNiches } from "@/lib/discovery/niches";
 import { countries, STATES } from "@/lib/geo/regions";
 import { googleMapsLink } from "@/lib/discovery/google-places";
 import { googleDetailsAction, runGoogleSearchAction, saveGoogleLeadsAction } from "@/server/actions/discovery";
-import { findEmailsForResultsAction } from "@/server/actions/emails";
+import { exportPlacesAction, startCampaignFromPlacesAction } from "@/server/actions/leads-io";
 import type { GoogleResult, GoogleSearchOutcome } from "@/server/services/discovery";
 import { cn } from "@/lib/utils";
 
@@ -54,7 +54,6 @@ export function GoogleSearchForm({ available, remainingToday, onResult, prefill 
   const [error, setError] = React.useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = React.useState<Record<string, string>>({});
   const [maxResults, setMaxResults] = React.useState(20);
-  const requests = maxResults / 20;
   const over = maxResults > available;
   const noCalls = remainingToday !== null && remainingToday < 1;
 
@@ -120,24 +119,24 @@ export function GoogleSearchForm({ available, remainingToday, onResult, prefill 
           </Select>
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="g-max">Maximum results</Label>
+          <Label htmlFor="g-max">Businesses with email</Label>
           <Select id="g-max" name="maxResults" value={maxResults} onChange={(e) => setMaxResults(Number(e.target.value))}>
             {[20, 40, 60].map((m) => (
               <option key={m} value={m}>
-                {m}
+                Up to {m}
               </option>
             ))}
           </Select>
           <FieldHint>
-            Uses up to {maxResults} discovery units (you have {available}) and {requests} Google request{requests === 1 ? "" : "s"}
-            {remainingToday !== null ? ` (${remainingToday} left today)` : ""}.
+            Only businesses that show a public email are returned, and only those use units (you have {available}). Locenti checks up to 60 Google Maps results to find them
+            {remainingToday !== null ? ` (${remainingToday} Google requests left today)` : ""}.
           </FieldHint>
         </div>
       </div>
       {error ? <Callout tone="danger">{error}</Callout> : null}
       <Button type="submit" disabled={pending || over || noCalls}>
         {pending ? <Loader2 aria-hidden className="animate-spin" /> : <MapPinned aria-hidden />}
-        {pending ? "Searching Google Maps…" : "Search Google Maps"}
+        {pending ? "Searching and finding emails… (up to a minute)" : "Search Google Maps"}
       </Button>
       {over ? <p className="text-xs text-danger-fg">Lower the maximum results to fit your remaining units.</p> : null}
       {noCalls ? <p className="text-xs text-danger-fg">Today&apos;s Google Maps limit is used up. It resets at midnight UTC; OpenStreetMap search still works.</p> : null}
@@ -145,124 +144,134 @@ export function GoogleSearchForm({ available, remainingToday, onResult, prefill 
   );
 }
 
-type Lookup = { status: "waiting" | "checking" | "found" | "none" | "blocked" | "failed"; emails: { email: string; kind: "role" | "named"; url: string }[]; siteName: string | null; note?: string };
-
-/** Reads each result's website (5 at a time) for a public email, as soon as results appear. */
-function useEmailLookups(rows: GoogleResult[]) {
-  const [map, setMap] = React.useState<Record<string, Lookup>>(() =>
-    Object.fromEntries(rows.filter((r) => r.website && !r.saved).map((r) => [r.placeId, { status: "waiting", emails: [], siteName: null } as Lookup])),
-  );
-  const [error, setError] = React.useState<string | null>(null);
-  React.useEffect(() => {
-    let cancelled = false;
-    const queue = rows.filter((r) => r.website && !r.saved).map((r) => ({ placeId: r.placeId, website: r.website! }));
-    (async () => {
-      for (let i = 0; i < queue.length && !cancelled; i += 5) {
-        const batch = queue.slice(i, i + 5);
-        setMap((m) => ({ ...m, ...Object.fromEntries(batch.map((b) => [b.placeId, { ...m[b.placeId], status: "checking" as const }])) }));
-        const r = await findEmailsForResultsAction(batch).catch(() => null);
-        if (cancelled) return;
-        if (!r || !r.ok) {
-          setError(r && !r.ok ? r.error : "Email lookup stopped. Try again later.");
-          setMap((m) => ({ ...m, ...Object.fromEntries(queue.slice(i).map((b) => [b.placeId, { ...m[b.placeId], status: "failed" as const }])) }));
-          return;
-        }
-        setMap((m) => ({ ...m, ...Object.fromEntries(r.results.map((x) => [x.placeId, { status: x.status, emails: x.emails, siteName: x.siteName, note: x.note } as Lookup])) }));
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [rows]);
-  return { map, error };
+/** Downloads text as a file in the browser. */
+function download(filename: string, text: string) {
+  const url = URL.createObjectURL(new Blob([text], { type: "text/csv;charset=utf-8" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 export function GoogleResults({ result }: { result: Done }) {
   const router = useRouter();
   const [rows, setRows] = React.useState<GoogleResult[]>(result.results);
-  const [initialRows] = React.useState(result.results);
-  const { map: lookups, error: lookupError } = useEmailLookups(initialRows);
-  const [onlyEmail, setOnlyEmail] = React.useState(false);
-  const shown = onlyEmail ? rows.filter((r) => (lookups[r.placeId]?.emails.length ?? 0) > 0) : rows;
-  const checking = Object.values(lookups).filter((l) => l.status === "waiting" || l.status === "checking").length;
-  const withEmail = Object.values(lookups).filter((l) => l.emails.length).length;
-  const selectable = shown.filter((r) => !r.saved && r.website).map((r) => r.placeId);
-  const [selected, setSelected] = React.useState<string[]>([]);
+  const selectable = rows.map((r) => r.placeId);
+  const [selected, setSelected] = React.useState<string[]>(() => rows.filter((r) => !r.saved).map((r) => r.placeId));
   const [pending, start] = React.useTransition();
-  const [status, setStatus] = React.useState<{ tone: "green" | "danger"; text: string } | null>(null);
+  const [busy, setBusy] = React.useState<null | "save" | "csv" | "campaign">(null);
+  const [status, setStatus] = React.useState<{ tone: "green" | "danger" | "info"; text: string; href?: string; link?: string } | null>(null);
 
   if (!rows.length)
     return (
       <div className="p-5">
-        <EmptyState icon={<MapPinned />} title="No businesses found">
-          Google Maps returned no matches{result.filteredOut ? ` after your filters (${result.filteredOut} hidden)` : ""}. Try a nearby city or loosen the filters.
+        <EmptyState icon={<MapPinned />} title="No businesses with a public email here">
+          We checked {result.scanned} businesses on Google Maps: {result.noWebsite} have no website and {result.noEmail} don&apos;t show an email on it. Nothing was charged. Try a nearby city or another business type.
         </EmptyState>
       </div>
     );
 
+  /** Saves the selected rows that aren't in Leads yet (with their emails), then returns all selected place ids. */
+  const saveSelected = async (): Promise<string[] | null> => {
+    const toSave = rows.filter((r) => selected.includes(r.placeId) && !r.saved && r.website);
+    if (toSave.length) {
+      const r = await saveGoogleLeadsAction({ niche: result.niche, items: toSave.map((x) => ({ placeId: x.placeId, website: x.website!, siteName: x.siteName, emails: x.emails })) });
+      if (!r.ok) {
+        setStatus({ tone: "danger", text: r.error });
+        return null;
+      }
+      setRows((xs) => xs.map((x) => (selected.includes(x.placeId) ? { ...x, saved: true } : x)));
+    }
+    return selected;
+  };
+  const run = (kind: "save" | "csv" | "campaign", fn: () => Promise<void>) =>
+    start(async () => {
+      setBusy(kind);
+      setStatus(null);
+      try {
+        await fn();
+      } finally {
+        setBusy(null);
+        router.refresh();
+      }
+    });
+
   return (
     <div>
-      <div className="flex flex-wrap items-center gap-3 border-b border-line px-5 py-2.5 text-sm">
-        <span className="inline-flex items-center gap-2 text-slate">
-          {checking ? <Loader2 aria-hidden className="size-3.5 animate-spin text-green" /> : <Mail aria-hidden className="size-3.5 text-green" />}
-          <span>
-            <span className="font-medium tabular-nums text-ink">{withEmail}</span> of {Object.keys(lookups).length} websites show a public email
-            {checking ? ` · checking ${checking}…` : ""}
-          </span>
+      <div className="flex flex-wrap items-center gap-3 border-b border-line px-5 py-2.5 text-sm text-slate">
+        <Mail aria-hidden className="size-3.5 text-green" />
+        <span>
+          <span className="font-medium tabular-nums text-ink">{rows.length}</span> businesses with a public email
+          <span className="text-xs"> · checked {result.scanned} on Google Maps; {result.noWebsite + result.noEmail} without an email were left out and not charged</span>
         </span>
-        <label className="ml-auto inline-flex cursor-pointer items-center gap-2 text-slate">
-          <Checkbox checked={onlyEmail} onChange={(e) => setOnlyEmail(e.target.checked)} /> Only with email
-        </label>
       </div>
-      {lookupError ? <p className="border-b border-line px-5 py-2 text-xs text-danger-fg">{lookupError}</p> : null}
-      {selected.length || status ? (
-        <div className="flex flex-wrap items-center gap-3 border-b border-line bg-mint-soft/40 px-5 py-2.5">
-          {selected.length ? (
-            <>
-              <span className="text-sm font-medium text-ink">{selected.length} selected</span>
-              <Button
-                size="sm"
-                disabled={pending}
-                onClick={() =>
-                  start(async () => {
-                    const items = rows
-                      .filter((r) => selected.includes(r.placeId) && r.website)
-                      .map((r) => ({ placeId: r.placeId, website: r.website!, siteName: lookups[r.placeId]?.siteName ?? null, emails: lookups[r.placeId]?.emails ?? [] }));
-                    const r = await saveGoogleLeadsAction({ niche: result.niche, items });
-                    if (r.ok) {
-                      setRows((xs) => xs.map((x) => (selected.includes(x.placeId) ? { ...x, saved: true } : x)));
-                      setStatus({ tone: "green", text: `Saved ${r.added} lead${r.added === 1 ? "" : "s"}.` });
-                      setSelected([]);
-                      router.refresh();
-                    } else setStatus({ tone: "danger", text: r.error });
-                  })
-                }
-              >
-                {pending ? <Loader2 aria-hidden className="animate-spin" /> : null} Save to leads
-              </Button>
-            </>
-          ) : null}
-          {status ? (
-            <Callout tone={status.tone} className="py-1.5">
-              <span role="status">
-                {status.text} {status.tone === "green" ? <Link href="/app/leads">Open leads to research them</Link> : null}
-              </span>
-            </Callout>
-          ) : null}
-        </div>
-      ) : null}
+      <div className="flex flex-wrap items-center gap-2 border-b border-line bg-mint-soft/40 px-5 py-2.5">
+        <span className="mr-1 text-sm font-medium text-ink">{selected.length} selected</span>
+        <Button
+          size="sm"
+          variant="secondary"
+          disabled={pending || !selected.length}
+          onClick={() =>
+            run("save", async () => {
+              const ids = await saveSelected();
+              if (ids) setStatus({ tone: "green", text: `${ids.length} in Leads.`, href: "/app/leads", link: "Open Leads" });
+            })
+          }
+        >
+          {busy === "save" ? <Loader2 aria-hidden className="animate-spin" /> : <BookmarkPlus aria-hidden />} Save to leads
+        </Button>
+        <Button
+          size="sm"
+          variant="secondary"
+          disabled={pending || !selected.length}
+          onClick={() =>
+            run("csv", async () => {
+              const ids = await saveSelected();
+              if (!ids) return;
+              const r = await exportPlacesAction(ids);
+              if (r.ok) {
+                download(r.filename, r.csv);
+                setStatus({ tone: "green", text: `Saved to Leads and downloaded ${r.count} as CSV.` });
+              } else setStatus({ tone: "danger", text: r.error });
+            })
+          }
+        >
+          {busy === "csv" ? <Loader2 aria-hidden className="animate-spin" /> : <Download aria-hidden />} Save &amp; download CSV
+        </Button>
+        <Button
+          size="sm"
+          disabled={pending || !selected.length}
+          onClick={() =>
+            run("campaign", async () => {
+              const ids = await saveSelected();
+              if (!ids) return;
+              setStatus({ tone: "info", text: `Reading ${ids.length} website${ids.length === 1 ? "" : "s"} and writing a first email for each…` });
+              const r = await startCampaignFromPlacesAction({ name: `${result.query}`.slice(0, 120), placeIds: ids });
+              if (r.ok) router.push(`/app/campaigns/${r.id}`);
+              else setStatus({ tone: "danger", text: r.error });
+            })
+          }
+        >
+          {busy === "campaign" ? <Loader2 aria-hidden className="animate-spin" /> : <Send aria-hidden />} Start campaign
+        </Button>
+        {status ? (
+          <Callout tone={status.tone} className="py-1.5">
+            <span role="status">
+              {status.text} {status.href ? <Link href={status.href}>{status.link}</Link> : null}
+            </span>
+          </Callout>
+        ) : null}
+      </div>
       <div className="overflow-x-auto scrollbar-thin">
         <table className="w-full min-w-[1020px] text-left text-sm">
           <caption className="sr-only">Google Maps results</caption>
           <thead className="border-b border-line bg-canvas/60 text-xs text-slate">
             <tr>
               <th scope="col" className="w-10 px-5 py-2.5">
-                <Checkbox
-                  aria-label="Select all results with a website"
-                  checked={selectable.length > 0 && selected.length === selectable.length}
-                  disabled={!selectable.length}
-                  onChange={(e) => setSelected(e.target.checked ? selectable : [])}
-                />
+                <Checkbox aria-label="Select all results" checked={selectable.length > 0 && selected.length === selectable.length} onChange={(e) => setSelected(e.target.checked ? selectable : [])} />
               </th>
               <th scope="col" className="py-2.5 pr-3 font-medium">Business</th>
               <th scope="col" className="py-2.5 pr-3 font-medium">Rating</th>
@@ -273,17 +282,12 @@ export function GoogleResults({ result }: { result: Done }) {
             </tr>
           </thead>
           <tbody>
-            {shown.map((r) => {
+            {rows.map((r) => {
               const on = selected.includes(r.placeId);
               return (
                 <tr key={r.placeId} className={cn("border-b border-line last:border-b-0", on && "bg-mint-soft/30")}>
                   <td className="px-5 py-3">
-                    <Checkbox
-                      aria-label={`Select ${r.name}`}
-                      checked={on}
-                      disabled={r.saved || !r.website}
-                      onChange={() => setSelected((xs) => (on ? xs.filter((x) => x !== r.placeId) : [...xs, r.placeId]))}
-                    />
+                    <Checkbox aria-label={`Select ${r.name}`} checked={on} onChange={() => setSelected((xs) => (on ? xs.filter((x) => x !== r.placeId) : [...xs, r.placeId]))} />
                   </td>
                   <td className="py-3 pr-3">
                     <a href={googleMapsLink(r.placeId, r.name)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-ink hover:text-green hover:underline">
@@ -306,21 +310,15 @@ export function GoogleResults({ result }: { result: Done }) {
                     )}
                   </td>
                   <td className="max-w-[200px] truncate py-3 pr-3 font-mono text-xs text-slate">
-                    {r.website ? (
-                      <a href={r.website} target="_blank" rel="noopener noreferrer nofollow" className="hover:text-green hover:underline">
-                        {r.website.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "")}
-                      </a>
-                    ) : (
-                      "Not listed"
-                    )}
+                    <a href={r.website!} target="_blank" rel="noopener noreferrer nofollow" className="hover:text-green hover:underline">
+                      {r.website!.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "")}
+                    </a>
                   </td>
                   <td className="max-w-[230px] py-3 pr-3 text-xs">
-                    <EmailCell r={r} l={lookups[r.placeId]} />
+                    <EmailCell r={r} />
                   </td>
                   <td className="whitespace-nowrap py-3 pr-3 text-xs text-slate">{r.phone ?? "Not listed"}</td>
-                  <td className="py-3 pr-5 text-right">
-                    {r.saved ? <Badge tone="green">In leads</Badge> : r.website ? <Badge tone="outline">New</Badge> : <Badge tone="neutral">No website</Badge>}
-                  </td>
+                  <td className="py-3 pr-5 text-right">{r.saved ? <Badge tone="green">In leads</Badge> : <Badge tone="outline">New</Badge>}</td>
                 </tr>
               );
             })}
@@ -390,28 +388,19 @@ export function GoogleDetails({ placeId, label }: { placeId: string; label: stri
   );
 }
 
-function EmailCell({ r, l }: { r: GoogleResult; l: Lookup | undefined }) {
-  if (!r.website) return <span className="text-slate">No website</span>;
-  if (r.saved && !l) return <span className="text-slate">In leads</span>;
-  if (!l || l.status === "waiting") return <span className="text-slate">Waiting…</span>;
-  if (l.status === "checking")
-    return (
-      <span className="inline-flex items-center gap-1.5 text-slate">
-        <Loader2 aria-hidden className="size-3 animate-spin" /> Reading website…
+function EmailCell({ r }: { r: GoogleResult }) {
+  const first = r.emails[0];
+  if (!first) return <span className="text-slate">None shown</span>;
+  return (
+    <span className="block">
+      <a href={first.url} target="_blank" rel="noopener noreferrer nofollow" title={`Shown on ${first.url}`} className="block truncate font-mono text-ink hover:text-green hover:underline">
+        {first.email}
+      </a>
+      <span className="text-[11px] text-slate">
+        From its website{r.emails.length > 1 ? ` · +${r.emails.length - 1} more` : ""} · unverified
       </span>
-    );
-  if (l.emails.length)
-    return (
-      <span className="block">
-        <a href={l.emails[0].url} target="_blank" rel="noopener noreferrer nofollow" title={`Shown on ${l.emails[0].url}`} className="block truncate font-mono text-ink hover:text-green hover:underline">
-          {l.emails[0].email}
-        </a>
-        <span className="text-[11px] text-slate">
-          From its website{l.emails.length > 1 ? ` · +${l.emails.length - 1} more` : ""} · unverified
-        </span>
-      </span>
-    );
-  return <span className="text-slate" title={l.note}>{l.status === "blocked" ? "Site blocks tools" : l.status === "failed" ? "Couldn't read site" : "None shown"}</span>;
+    </span>
+  );
 }
 
 /** Country, then state/province (suggestions for common countries), then city or area. */

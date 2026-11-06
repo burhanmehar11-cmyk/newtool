@@ -4,7 +4,7 @@ import { z } from "zod";
 import { followUpProblem, MAX_FOLLOW_UPS, type FollowUp } from "@/lib/campaigns/followups";
 import { DEFAULT_SCHEDULE, isValidTimezone, type Schedule } from "@/lib/campaigns/schedule";
 import { generateDraft } from "@/lib/drafts/template";
-import { requireWorkspace } from "@/server/auth";
+import { requireWorkspace, type WorkspaceRef } from "@/server/auth";
 import type { Q } from "@/server/auth-store";
 import { withUser } from "@/server/db";
 import {
@@ -32,6 +32,7 @@ import { runDispatch } from "@/server/services/dispatch";
 import { getOfferProfile } from "@/server/services/workspaces";
 import { aiWriterStatus } from "@/server/services/ai-writer";
 import { syncWorkspaceReplies } from "@/server/services/replies";
+import { researchLeadAs } from "@/server/services/research";
 import { deliverDueWebhooks } from "@/server/services/webhooks";
 
 const asQ = <T,>(userId: string, fn: (q: Q) => Promise<T>) => withUser(userId, (q) => fn(q as unknown as Q));
@@ -67,6 +68,8 @@ export async function createCampaignWithDrafts(input: unknown): Promise<R<{ id: 
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
   const offer = await getOfferProfile(workspace);
   if (!offer) return { ok: false, error: "Add your offer profile in Settings first. Messages are written from it." };
+  // Leads that haven't been researched yet get their website read now, so each one has facts to write from.
+  await researchMissing({ user, workspace }, parsed.data.leadIds);
 
   const id = await asQ(user.id, async (q) => {
     const id = await createCampaign(q, workspace.id, user.id, { name: parsed.data.name, schedule: DEFAULT_SCHEDULE, mailboxId: parsed.data.mailboxId, leadIds: parsed.data.leadIds });
@@ -79,6 +82,52 @@ export async function createCampaignWithDrafts(input: unknown): Promise<R<{ id: 
     return id;
   });
   return { ok: true, id };
+}
+
+/** Researches leads without a brief, a few at a time, within a time budget. Returns how many were researched and how many are left. */
+async function researchMissing(ctx: { user: { id: string }; workspace: WorkspaceRef }, leadIds: string[], budgetMs = 35_000) {
+  const todo = await asQ(ctx.user.id, (q) =>
+    q.query<{ id: string }>(
+      `select l.id from public.leads l join public.businesses b on b.id = l.business_id
+       where l.id = any($1::uuid[]) and b.website is not null and not exists (select 1 from public.briefs br where br.business_id = l.business_id)`,
+      [leadIds],
+    ),
+  );
+  const deadline = Date.now() + budgetMs;
+  const queue = todo.rows.map((r) => r.id);
+  let researched = 0;
+  await Promise.all(
+    Array.from({ length: Math.min(6, queue.length) }, async () => {
+      while (queue.length && Date.now() < deadline) {
+        const id = queue.shift()!;
+        const r = await researchLeadAs(ctx, id).catch(() => null);
+        if (r?.ok) researched++;
+      }
+    }),
+  );
+  return { researched, pending: queue.length };
+}
+
+/**
+ * One click from search results: researches the chosen leads that haven't been
+ * researched yet (within a time budget, so the request stays short), then
+ * creates a draft campaign on the first connected mailbox. Nothing is sent
+ * until someone reviews and approves it.
+ */
+export async function startCampaignFromLeads(input: unknown): Promise<R<{ id: string; researched: number; pending: number }>> {
+  const ctx = await requireWorkspace("/app/discover");
+  const { user, workspace } = ctx;
+  if (!canManage(workspace.role)) return { ok: false, error: "Only workspace owners and admins can create campaigns." };
+  const p = z.object({ name: z.string().trim().min(2).max(120), leadIds: z.array(uuid).min(1, "Select at least one business.").max(100, "At most 100 leads per campaign.") }).safeParse(input);
+  if (!p.success) return { ok: false, error: p.error.issues[0].message };
+  const mailbox = (await asQ(user.id, (q) => listMailboxes(q, workspace.id))).find((m) => m.status === "connected");
+  if (!mailbox) return { ok: false, error: "Connect a Gmail mailbox in Mailboxes first; campaigns send from it." };
+  if (!(await getOfferProfile(workspace))) return { ok: false, error: "Add your offer profile in Settings first. Emails are written from it." };
+
+  const { researched, pending } = await researchMissing(ctx, p.data.leadIds);
+  const created = await createCampaignWithDrafts({ name: p.data.name, mailboxId: mailbox.id, leadIds: p.data.leadIds });
+  if (!created.ok) return created;
+  return { ok: true, id: created.id, researched, pending };
 }
 
 export async function getCampaignDetail(id: string) {

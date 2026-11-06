@@ -38,9 +38,9 @@ beforeAll(async () => {
 describe("campaigns", () => {
   let campaign: string;
 
-  it("lists only researched leads with an email as eligible", async () => {
+  it("lists leads with an email as eligible, researched or not (research runs when the campaign is created)", async () => {
     const eligible = await as(db, A, () => eligibleLeads(q, ws));
-    expect(eligible.map((l) => l.lead_id).sort()).toEqual([leads[0], leads[1]].sort());
+    expect(eligible.map((l) => l.lead_id).sort()).toEqual([leads[0], leads[1], leads[2]].sort());
   });
 
   it("creates a draft campaign and refuses a stale approval", async () => {

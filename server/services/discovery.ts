@@ -7,7 +7,8 @@ import { requireWorkspace, type WorkspaceRef, isViewer, VIEW_ONLY } from "@/serv
 import { withService, withUser } from "@/server/db";
 import type { Q } from "@/server/auth-store";
 import { geocode, searchBusinesses } from "@/server/providers/osm";
-import { googlePlacesConfigured, placeDetails, remainingToday, textSearch } from "@/server/providers/google-places";
+import { googlePlacesConfigured, placeDetails, remainingToday, searchPage } from "@/server/providers/google-places";
+import { findEmailsOnWebsite, type EmailLookup } from "@/server/research/find-emails";
 import { GOOGLE_PROVIDER, MIN_RATINGS, PLACE_ID, type GooglePlace } from "@/lib/discovery/google-places";
 import { isCountryCode, placeLabel } from "@/lib/geo/regions";
 
@@ -170,9 +171,10 @@ export const googleSearchSchema = z.object({
   maxResults: z.coerce.number().refine((v) => [20, 40, 60].includes(v), "Choose a maximum."),
 });
 
-export type GoogleResult = GooglePlace & { saved: boolean };
+export type GoogleResult = GooglePlace & { saved: boolean; emails: FoundEmail[]; siteName: string | null };
+type FoundEmail = EmailLookup["emails"][number];
 export type GoogleSearchOutcome =
-  | { ok: true; jobId: string; query: string; niche: string | null; results: GoogleResult[]; filteredOut: number; requests: number }
+  | { ok: true; jobId: string; query: string; niche: string | null; results: GoogleResult[]; filteredOut: number; requests: number; scanned: number; noWebsite: number; noEmail: number }
   | { ok: false; error: string; fieldErrors?: Record<string, string> };
 
 export async function googleStatus() {
@@ -223,16 +225,47 @@ export async function runGoogleSearchAs({ user, workspace }: Ctx, input: unknown
     return { ok: false, error: quota ? "This search could use more discovery units than you have left. Lower the maximum results." : "Couldn't start the search. Try again." };
   }
 
-  const found = await textSearch({ query, maxResults: f.maxResults, minRating: f.minRating, regionCode: f.country });
-  if (!found.ok) {
+  // Only businesses with a public email count: read each result's website now,
+  // keep those with an email, and fetch the next page of 20 (up to 3 pages)
+  // until there are enough. People are charged only for what they get.
+  const target = f.maxResults;
+  const results: GoogleResult[] = [];
+  const seen = new Set<string>();
+  let token: string | null = null;
+  let requests = 0;
+  let scanned = 0;
+  let noWebsite = 0;
+  let noEmail = 0;
+  let lastError: string | null = null;
+  for (let page = 0; page < 3 && results.length < target; page++) {
+    const r = await searchPage({ query, pageToken: token, minRating: f.minRating, regionCode: f.country });
+    if (!r.ok) {
+      lastError = r.error.message;
+      break;
+    }
+    requests++;
+    const fresh = r.value.places.filter((p) => p.status !== "CLOSED_PERMANENTLY" && !seen.has(p.placeId));
+    fresh.forEach((p) => seen.add(p.placeId));
+    scanned += fresh.length;
+    const withSite = fresh.filter((p) => !!p.website);
+    noWebsite += fresh.length - withSite.length;
+    const lookups = await pool(withSite, 20, (p) => findEmailsOnWebsite(p.website!, { budgetMs: 7_000 }).catch(() => null));
+    withSite.forEach((p, i) => {
+      const l = lookups[i];
+      if (l && l.emails.length) results.push({ ...p, saved: false, emails: l.emails, siteName: l.siteName });
+      else noEmail++;
+    });
+    token = r.value.nextPageToken;
+    if (!token) break;
+  }
+  if (!requests) {
     await asQ(user.id, async (q) => {
       await settle(q, workspace.id, jobId, 0);
-      await finishJob(q, jobId, "failed", 0, found.error.message);
+      await finishJob(q, jobId, "failed", 0, lastError ?? "Search failed.");
     });
-    return { ok: false, error: found.error.message };
+    return { ok: false, error: lastError ?? "Couldn't search Google Maps. Try again." };
   }
-  const all = found.value.places.filter((p) => p.status !== "CLOSED_PERMANENTLY");
-  const kept = all.filter((p) => (f.website === "has" ? !!p.website : f.website === "none" ? !p.website : true));
+  const kept = results.slice(0, target);
   const saved = new Set(await asQ(user.id, (q) => savedPlaceIds(q, workspace.id, kept.map((p) => p.placeId))));
   await asQ(user.id, async (q) => {
     await settle(q, workspace.id, jobId, kept.length);
@@ -244,9 +277,26 @@ export async function runGoogleSearchAs({ user, workspace }: Ctx, input: unknown
     query,
     niche: f.niche,
     results: kept.map((p) => ({ ...p, saved: saved.has(p.placeId) })),
-    filteredOut: found.value.places.length - kept.length,
-    requests: found.value.requests,
+    filteredOut: noWebsite + noEmail,
+    requests,
+    scanned,
+    noWebsite,
+    noEmail,
   };
+}
+
+async function pool<T, R>(items: T[], size: number, fn: (t: T) => Promise<R>): Promise<R[]> {
+  const out: R[] = new Array(items.length);
+  let i = 0;
+  await Promise.all(
+    Array.from({ length: Math.min(size, items.length) }, async () => {
+      while (i < items.length) {
+        const k = i++;
+        out[k] = await fn(items[k]);
+      }
+    }),
+  );
+  return out;
 }
 
 const googleSaveSchema = z.object({

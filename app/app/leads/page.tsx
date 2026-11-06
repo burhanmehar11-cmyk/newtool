@@ -13,6 +13,8 @@ import { FindEmailsButton } from "@/features/product/lead-actions";
 import { googleMapsLink } from "@/lib/discovery/google-places";
 import { nicheLabel } from "@/lib/discovery/niches";
 import { getLeads } from "@/server/services/discovery";
+import { isViewer, requireWorkspace } from "@/server/auth";
+import { LeadsCsvButtons } from "@/features/product/leads-csv";
 import type { EmailStatus } from "@/lib/domain/types";
 import type { LeadRow } from "@/server/discovery-store";
 import { cn, formatDate } from "@/lib/utils";
@@ -45,7 +47,7 @@ async function Leads({ searchParams }: { searchParams: PageProps<"/app/leads">["
   const sp = await searchParams;
   const filter = (FILTERS.some((f) => f.id === sp.f) ? sp.f : "all") as FilterId;
   const q = typeof sp.q === "string" ? sp.q.trim().toLowerCase().slice(0, 80) : "";
-  const all = await getLeads();
+  const [all, { workspace }] = await Promise.all([getLeads(), requireWorkspace("/app/leads")]);
   const leads = all.filter((l) => keep(filter, l) && (!q || [l.name, l.website, l.email, l.address].some((v) => v?.toLowerCase().includes(q))));
   const researched = all.filter((l) => l.researched_at).length;
   const withEmail = all.filter((l) => l.email).length;
@@ -77,6 +79,9 @@ async function Leads({ searchParams }: { searchParams: PageProps<"/app/leads">["
           { label: "Strong fit", value: String(strong), hint: "for your offer" },
         ]}
       />
+      <div className="mb-5 flex justify-end">
+        <LeadsCsvButtons canImport={!isViewer(workspace)} />
+      </div>
 
       {all.length ? (
         <div className="card overflow-hidden">

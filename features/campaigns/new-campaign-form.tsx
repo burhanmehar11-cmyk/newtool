@@ -34,7 +34,7 @@ export function NewCampaignForm({ leads, mailboxes, hasOffer }: { leads: Eligibl
   if (!leads.length)
     return (
       <EmptyState title="No leads ready yet" action={<Button asChild><Link href="/app/leads">Open leads</Link></Button>}>
-        A lead can join a campaign once its website has been researched and a public email address was found. Open a lead and click Research website.
+        A lead can join a campaign once a public email address is known. Search Google Maps (results come with emails) or import a CSV in Leads.
       </EmptyState>
     );
 
@@ -93,7 +93,7 @@ export function NewCampaignForm({ leads, mailboxes, hasOffer }: { leads: Eligibl
             );
           })}
         </ul>
-        <FieldHint className="mt-2">Only researched leads with a public email are listed. Leads already in an active campaign or on the do-not-contact list are left out.</FieldHint>
+        <FieldHint className="mt-2">Leads with a public email are listed. Ones not researched yet have their website read when you create the campaign (this can take up to a minute). Leads already in an active campaign or on the do-not-contact list are left out.</FieldHint>
       </div>
 
       {error ? <Callout tone="danger">{error}</Callout> : null}
