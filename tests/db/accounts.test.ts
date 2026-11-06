@@ -46,7 +46,7 @@ describe("email and password accounts", () => {
     expect(await requestPasswordReset(q, "nobody@agency.example")).toBeNull();
     expect(await resetPassword(q, token!, "brand new password 1")).toBe(user.id);
     expect(await resetPassword(q, token!, "again new password 2")).toBeNull();
-    expect((await db.query(AUTH_SQL.findSession, [s.id, user.id])).rows).toHaveLength(0);
+    expect((await db.query(AUTH_SQL.findSession, [s.id, user.id, 3600])).rows).toHaveLength(0);
     expect(await passwordSignIn(q, "owner@agency.example", "brand new password 1", null)).toMatchObject({ kind: "ok" });
   });
 

@@ -29,11 +29,11 @@ export function DiscoverForm({ available }: { available: number }) {
         setFieldErrors({});
         start(async () => {
           const r = await runSearchAction(Object.fromEntries(fd));
-          if (r.ok) router.push(`/app/discover?job=${r.jobId}`);
+          if (r.ok) router.push(`/app/discover?job=${r.jobId}#search-results`);
           else {
             setError(r.error);
             setFieldErrors(r.fieldErrors ?? {});
-            if (r.jobId) router.push(`/app/discover?job=${r.jobId}`);
+            if (r.jobId) router.push(`/app/discover?job=${r.jobId}#search-results`);
           }
         });
       }}

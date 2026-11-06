@@ -8,9 +8,19 @@ export const AUTH_SQL = {
   /** $1 user id, $2 lifetime in seconds, $3 user agent */
   createSession: `insert into auth.sessions (user_id, expires_at, user_agent)
      values ($1, now() + make_interval(secs => $2), $3) returning id`,
-  /** $1 session id, $2 user id. Valid only if unexpired and not revoked. */
-  findSession: `select u.id, u.email from auth.sessions s join auth.users u on u.id = s.user_id
-     where s.id = $1 and s.user_id = $2 and s.revoked_at is null and s.expires_at > now()`,
+  /**
+   * $1 session id, $2 user id, $3 idle lifetime in seconds. Valid only if
+   * unexpired and not revoked; a valid session's expiry moves forward (at most
+   * once a day, to avoid a write on every page view).
+   */
+  findSession: `with s as (
+       select s.id as sid, s.expires_at, u.id, u.email from auth.sessions s join auth.users u on u.id = s.user_id
+       where s.id = $1 and s.user_id = $2 and s.revoked_at is null and s.expires_at > now()
+     ), renewed as (
+       update auth.sessions x set expires_at = now() + make_interval(secs => $3::int)
+       from s where x.id = s.sid and s.expires_at < now() + make_interval(secs => $3::int) - interval '1 day'
+     )
+     select id, email from s`,
   /** $1 session id */
   revokeSession: "update auth.sessions set revoked_at = now() where id = $1 and revoked_at is null",
 } as const;

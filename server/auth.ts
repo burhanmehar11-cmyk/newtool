@@ -2,7 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { SESSION_COOKIE } from "@/lib/auth/constants";
+import { SESSION_COOKIE, SESSION_IDLE_S } from "@/lib/auth/constants";
 import { verifySession } from "@/lib/auth/tokens";
 import { accountsConfigured, sessionSecret } from "@/server/env";
 import { withService, withUser } from "@/server/db";
@@ -28,7 +28,7 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   try {
     // The session row must exist, belong to this user, be unexpired and not revoked.
     const r = await withService((q) =>
-      q.query<{ id: string; email: string | null }>(AUTH_SQL.findSession, [claims.sid, claims.uid]),
+      q.query<{ id: string; email: string | null }>(AUTH_SQL.findSession, [claims.sid, claims.uid, SESSION_IDLE_S]),
     );
     const row = r.rows[0];
     return row ? { id: row.id, sessionId: claims.sid, email: row.email } : null;

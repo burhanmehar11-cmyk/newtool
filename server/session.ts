@@ -1,6 +1,6 @@
 import "server-only";
 import { cookies, headers } from "next/headers";
-import { SESSION_COOKIE, SESSION_MAX_AGE_S } from "@/lib/auth/constants";
+import { SESSION_COOKIE, SESSION_IDLE_S, SESSION_MAX_AGE_S } from "@/lib/auth/constants";
 import { signSession } from "@/lib/auth/tokens";
 import { resolveAppOrigin } from "@/lib/auth/oidc";
 import { configuredSiteUrl, sessionSecret } from "@/server/env";
@@ -17,7 +17,7 @@ export const sessionCookieOptions = {
 
 /** Records a session row and returns the signed cookie value. */
 export async function newSessionToken(userId: string, userAgent: string | null) {
-  const s = await withService((q) => q.query<{ id: string }>(AUTH_SQL.createSession, [userId, SESSION_MAX_AGE_S, (userAgent ?? "").slice(0, 300)]));
+  const s = await withService((q) => q.query<{ id: string }>(AUTH_SQL.createSession, [userId, SESSION_IDLE_S, (userAgent ?? "").slice(0, 300)]));
   return signSession({ sid: s.rows[0].id, uid: userId }, sessionSecret()!);
 }
 

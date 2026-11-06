@@ -22,6 +22,13 @@ export function DiscoverPanel({
 }) {
   const [source, setSource] = React.useState<"google" | "osm">(google.configured ? "google" : "osm");
   const [result, setResult] = React.useState<Done | null>(null);
+  const resultsRef = React.useRef<HTMLDivElement>(null);
+  // When a search finishes, bring its results into view.
+  React.useEffect(() => {
+    if (!result) return;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    resultsRef.current?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+  }, [result]);
 
   return (
     <>
@@ -65,6 +72,7 @@ export function DiscoverPanel({
       </div>
 
       {source === "google" && result ? (
+        <div ref={resultsRef} className="scroll-mt-6">
         <SectionCard
           className="mt-5"
           title={result.query}
@@ -76,6 +84,7 @@ export function DiscoverPanel({
             <GoogleCredit />
           </div>
         </SectionCard>
+        </div>
       ) : null}
     </>
   );

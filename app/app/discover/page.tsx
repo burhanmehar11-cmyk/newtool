@@ -102,7 +102,8 @@ async function Discover({ searchParams }: { searchParams: PageProps<"/app/discov
 
       {jobId ? (
         <SectionCard
-          className="mt-5"
+          id="search-results"
+          className="mt-5 scroll-mt-6"
           title={search ? search.job.query : "Search not found"}
           description={
             search

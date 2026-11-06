@@ -29,7 +29,9 @@ export function SectionCard({
   children,
   className,
   bodyClassName,
+  id,
 }: {
+  id?: string;
   title?: React.ReactNode;
   description?: React.ReactNode;
   actions?: React.ReactNode;
@@ -38,7 +40,7 @@ export function SectionCard({
   bodyClassName?: string;
 }) {
   return (
-    <section className={cn("card", className)}>
+    <section id={id} className={cn("card", className)}>
       {title ? (
         <div className="flex flex-wrap items-start justify-between gap-3 border-b border-line px-5 py-4">
           <div className="min-w-0">

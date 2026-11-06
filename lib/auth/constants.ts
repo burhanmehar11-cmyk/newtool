@@ -1,6 +1,9 @@
 export const SESSION_COOKIE = "locentio_session";
 export const STATE_COOKIE = "locentio_oauth";
-export const SESSION_MAX_AGE_S = 60 * 60 * 24 * 7; // 7 days
+/** How long the browser keeps the sign-in cookie (people stay signed in on that device). */
+export const SESSION_MAX_AGE_S = 60 * 60 * 24 * 365; // 1 year
+/** A session ends after this long without any visit; every visit renews it. */
+export const SESSION_IDLE_S = 60 * 60 * 24 * 60; // 60 days
 export const STATE_MAX_AGE_S = 10 * 60; // the Google round trip must finish within 10 minutes
 export const GOOGLE_ISSUERS = ["https://accounts.google.com", "accounts.google.com"];
 export const GOOGLE_JWKS_URL = "https://www.googleapis.com/oauth2/v3/certs";
