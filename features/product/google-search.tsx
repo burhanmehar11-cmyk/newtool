@@ -396,9 +396,7 @@ function EmailCell({ r }: { r: GoogleResult }) {
       <a href={first.url} target="_blank" rel="noopener noreferrer nofollow" title={`Shown on ${first.url}`} className="block truncate font-mono text-ink hover:text-green hover:underline">
         {first.email}
       </a>
-      <span className="text-[11px] text-slate">
-        From its website{r.emails.length > 1 ? ` · +${r.emails.length - 1} more` : ""} · unverified
-      </span>
+      {r.emails.length > 1 ? <span className="text-[11px] text-slate">+{r.emails.length - 1} more</span> : null}
     </span>
   );
 }

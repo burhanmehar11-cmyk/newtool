@@ -7,6 +7,7 @@ import type { Q } from "@/server/auth-store";
 import { withUser } from "@/server/db";
 import { findEmailsOnWebsite, type EmailLookup } from "@/server/research/find-emails";
 import { storeFoundEmails } from "@/server/email-store";
+import { deliverableEmails } from "@/server/research/email-check";
 
 const asQ = <T,>(userId: string, fn: (q: Q) => Promise<T>) => withUser(userId, (q) => fn(q as unknown as Q));
 
@@ -51,7 +52,10 @@ export async function findEmailsForResults(input: unknown): Promise<{ ok: true; 
   const p = resultsSchema.safeParse(input);
   if (!p.success) return { ok: false, error: "Nothing to look up." };
   if (!takeLookups(user.id, p.data.length)) return { ok: false, error: "That's a lot of websites in a short time. Wait a few minutes, then continue." };
-  const results = await pool(p.data, 5, async (it) => ({ placeId: it.placeId, ...(await findEmailsOnWebsite(it.website).catch(() => ({ status: "failed" as const, emails: [], siteName: null, note: "Lookup failed." }))) }));
+  const results = await pool(p.data, 5, async (it) => {
+    const l = await findEmailsOnWebsite(it.website).catch(() => ({ status: "failed" as const, emails: [], siteName: null, note: "Lookup failed." }));
+    return { placeId: it.placeId, ...l, emails: await deliverableEmails(l.emails) };
+  });
   return { ok: true, results };
 }
 
@@ -76,7 +80,10 @@ export async function findMissingLeadEmails(): Promise<{ ok: true; checked: numb
   const batch = todo.rows.slice(0, 15);
   if (!batch.length) return { ok: true, checked: 0, found: 0, remaining: 0 };
   if (!takeLookups(user.id, batch.length)) return { ok: false, error: "That's a lot of websites in a short time. Wait a few minutes, then try again." };
-  const results = await pool(batch, 5, (b) => findEmailsOnWebsite(b.website).catch(() => null));
+  const results = await pool(batch, 5, async (b) => {
+    const l = await findEmailsOnWebsite(b.website).catch(() => null);
+    return l ? { ...l, emails: await deliverableEmails(l.emails) } : null;
+  });
   let found = 0;
   await asQ(user.id, async (q) => {
     for (const [i, r] of results.entries()) {

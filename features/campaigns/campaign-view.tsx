@@ -317,8 +317,8 @@ function SettingsForm({ campaign, mailboxes, canManage }: { campaign: CampaignRo
         <label className="flex items-start gap-2.5 text-sm text-ink">
           <Checkbox name="includeUnknown" defaultChecked={campaign.policy.includeUnknown} className="mt-0.5" />
           <span>
-            Include addresses that aren&apos;t verified
-            <span className="block text-xs text-slate">No paid verifier is connected, so most addresses are unverified. They were published by the business, but may bounce.</span>
+            Include addresses found on business websites
+            <span className="block text-xs text-slate">Published by the business on its own site, and its domain accepts email. Bounces are stopped and blocked automatically.</span>
           </span>
         </label>
         <label className="flex items-start gap-2.5 text-sm text-ink">

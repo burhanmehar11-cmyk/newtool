@@ -254,7 +254,7 @@ export const mcpTools: ToolDef<McpCtx>[] = [
           status: "draft (not approved)",
           recipients: rows.map((r) => ({ lead_id: r.lead_id, name: r.name, email: r.email, has_message: !!r.draft_id, will_send_if_approved: classifyRecipient(r, c.policy) })),
           approve_here: `${origin()}/app/campaigns/${id}`,
-          note: "Unverified addresses are excluded unless the person includes them in the campaign settings.",
+          note: "Addresses found on business websites are included by default; the person can change that in the campaign settings.",
         };
       });
     },

@@ -9,6 +9,7 @@ import type { Q } from "@/server/auth-store";
 import { geocode, searchBusinesses } from "@/server/providers/osm";
 import { googlePlacesConfigured, placeDetails, remainingToday, searchPage } from "@/server/providers/google-places";
 import { findEmailsOnWebsite, type EmailLookup } from "@/server/research/find-emails";
+import { deliverableEmails } from "@/server/research/email-check";
 import { GOOGLE_PROVIDER, MIN_RATINGS, PLACE_ID, type GooglePlace } from "@/lib/discovery/google-places";
 import { isCountryCode, placeLabel } from "@/lib/geo/regions";
 
@@ -249,7 +250,11 @@ export async function runGoogleSearchAs({ user, workspace }: Ctx, input: unknown
     scanned += fresh.length;
     const withSite = fresh.filter((p) => !!p.website);
     noWebsite += fresh.length - withSite.length;
-    const lookups = await pool(withSite, 20, (p) => findEmailsOnWebsite(p.website!, { budgetMs: 7_000 }).catch(() => null));
+    const lookups = await pool(withSite, 20, async (p) => {
+      const l = await findEmailsOnWebsite(p.website!, { budgetMs: 7_000 }).catch(() => null);
+      // Keep only addresses whose domain can actually receive email (free DNS check).
+      return l ? { ...l, emails: await deliverableEmails(l.emails) } : null;
+    });
     withSite.forEach((p, i) => {
       const l = lookups[i];
       if (l && l.emails.length) results.push({ ...p, saved: false, emails: l.emails, siteName: l.siteName });

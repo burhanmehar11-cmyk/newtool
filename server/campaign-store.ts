@@ -42,8 +42,9 @@ export async function eligibleLeads(q: Q, ws: string): Promise<EligibleLead[]> {
 
 export async function createCampaign(q: Q, ws: string, userId: string, p: { name: string; schedule: Schedule; mailboxId: string | null; leadIds: string[] }): Promise<string> {
   const c = await q.query<{ id: string }>(
-    `insert into public.campaigns (workspace_id, name, status, sending_account_id, schedule, created_by) values ($1, $2, 'draft', $3, $4::jsonb, $5) returning id`,
-    [ws, p.name, p.mailboxId, JSON.stringify(p.schedule), userId],
+    `insert into public.campaigns (workspace_id, name, status, sending_account_id, schedule, policy, created_by) values ($1, $2, 'draft', $3, $4::jsonb, $5::jsonb, $6) returning id`,
+    // Addresses come from the business's own website and pass the domain check, so they're included by default.
+    [ws, p.name, p.mailboxId, JSON.stringify(p.schedule), JSON.stringify({ includeCatchAll: false, includeUnknown: true }), userId],
   );
   const id = c.rows[0].id;
   await q.query("insert into public.campaign_steps (workspace_id, campaign_id, position, kind) values ($1, $2, 0, 'initial')", [ws, id]);
@@ -215,7 +216,7 @@ export function classifyRecipient(r: Pick<RecipientRow, "email" | "email_status"
   if (s === "invalid") return { send: false, reason: "Address can't receive email" };
   if (s === "valid") return { send: true };
   if (s === "catch_all") return policy.includeCatchAll ? { send: true } : { send: false, reason: "Catch-all domain (not included)" };
-  return policy.includeUnknown ? { send: true } : { send: false, reason: "Not verified (not included)" };
+  return policy.includeUnknown ? { send: true } : { send: false, reason: "Website address (left out by this campaign's settings)" };
 }
 
 /**

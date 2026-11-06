@@ -14,6 +14,8 @@ vi.mock("@/server/auth", async (orig) => ({
 }));
 vi.mock("@/server/providers/google-places", async (orig) => ({ ...(await orig<typeof import("@/server/providers/google-places")>()), searchPage: (...a: unknown[]) => h.page(...a) }));
 vi.mock("@/server/research/find-emails", () => ({ findEmailsOnWebsite: (...a: unknown[]) => h.find(...a) }));
+// The free domain check is tested on its own (tests/deliverable.test.ts); here it lets every address through.
+vi.mock("@/server/research/email-check", () => ({ deliverableEmails: async <T,>(x: T[]) => x }));
 
 const { importLeadsCsv, exportLeadsCsv } = await import("@/server/services/leads-io");
 const { runGoogleSearchAs } = await import("@/server/services/discovery");

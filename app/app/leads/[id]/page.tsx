@@ -154,7 +154,7 @@ async function Lead({ params }: { params: PageProps<"/app/leads/[id]">["params"]
                       <EmailStatusBadge status={c.status} />
                       <span className="text-xs text-slate">{c.kind === "role" ? "Role address" : "Personal address"}</span>
                     </div>
-                    <p className="mt-1.5 text-xs leading-5 text-slate">{c.verification_detail ?? emailStatusMeta[c.status as EmailStatus].help}</p>
+                    {c.verification_detail || emailStatusMeta[c.status as EmailStatus].help ? <p className="mt-1.5 text-xs leading-5 text-slate">{c.verification_detail ?? emailStatusMeta[c.status as EmailStatus].help}</p> : null}
                     {c.verified_at ? (
                       <p className="mt-0.5 text-xs text-slate">
                         Checked {formatDate(c.verified_at)} · {c.verification_provider === "dns-check" ? "free DNS check (can't confirm mailboxes)" : c.verification_provider}

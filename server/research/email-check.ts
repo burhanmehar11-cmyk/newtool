@@ -39,3 +39,32 @@ export async function dnsEmailCheck(email: string): Promise<DnsCheckResult> {
   if (firstPass.status !== "invalid") return firstPass;
   return classifyDns({ syntaxOk, mx, hasAddress, resolverHealthy: await resolverHealthy() });
 }
+
+const domainCache = new Map<string, { at: number; invalid: boolean }>();
+
+/**
+ * Drops addresses whose domain can't receive email (no mail server and no
+ * address at all, confirmed against a healthy resolver). Free DNS check, one
+ * per domain, cached for an hour. Lookup errors keep the address: a failing
+ * resolver must never throw good addresses away.
+ */
+export async function deliverableEmails<T extends { email: string }>(items: T[]): Promise<T[]> {
+  if (!items.length) return items;
+  const domains = [...new Set(items.map((i) => i.email.split("@")[1]?.toLowerCase()).filter(Boolean))] as string[];
+  const bad = new Set<string>();
+  await Promise.all(
+    domains.map(async (d) => {
+      const hit = domainCache.get(d);
+      if (hit && Date.now() - hit.at < 60 * 60_000) {
+        if (hit.invalid) bad.add(d);
+        return;
+      }
+      const sample = items.find((i) => i.email.toLowerCase().endsWith(`@${d}`))!.email;
+      const r = await dnsEmailCheck(sample).catch(() => null);
+      const invalid = r?.status === "invalid";
+      domainCache.set(d, { at: Date.now(), invalid });
+      if (invalid) bad.add(d);
+    }),
+  );
+  return items.filter((i) => !bad.has(i.email.split("@")[1]?.toLowerCase() ?? ""));
+}

@@ -43,7 +43,7 @@ describe("campaigns", () => {
     expect(eligible.map((l) => l.lead_id).sort()).toEqual([leads[0], leads[1], leads[2]].sort());
   });
 
-  it("creates a draft campaign and refuses a stale approval", async () => {
+  it("creates a draft campaign that includes website addresses by default, and refuses a stale approval", async () => {
     campaign = await as(db, A, async () => {
       const id = await createCampaign(q, ws, A, { name: "Austin", schedule: DEFAULT_SCHEDULE, mailboxId: mailbox, leadIds: [leads[0], leads[1], leads[3]] });
       await saveDraft(q, ws, A, leads[0], { subject: "Hello 1", body: "Body one, long enough.", factIds: [], origin: "generated" });
@@ -51,10 +51,15 @@ describe("campaigns", () => {
       return id;
     });
     const c = await as(db, A, () => getCampaign(q, campaign));
-    // Unverified addresses aren't included by default.
-    await expect(as(db, A, () => approveCampaign(q, ws, A, campaign, c!.revision))).rejects.toThrow("no_recipients");
+    // Addresses found on business websites are included by default.
+    expect(c!.policy).toEqual({ includeCatchAll: false, includeUnknown: true });
+    // Leaving them out leaves nobody to send to.
+    await as(db, A, () => updateCampaignSettings(q, campaign, { name: "Austin", mailboxId: mailbox, schedule: DEFAULT_SCHEDULE, policy: { includeUnknown: false, includeCatchAll: false } }));
+    const c2 = await as(db, A, () => getCampaign(q, campaign));
+    await expect(as(db, A, () => approveCampaign(q, ws, A, campaign, c2!.revision))).rejects.toThrow("no_recipients");
     await as(db, A, () => updateCampaignSettings(q, campaign, { name: "Austin", mailboxId: mailbox, schedule: DEFAULT_SCHEDULE, policy: { includeUnknown: true, includeCatchAll: false } }));
-    await expect(as(db, A, () => approveCampaign(q, ws, A, campaign, c!.revision))).rejects.toThrow("stale");
+    // An approval for the revision reviewed earlier is refused once settings changed.
+    await expect(as(db, A, () => approveCampaign(q, ws, A, campaign, c2!.revision))).rejects.toThrow("stale");
   });
 
   it("approves exactly the reviewed revision and enrolls who will be sent to", async () => {

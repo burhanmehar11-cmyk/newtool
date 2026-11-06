@@ -7,7 +7,7 @@ export const emailStatusMeta: Record<EmailStatus, { label: string; tone: "green"
   invalid: { label: "Invalid", tone: "danger", help: "The mailbox does not exist or rejects mail. Never sent to." },
   catch_all: { label: "Catch-all", tone: "warn", help: "The domain accepts every address, so this one cannot be confirmed. Excluded by default." },
   unknown: { label: "Unknown", tone: "neutral", help: "The check was inconclusive. Excluded by default." },
-  unverified: { label: "Unverified", tone: "outline", help: "Not checked yet. Must be verified before it can be sent to." },
+  unverified: { label: "", tone: "outline", help: "" },
 };
 
 export function EmailStatusBadge({ status, verifying, suppressed }: { status: EmailStatus; verifying?: boolean; suppressed?: boolean }) {
@@ -23,6 +23,8 @@ export function EmailStatusBadge({ status, verifying, suppressed }: { status: Em
         <Loader2 aria-hidden className="animate-spin" /> Verifying
       </Badge>
     );
+  // Addresses found on a business's website and passing the domain check show no label.
+  if (status === "unverified") return null;
   const m = emailStatusMeta[status];
   const Icon = status === "valid" ? CircleCheck : status === "invalid" ? CircleX : status === "catch_all" ? MailWarning : status === "unknown" ? CircleHelp : CircleDashed;
   return (

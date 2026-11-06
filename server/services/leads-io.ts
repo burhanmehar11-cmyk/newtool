@@ -6,6 +6,7 @@ import { requireWorkspace, isViewer, VIEW_ONLY } from "@/server/auth";
 import type { Q } from "@/server/auth-store";
 import { withUser } from "@/server/db";
 import { emitLeadsCreated } from "@/server/services/webhooks";
+import { deliverableEmails } from "@/server/research/email-check";
 
 const asQ = <T,>(userId: string, fn: (q: Q) => Promise<T>) => withUser(userId, (q) => fn(q as unknown as Q));
 
@@ -91,7 +92,7 @@ const domainOf = (website: string | null, email: string | null) => {
 /**
  * Imports leads from a CSV (name plus website and/or email; optional type and
  * city). Duplicates (same website or email) are skipped. Emails are kept as
- * unverified, like any found address.
+ * as found (not verified by a paid service), after the free domain check.
  */
 export async function importLeadsCsv(text: string): Promise<{ ok: true; added: number; skipped: number; errors: string[] } | { ok: false; error: string }> {
   const { user, workspace } = await requireWorkspace("/app/leads");
@@ -100,6 +101,10 @@ export async function importLeadsCsv(text: string): Promise<{ ok: true; added: n
   if (text.length > 2_000_000) return { ok: false, error: "The file is too large (2 MB at most)." };
   const parsed = parseLeadsCsv(text);
   if (!parsed.rows.length) return { ok: false, error: parsed.errors[0] ?? "No rows to import." };
+  // Addresses whose domain can't receive email are dropped (the business is still imported if it has a website).
+  const okEmails = new Set((await deliverableEmails(parsed.rows.filter((r) => r.email).map((r) => ({ email: r.email! })))).map((x) => x.email));
+  for (const r of parsed.rows) if (r.email && !okEmails.has(r.email)) r.email = null;
+  parsed.rows = parsed.rows.filter((r) => r.email || r.website);
   const since = new Date();
   const { added, skipped } = await asQ(user.id, async (q) => {
     let added = 0;
