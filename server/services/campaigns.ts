@@ -294,8 +294,13 @@ export async function reopenCampaign(campaignId: string): Promise<R> {
 export async function removeCampaign(campaignId: string): Promise<R> {
   const { user, workspace } = await requireWorkspace("/app/campaigns");
   if (!canManage(workspace.role) || !uuid.safeParse(campaignId).success) return { ok: false, error: "Only workspace owners and admins can delete campaigns." };
-  const ok = await asQ(user.id, (q) => deleteCampaign(q, campaignId));
-  return ok ? { ok: true } : { ok: false, error: "Campaign not found." };
+  try {
+    const ok = await asQ(user.id, (q) => deleteCampaign(q, campaignId));
+    return ok ? { ok: true } : { ok: false, error: "Campaign not found." };
+  } catch (e) {
+    if (/deleted_at/.test((e as Error).message)) return { ok: false, error: "Deleting needs a database update first: run 0015_campaign_delete.sql in Neon." };
+    throw e;
+  }
 }
 
 /** Runs one sending pass for this workspace now (same rules as the scheduler). */

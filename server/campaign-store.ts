@@ -91,14 +91,15 @@ export async function listCampaigns(q: Q, ws: string): Promise<CampaignListRow[]
          (select count(*)::int from public.enrollments e where e.campaign_id = c.id and e.state = 'queued') as queued,
          (select count(*)::int from public.enrollments e where e.campaign_id = c.id and e.state = 'replied') as replied,
          (select count(*)::int from public.threads t where t.campaign_id = c.id and t.classification = 'interested' and t.last_inbound_at is not null) as interested
-       from public.campaigns c where c.workspace_id = $1 and c.deleted_at is null order by c.created_at desc limit 100`,
+       from public.campaigns c where c.workspace_id = $1 and to_jsonb(c)->>'deleted_at' is null order by c.created_at desc limit 100`,
       [ws],
     )
   ).rows;
 }
 
 export async function getCampaign(q: Q, id: string): Promise<CampaignRow | null> {
-  return (await q.query<CampaignRow>(`select ${CAMPAIGN_COLS} from public.campaigns where id = $1 and deleted_at is null`, [id])).rows[0] ?? null;
+  // to_jsonb(c)->>'deleted_at' also works before migration 0015 adds the column.
+  return (await q.query<CampaignRow>(`select ${CAMPAIGN_COLS} from public.campaigns c where c.id = $1 and to_jsonb(c)->>'deleted_at' is null`, [id])).rows[0] ?? null;
 }
 
 export type RecipientRow = {
@@ -271,7 +272,7 @@ export async function setCampaignStatus(q: Q, campaignId: string, from: Campaign
 /** Name and sending days/hours can change at any time: they don't change what was approved. */
 export async function updateLiveSettings(q: Q, campaignId: string, p: { name: string; schedule: Schedule }) {
   const r = await q.query(
-    "update public.campaigns set name = $2, schedule = $3::jsonb where id = $1 and status in ('running', 'paused') and deleted_at is null returning id",
+    "update public.campaigns c set name = $2, schedule = $3::jsonb where c.id = $1 and c.status in ('running', 'paused') and to_jsonb(c)->>'deleted_at' is null returning c.id",
     [campaignId, p.name, JSON.stringify(p.schedule)],
   );
   return r.rows.length > 0;
@@ -283,7 +284,7 @@ export async function updateLiveSettings(q: Q, campaignId: string, p: { name: st
  * ones wait for a new approval.
  */
 export async function reopenAsDraft(q: Q, campaignId: string) {
-  const r = await q.query("update public.campaigns set status = 'draft', revision = revision + 1 where id = $1 and status = 'paused' and deleted_at is null returning id", [campaignId]);
+  const r = await q.query("update public.campaigns c set status = 'draft', revision = revision + 1 where c.id = $1 and c.status = 'paused' and to_jsonb(c)->>'deleted_at' is null returning c.id", [campaignId]);
   if (!r.rows.length) return false;
   await q.query(
     `delete from public.enrollments e where e.campaign_id = $1 and e.state = 'queued'
