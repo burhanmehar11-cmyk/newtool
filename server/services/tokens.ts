@@ -4,7 +4,7 @@ import { z } from "zod";
 import { requireWorkspace } from "@/server/auth";
 import type { Q } from "@/server/auth-store";
 import { withUser } from "@/server/db";
-import { insertToken, listTokens, revokeToken } from "@/server/token-store";
+import { insertToken, listTokens, revokeToken, tokenLastUsed } from "@/server/token-store";
 
 const asQ = <T,>(userId: string, fn: (q: Q) => Promise<T>) => withUser(userId, (q) => fn(q as unknown as Q));
 
@@ -14,13 +14,20 @@ export async function getMyTokens() {
 }
 
 /** Creates a token and returns it once. Only its SHA-256 hash is stored. */
-export async function createMyToken(name: unknown): Promise<{ ok: true; token: string } | { ok: false; error: string }> {
+export async function createMyToken(name: unknown): Promise<{ ok: true; token: string; id: string } | { ok: false; error: string }> {
   const { user, workspace } = await requireWorkspace("/app/agent");
   const n = z.string().trim().min(1, "Name the token, e.g. “Claude on my laptop”.").max(60).safeParse(name);
   if (!n.success) return { ok: false, error: n.error.issues[0].message };
   const token = `loc_${randomBytes(32).toString("base64url")}`;
-  await asQ(user.id, (q) => insertToken(q, workspace.id, user.id, n.data, createHash("sha256").update(token).digest("hex"), token.slice(0, 12)));
-  return { ok: true, token };
+  const id = await asQ(user.id, (q) => insertToken(q, workspace.id, user.id, n.data, createHash("sha256").update(token).digest("hex"), token.slice(0, 12)));
+  return { ok: true, token, id };
+}
+
+/** Whether an agent has called Locenti with this token yet (for the setup check). */
+export async function myTokenStatus(id: string): Promise<{ found: boolean; lastUsedAt: string | null }> {
+  const { user } = await requireWorkspace("/app/agent");
+  if (!z.string().uuid().safeParse(id).success) return { found: false, lastUsedAt: null };
+  return asQ(user.id, (q) => tokenLastUsed(q, id));
 }
 
 export async function revokeMyToken(id: string): Promise<boolean> {

@@ -13,6 +13,12 @@ export async function listTokens(q: Q, ws: string): Promise<TokenRow[]> {
   return (await q.query<TokenRow>("select id, name, prefix, created_at, last_used_at, revoked_at from public.api_tokens where workspace_id = $1 and revoked_at is null order by created_at desc", [ws])).rows;
 }
 
+/** When one of your tokens was last used (row-level security limits this to your own). */
+export async function tokenLastUsed(q: Q, id: string): Promise<{ found: boolean; lastUsedAt: string | null }> {
+  const r = (await q.query<{ last_used_at: string | null }>("select last_used_at from public.api_tokens where id = $1 and revoked_at is null", [id])).rows[0];
+  return { found: !!r, lastUsedAt: r?.last_used_at ?? null };
+}
+
 export async function revokeToken(q: Q, id: string): Promise<boolean> {
   return (await q.query("update public.api_tokens set revoked_at = now() where id = $1 and revoked_at is null returning id", [id])).rows.length > 0;
 }

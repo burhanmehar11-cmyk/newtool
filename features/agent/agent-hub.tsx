@@ -29,7 +29,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/field";
 import { Callout } from "@/components/ui/misc";
-import { createTokenAction, revokeTokenAction } from "@/server/actions/tokens";
+import { Dialog, DialogContent } from "@/components/ui/sheet";
+import { createTokenAction, revokeTokenAction, tokenStatusAction } from "@/server/actions/tokens";
 import type { TokenRow } from "@/server/token-store";
 import { cn, formatDate } from "@/lib/utils";
 
@@ -84,16 +85,18 @@ export type AgentHubProps = {
   canManage: boolean;
 };
 
+/** A token created on this page: its value is shown once, its id lets the setup check for the first agent call. */
+type Fresh = { token: string; id: string };
+
 export function AgentHub(p: AgentHubProps) {
-  const [fresh, setFresh] = React.useState<string | null>(null);
-  const token = fresh ?? "YOUR_TOKEN";
+  const [fresh, setFresh] = React.useState<Fresh | null>(null);
   return (
     <div className="space-y-16 pb-10">
       <Hero toolCount={p.toolNames.length} />
       <HowItWorks />
       <Connect endpoint={p.endpoint} tokens={p.tokens} fresh={fresh} setFresh={setFresh} toolCount={p.toolNames.length} />
       <Usage tokens={p.tokens} ai={p.ai} google={p.google} />
-      <Clients endpoint={p.endpoint} token={token} hasFresh={!!fresh} />
+      <Clients endpoint={p.endpoint} fresh={fresh} setFresh={setFresh} />
       <Prompts />
       <Capabilities toolNames={p.toolNames} />
       <Limits />
@@ -172,7 +175,7 @@ function HowItWorks() {
 
 /* ---------------------------------------------------------------- connect */
 
-function Connect({ endpoint, tokens, fresh, setFresh, toolCount }: { endpoint: string; tokens: TokenRow[]; fresh: string | null; setFresh: (t: string | null) => void; toolCount: number }) {
+function Connect({ endpoint, tokens, fresh, setFresh, toolCount }: { endpoint: string; tokens: TokenRow[]; fresh: Fresh | null; setFresh: (t: Fresh | null) => void; toolCount: number }) {
   const router = useRouter();
   const [name, setName] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
@@ -231,7 +234,7 @@ function Connect({ endpoint, tokens, fresh, setFresh, toolCount }: { endpoint: s
             start(async () => {
               const r = await createTokenAction(name);
               if (r.ok) {
-                setFresh(r.token);
+                setFresh({ token: r.token, id: r.id });
                 setName("");
               } else setError(r.error);
               router.refresh();
@@ -251,8 +254,8 @@ function Connect({ endpoint, tokens, fresh, setFresh, toolCount }: { endpoint: s
           <Callout tone="green" title="Copy your token now" className="mt-3">
             It won&apos;t be shown again, and the setup snippets below now include it. Anyone with it can act as you in this workspace (except sending), so keep it private.
             <span className="mt-2 flex flex-wrap items-center gap-2">
-              <code className="min-w-0 flex-1 break-all rounded-md bg-surface px-2 py-1.5 font-mono text-xs text-ink">{fresh}</code>
-              <CopyButton id="fresh" text={fresh} label="Copy token" />
+              <code className="min-w-0 flex-1 break-all rounded-md bg-surface px-2 py-1.5 font-mono text-xs text-ink">{fresh.token}</code>
+              <CopyButton id="fresh" text={fresh.token} label="Copy token" />
             </span>
           </Callout>
         ) : null}
@@ -344,7 +347,22 @@ function Usage({ tokens, ai, google }: Pick<AgentHubProps, "tokens" | "ai" | "go
 
 /* ---------------------------------------------------------------- clients */
 
-type Client = { id: string; name: string; initial: string; color: string; blurb: string; where: string; snippet: (url: string, token: string) => string; popular?: boolean };
+type Client = {
+  id: string;
+  name: string;
+  initial: string;
+  color: string;
+  blurb: string;
+  where: string;
+  /** What to do with the snippet, in order. */
+  steps: string[];
+  /** How to see it worked inside that app. */
+  verify: string;
+  snippet: (url: string, token: string) => string;
+  popular?: boolean;
+};
+
+const MERGE = "If the file already has other servers, add the locenti entry next to them instead of replacing the file.";
 
 const CLIENTS: Client[] = [
   {
@@ -355,6 +373,8 @@ const CLIENTS: Client[] = [
     blurb: "Anthropic's terminal agent. One command and it's connected.",
     where: "Run in your terminal",
     popular: true,
+    steps: ["Open a terminal on the computer where you use Claude Code.", "Paste the command below and press Enter."],
+    verify: "Start Claude Code (run claude) and type /mcp: locenti should be listed as connected.",
     snippet: (u, t) => `claude mcp add --transport http locenti ${u} --header "Authorization: Bearer ${t}"`,
   },
   {
@@ -364,6 +384,8 @@ const CLIENTS: Client[] = [
     color: "bg-ink",
     blurb: "Add Locenti to Cursor's MCP settings and use it from the agent chat.",
     where: "Paste into .cursor/mcp.json (project) or ~/.cursor/mcp.json (all projects)",
+    steps: ["Open (or create) .cursor/mcp.json in your project, or ~/.cursor/mcp.json for all projects.", "Paste the snippet and save. " + MERGE],
+    verify: "In Cursor Settings → MCP, locenti should show as enabled with its tools.",
     snippet: (u, t) => JSON.stringify({ mcpServers: { locenti: { url: u, headers: { Authorization: `Bearer ${t}` } } } }, null, 2),
   },
   {
@@ -373,6 +395,8 @@ const CLIENTS: Client[] = [
     color: "bg-[#a855f7]",
     blurb: "Claude's desktop app, through the mcp-remote bridge (needs Node.js).",
     where: "Settings → Developer → Edit config (claude_desktop_config.json), then restart Claude",
+    steps: ["Install Node.js if you don't have it (the bridge runs with npx).", "In Claude Desktop: Settings → Developer → Edit config.", "Paste the snippet into claude_desktop_config.json and save. " + MERGE, "Quit and reopen Claude Desktop."],
+    verify: "Locenti's tools appear under the tools (search and tools) menu in a new chat.",
     snippet: (u, t) => JSON.stringify({ mcpServers: { locenti: { command: "npx", args: ["-y", "mcp-remote", u, "--header", `Authorization:Bearer ${t}`] } } }, null, 2),
   },
   {
@@ -382,6 +406,8 @@ const CLIENTS: Client[] = [
     color: "bg-[#2f80ed]",
     blurb: "Use Locenti from GitHub Copilot's agent mode.",
     where: "Paste into .vscode/mcp.json in your project",
+    steps: ["Create .vscode/mcp.json in your project.", "Paste the snippet and save. " + MERGE, "Click Start above the locenti entry if VS Code doesn't start it on its own."],
+    verify: "Open Copilot Chat in Agent mode: the Locenti tools are listed under the tools button.",
     snippet: (u, t) => JSON.stringify({ servers: { locenti: { type: "http", url: u, headers: { Authorization: `Bearer ${t}` } } } }, null, 2),
   },
   {
@@ -391,6 +417,8 @@ const CLIENTS: Client[] = [
     color: "bg-[#0ea5a4]",
     blurb: "Connect Windsurf's Cascade agent to your workspace.",
     where: "Paste into ~/.codeium/windsurf/mcp_config.json",
+    steps: ["Open ~/.codeium/windsurf/mcp_config.json.", "Paste the snippet and save. " + MERGE, "Refresh the MCP servers in Cascade."],
+    verify: "Cascade lists locenti among its MCP servers with its tools.",
     snippet: (u, t) => JSON.stringify({ mcpServers: { locenti: { serverUrl: u, headers: { Authorization: `Bearer ${t}` } } } }, null, 2),
   },
   {
@@ -400,49 +428,176 @@ const CLIENTS: Client[] = [
     color: "bg-green",
     blurb: "Anything that supports remote MCP servers with a header, or local ones via mcp-remote.",
     where: "Server URL plus an Authorization header; or run the bridge command",
+    steps: ["Add a remote (HTTP) MCP server with the URL and Authorization header below.", "If your app only runs local (stdio) servers, use the mcp-remote command instead (needs Node.js)."],
+    verify: "Your app should list Locenti's tools once it connects.",
     snippet: (u, t) => `URL:    ${u}\nHeader: Authorization: Bearer ${t}\n\nLocal-only clients (stdio):\nnpx -y mcp-remote ${u} --header "Authorization:Bearer ${t}"`,
   },
 ];
 
-function Clients({ endpoint, token, hasFresh }: { endpoint: string; token: string; hasFresh: boolean }) {
+function Clients({ endpoint, fresh, setFresh }: { endpoint: string; fresh: Fresh | null; setFresh: (t: Fresh | null) => void }) {
   const [open, setOpen] = React.useState<string | null>(null);
-  const client = CLIENTS.find((c) => c.id === open);
+  const client = CLIENTS.find((c) => c.id === open) ?? null;
   return (
     <section>
-      <SectionTitle title="Connect your AI agent" sub="Pick a client, paste one snippet, and your agent is live." />
+      <SectionTitle title="Connect your AI agent" sub="Pick your app: Locenti makes the token and the exact snippet, then checks that your agent got through." />
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {CLIENTS.map((c) => (
-          <article key={c.id} className={cn("card relative flex flex-col p-6 transition-shadow hover:shadow-float", open === c.id && "ring-2 ring-green/50")}>
+          <article key={c.id} className="card relative flex flex-col p-6 transition-shadow hover:shadow-float">
             {c.popular ? <span className="absolute right-4 top-4 rounded-full border border-green/30 bg-mint-soft px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-green">Quickest</span> : null}
             <span className={cn("flex size-12 items-center justify-center rounded-full text-lg font-bold text-white", c.color)}>{c.initial}</span>
-            <h3 className="mt-4 font-display text-lg font-semibold text-ink">{c.name}</h3>
+            <h3 className="mt-4 font-display text-lg font-semibold text-ink">
+              {/* The whole card opens the setup. */}
+              <button type="button" onClick={() => setOpen(c.id)} className="text-left after:absolute after:inset-0 after:rounded-2xl after:content-[''] focus-visible:outline-none">
+                {c.name}
+              </button>
+            </h3>
             <p className="mt-1 flex-1 text-sm leading-6 text-slate">{c.blurb}</p>
             <div className="mt-5 flex justify-end">
-              <Button size="sm" variant={open === c.id ? "secondary" : "primary"} onClick={() => setOpen(open === c.id ? null : c.id)} aria-expanded={open === c.id}>
-                {open === c.id ? "Close" : "Set up"} {open === c.id ? null : <ArrowRight aria-hidden />}
-              </Button>
+              <span className="pointer-events-none inline-flex h-8 items-center gap-1.5 rounded-lg bg-ink px-3 text-xs font-medium text-white" aria-hidden>
+                Set up <ArrowRight className="size-3.5" />
+              </span>
             </div>
           </article>
         ))}
       </div>
-      {client ? (
-        <div className="card mt-4 p-6">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h3 className="font-display text-base font-semibold text-ink">Set up {client.name}</h3>
-              <p className="mt-0.5 text-sm text-slate">{client.where}</p>
-            </div>
-            <CopyButton id={`snip-${client.id}`} text={client.snippet(endpoint, token)} label="Copy snippet" />
-          </div>
-          <pre className="mt-4 overflow-x-auto rounded-lg border border-line bg-canvas p-4 font-mono text-[12.5px] leading-6 text-ink scrollbar-thin">{client.snippet(endpoint, token)}</pre>
-          {!hasFresh ? (
-            <p className="mt-3 text-xs text-slate">
-              Replace <code className="font-mono">YOUR_TOKEN</code> with a token, or <a href="#connect">create one above</a> and this snippet fills it in.
-            </p>
-          ) : null}
-        </div>
-      ) : null}
+      <Dialog open={!!client} onOpenChange={(o) => !o && setOpen(null)}>
+        {client ? <SetupDialog client={client} endpoint={endpoint} fresh={fresh} setFresh={setFresh} /> : null}
+      </Dialog>
     </section>
+  );
+}
+
+function StepHead({ n, done, children }: { n: number; done?: boolean; children: React.ReactNode }) {
+  return (
+    <h4 className="flex items-center gap-2.5 text-sm font-semibold text-ink">
+      <span className={cn("flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-bold", done ? "bg-green text-white" : "border-2 border-green/40 text-green")}>{done ? <Check aria-hidden className="size-3.5" /> : n}</span>
+      {children}
+    </h4>
+  );
+}
+
+function SetupDialog({ client, endpoint, fresh, setFresh }: { client: Client; endpoint: string; fresh: Fresh | null; setFresh: (t: Fresh | null) => void }) {
+  const router = useRouter();
+  const [name, setName] = React.useState(`${client.name} on my computer`);
+  const [own, setOwn] = React.useState("");
+  const [error, setError] = React.useState<string | null>(null);
+  const [pending, start] = React.useTransition();
+  const [status, setStatus] = React.useState<{ connected: boolean; at: string | null; checked: boolean }>({ connected: false, at: null, checked: false });
+  const pasted = own.trim().startsWith("loc_") ? own.trim() : null;
+  const token = fresh?.token ?? pasted;
+  const snippet = client.snippet(endpoint, token ?? "YOUR_TOKEN");
+
+  const check = React.useCallback(async () => {
+    if (!fresh) return;
+    const r = await tokenStatusAction(fresh.id);
+    setStatus({ connected: !!r.lastUsedAt, at: r.lastUsedAt, checked: true });
+  }, [fresh]);
+
+  // Once there's a token, watch for the agent's first call (every 4 s, for up to 10 minutes).
+  React.useEffect(() => {
+    if (!fresh || status.connected) return;
+    let n = 0;
+    const t = setInterval(() => {
+      if (++n > 150) clearInterval(t);
+      else void check();
+    }, 4000);
+    return () => clearInterval(t);
+  }, [fresh, status.connected, check]);
+
+  return (
+    <DialogContent title={`Connect ${client.name}`} description={client.blurb} className="max-w-2xl">
+      <ol className="space-y-6">
+        <li className="space-y-3">
+          <StepHead n={1} done={!!token}>
+            Get a token
+          </StepHead>
+          {token ? (
+            <p className="pl-8 text-sm text-slate">
+              {fresh ? "Token created and filled into the snippet below. It's shown only on this page, so finish setup before you leave." : "Using the token you pasted."}
+            </p>
+          ) : (
+            <div className="space-y-3 pl-8">
+              <form
+                className="flex flex-wrap items-end gap-2"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  setError(null);
+                  start(async () => {
+                    const r = await createTokenAction(name);
+                    if (r.ok) setFresh({ token: r.token, id: r.id });
+                    else setError(r.error);
+                    router.refresh();
+                  });
+                }}
+              >
+                <div className="min-w-0 flex-1 space-y-1.5">
+                  <Label htmlFor="setup-tok">Token name</Label>
+                  <Input id="setup-tok" value={name} onChange={(e) => setName(e.target.value)} maxLength={60} />
+                </div>
+                <Button type="submit" disabled={pending || !name.trim()}>
+                  {pending ? <Loader2 aria-hidden className="animate-spin" /> : <KeyRound aria-hidden />} Create token
+                </Button>
+              </form>
+              {error ? <Callout tone="danger">{error}</Callout> : null}
+              <details className="text-sm text-slate">
+                <summary className="cursor-pointer">I already have a token</summary>
+                <Input className="mt-2 font-mono" value={own} onChange={(e) => setOwn(e.target.value)} placeholder="loc_…" aria-label="Paste your token" autoComplete="off" />
+              </details>
+            </div>
+          )}
+        </li>
+
+        <li className="space-y-3">
+          <StepHead n={2}>Add Locenti to {client.name}</StepHead>
+          <ol className="list-decimal space-y-1 pl-12 text-sm leading-6 text-ink">
+            {client.steps.map((x) => (
+              <li key={x}>{x}</li>
+            ))}
+          </ol>
+          <div className="pl-8">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs text-slate">{client.where}</span>
+              <CopyButton id={`snip-${client.id}`} text={snippet} label={client.id === "claude-code" ? "Copy command" : "Copy snippet"} />
+            </div>
+            <pre className={cn("mt-2 overflow-x-auto rounded-lg border border-line bg-canvas p-4 font-mono text-[12.5px] leading-6 text-ink scrollbar-thin", client.id === "claude-code" && "whitespace-pre-wrap break-all")}>{snippet}</pre>
+            {!token ? <p className="mt-2 text-xs text-slate">Create a token in step 1 and it&apos;s filled in here.</p> : null}
+          </div>
+        </li>
+
+        <li className="space-y-3">
+          <StepHead n={3} done={status.connected}>
+            Check it works
+          </StepHead>
+          <div className="space-y-3 pl-8 text-sm">
+            <p className="text-slate">{client.verify} Then ask your agent something like:</p>
+            <div className="flex items-center gap-2 rounded-lg border border-line bg-canvas px-3 py-2">
+              <MessageSquare aria-hidden className="size-4 shrink-0 text-slate" />
+              <span className="flex-1 text-ink">“Use Locenti to show my workspace and my latest leads.”</span>
+              <CopyButton id={`ask-${client.id}`} text="Use Locenti to show my workspace and my latest leads." className="px-2 py-1" />
+            </div>
+            {fresh ? (
+              status.connected ? (
+                <Callout tone="green" title="Connected">
+                  Your agent reached Locenti{status.at ? ` at ${new Date(status.at).toLocaleTimeString()}` : ""}. You&apos;re all set.
+                </Callout>
+              ) : (
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="inline-flex items-center gap-2 text-slate">
+                    <Loader2 aria-hidden className="size-4 animate-spin text-green" /> Waiting for your agent&apos;s first call…
+                  </span>
+                  <Button size="sm" variant="secondary" onClick={() => void check()}>
+                    Check now
+                  </Button>
+                  {status.checked ? <span className="text-xs text-slate">Nothing yet. Make sure the app was restarted after saving.</span> : null}
+                </div>
+              )
+            ) : (
+              <p className="text-xs text-slate">With a token created here, this step confirms the moment your agent connects.</p>
+            )}
+          </div>
+        </li>
+      </ol>
+    </DialogContent>
   );
 }
 
