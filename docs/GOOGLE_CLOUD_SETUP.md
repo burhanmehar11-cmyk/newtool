@@ -282,7 +282,7 @@ If Google refuses a `*.vercel.app` address, the dependable fix is a custom domai
 | `Error 400: redirect_uri_mismatch` (from Google) | The redirect URI registered in Part C doesn't exactly match the one the app sends | See **Fixing redirect_uri_mismatch** below |
 | `Error 403: access_denied` / "app is being tested" | The Gmail account isn't a test user | Add it under Audience → Test users (Part B) |
 | "This Google account isn't on the private-beta list yet" | Email missing from `BETA_ALLOWED_EMAILS` | Add it, then redeploy |
-| "Email sign-up isn't available yet" | `SMTP_URL` not set | Part E2, or use Google sign-in |
+| "Email sign-up isn't available yet" | No way to send confirmation emails | Easiest: set `ADMIN_EMAILS` to the email you sign in with and keep your Gmail connected in **Mailboxes** (account emails then go out from it). Or set `SMTP_URL` (Part E2). |
 | Confirmation or reset email never arrives | Wrong App Password, or the email is in spam | Check spam; recreate the App Password and update `SMTP_URL` |
 | "Sign-in isn't configured in this environment yet" | A setting is missing, or no redeploy happened | Recheck Part E (`SESSION_SECRET` must be 32+ characters), then redeploy |
 | "That sign-in link expired or was opened in another browser" | Took over 10 minutes, or opened in a different browser | Start again from the sign-in page |

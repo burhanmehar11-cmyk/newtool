@@ -5,7 +5,7 @@ import { adminEmails, isAdminEmail, trialDays } from "@/lib/admin";
 import { getCurrentUser, requireUser } from "@/server/auth";
 import type { Q } from "@/server/auth-store";
 import { withService } from "@/server/db";
-import { emailConfigured } from "@/server/email";
+import { emailChannel } from "@/server/email";
 import { dailyLimit, googlePlacesConfigured } from "@/server/providers/google-places";
 import { aiWriterStatus } from "@/server/services/ai-writer";
 import * as store from "@/server/admin-store";
@@ -47,7 +47,7 @@ export async function getAdminTab(tab: AdminTab, days: number, search: string) {
       case "usage":
         return { tab, daily: await store.daily(q, days) };
       case "emails":
-        return { tab, stats: await store.emailStats(q, days), daily: await store.daily(q, days), problems: await store.mailboxProblems(q), smtp: emailConfigured() };
+        return { tab, stats: await store.emailStats(q, days), daily: await store.daily(q, days), problems: await store.mailboxProblems(q), channel: await emailChannel() };
       case "apis":
         return { tab, apis: await store.sharedApis(q, days), placesLimit: dailyLimit(), placesOn: googlePlacesConfigured(), aiOn: aiWriterStatus().configured };
       case "revenue": {

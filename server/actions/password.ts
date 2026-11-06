@@ -9,7 +9,7 @@ import { passwordProblem } from "@/lib/auth/password";
 import { safeNextPath } from "@/lib/safe-redirect";
 import { accountsConfigured } from "@/server/env";
 import { withService } from "@/server/db";
-import { emailConfigured, existingAccountText, resetEmailText, sendEmail, verifyEmailText } from "@/server/email";
+import { emailAvailable, existingAccountText, resetEmailText, sendEmail, verifyEmailText } from "@/server/email";
 import {
   passwordSignIn,
   passwordSignUp,
@@ -55,7 +55,7 @@ export async function signInWithPasswordAction(_: FormState, form: FormData): Pr
 
 export async function signUpWithPasswordAction(_: FormState, form: FormData): Promise<FormState> {
   if (!accountsConfigured()) return NOT_CONFIGURED;
-  if (!emailConfigured()) return NO_EMAIL;
+  if (!(await emailAvailable())) return NO_EMAIL;
   const parsed = z
     .object({ name: z.string().trim().min(2, "Add your name.").max(120), email, password: z.string() })
     .safeParse({ name: form.get("name"), email: form.get("email"), password: form.get("password") });
@@ -85,7 +85,7 @@ export async function signUpWithPasswordAction(_: FormState, form: FormData): Pr
 }
 
 export async function resendVerificationAction(emailAddress: string): Promise<FormState> {
-  if (!accountsConfigured() || !emailConfigured()) return NO_EMAIL;
+  if (!accountsConfigured() || !(await emailAvailable())) return NO_EMAIL;
   const e = email.safeParse(emailAddress);
   if (!e.success || !(await mayUseLocenti(e.data))) return { message: "If that account needs confirming, a new link is on its way." };
   const token = await svc((q) => resendVerification(q, e.data));
@@ -101,7 +101,7 @@ export async function resendVerificationAction(emailAddress: string): Promise<Fo
 
 export async function forgotPasswordAction(_: FormState, form: FormData): Promise<FormState> {
   if (!accountsConfigured()) return NOT_CONFIGURED;
-  if (!emailConfigured()) return { error: "Password reset by email isn't available yet. Continue with Google instead." };
+  if (!(await emailAvailable())) return { error: "Password reset by email isn't available yet. Continue with Google instead." };
   const e = email.safeParse(form.get("email"));
   if (!e.success) return { values: { email: String(form.get("email") ?? "").slice(0, 254) }, fieldErrors: { email: e.error.issues[0].message } };
   const generic: FormState = { message: "If an account exists for that email, a reset link is on its way. It expires in 1 hour." };

@@ -5,7 +5,7 @@ import { brand } from "@/config/brand";
 import { requireUser, requireWorkspace } from "@/server/auth";
 import type { Q } from "@/server/auth-store";
 import { withService, withUser } from "@/server/db";
-import { emailConfigured, sendEmail } from "@/server/email";
+import { emailAvailable, sendEmail } from "@/server/email";
 import { configuredSiteUrl } from "@/server/env";
 import { acceptInvite, acceptInviteById, createInvite, myInvites, listInvites, listMembers, previewInvite, removeMember, revokeInvite, setMemberRole, type InvitePreview } from "@/server/team-store";
 
@@ -33,7 +33,7 @@ export async function getTeam() {
   const canManage = ["owner", "admin"].includes(workspace.role);
   // One connection per request: run queries one after another.
   const { members, invites } = await asQ(user.id, async (q) => ({ members: await listMembers(q, workspace.id), invites: canManage ? await listInvites(q, workspace.id) : [] }));
-  return { me: user.id, workspace, canManage, members, invites, emailOn: emailConfigured() };
+  return { me: user.id, workspace, canManage, members, invites, emailOn: await emailAvailable() };
 }
 
 const inviteInput = z.object({ email: z.string().trim().toLowerCase().email("Enter a valid email address.").max(254), role: z.enum(["admin", "member", "viewer"]) });
@@ -51,7 +51,7 @@ export async function inviteToTeam(input: unknown): Promise<Result<{ link: strin
   }
   const link = `${configuredSiteUrl() ?? brand.siteUrl}/invite/${token}`;
   let emailed = false;
-  if (emailConfigured()) {
+  if (await emailAvailable()) {
     try {
       await sendEmail(
         p.data.email,
