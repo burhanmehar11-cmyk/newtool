@@ -44,7 +44,9 @@ async function Discover({ searchParams }: { searchParams: PageProps<"/app/discov
         title="Discover"
         description="Search Google Maps for local businesses by type, country, state and city. Public emails are picked up from each website, and you save the ones worth contacting. Nothing is sent from here."
         stats={[
-          { label: "Google Maps searches left today", value: google.configured ? (google.remainingToday == null ? "—" : String(google.remainingToday)) : "Not set up" },
+          google.configured && google.remainingToday == null
+            ? { label: "Google Maps search", value: "Available", hint: "limited only by Google's quota" }
+            : { label: "Google Maps searches left today", value: google.configured ? String(google.remainingToday) : "Not set up" },
           { label: "Discovery units available", value: available.toLocaleString("en-US") },
           { label: "Businesses found recently", value: found.toLocaleString("en-US"), hint: recent.length ? `in your last ${recent.length} search${recent.length === 1 ? "" : "es"}` : "no searches yet" },
         ]}

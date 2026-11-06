@@ -1,10 +1,10 @@
 import "server-only";
-import { accessProblem } from "@/server/services/billing";
+import { accessProblem, billingConfig } from "@/server/services/billing";
 import { emitLeadsCreated } from "@/server/services/webhooks";
 import { z } from "zod";
 import { discoveryNiches, nicheLabel } from "@/lib/discovery/niches";
 import { requireWorkspace, type WorkspaceRef, isViewer, VIEW_ONLY } from "@/server/auth";
-import { withUser } from "@/server/db";
+import { withService, withUser } from "@/server/db";
 import type { Q } from "@/server/auth-store";
 import { geocode, searchBusinesses } from "@/server/providers/osm";
 import { googlePlacesConfigured, placeDetails, remainingToday, textSearch } from "@/server/providers/google-places";
@@ -53,6 +53,26 @@ const asQ = <T,>(userId: string, fn: (q: Q) => Promise<T>) => withUser(userId, (
  * OpenStreetMap, store results, then charge only what was returned. Failed
  * searches release the whole reservation.
  */
+/**
+ * Reserves discovery units for a search. While plan limits aren't enforced
+ * (BILLING_ENFORCE off), a workspace that runs out is topped up instead of
+ * blocked, so only Google's own quota limits searches; usage is still recorded.
+ */
+export async function reserveDiscovery(userId: string, workspaceId: string, jobId: string, units: number) {
+  try {
+    await asQ(userId, (q) => reserve(q, workspaceId, jobId, units));
+  } catch (e) {
+    if (!String((e as Error).message).includes("quota_exceeded") || billingConfig().enforce) throw e;
+    await withService((q) =>
+      q.query(
+        "update public.workspace_allowances set units = greatest(units, app.committed_units($1, 'discovery') + $2) where workspace_id = $1 and kind = 'discovery'",
+        [workspaceId, units],
+      ),
+    );
+    await asQ(userId, (q) => reserve(q, workspaceId, jobId, units));
+  }
+}
+
 export async function runSearch(input: unknown): Promise<SearchOutcome> {
   const { user, workspace } = await requireWorkspace("/app/discover");
   if (isViewer(workspace)) return { ok: false, error: VIEW_ONLY };
@@ -68,7 +88,7 @@ export async function runSearch(input: unknown): Promise<SearchOutcome> {
 
   const jobId = await asQ(user.id, (q) => createJob(q, workspace.id, user.id, query, f));
   try {
-    await asQ(user.id, (q) => reserve(q, workspace.id, jobId, f.maxResults));
+    await reserveDiscovery(user.id, workspace.id, jobId, f.maxResults);
   } catch (e) {
     const quota = String((e as Error).message).includes("quota_exceeded");
     await asQ(user.id, (q) => finishJob(q, jobId, "failed", 0, quota ? "Not enough discovery units left." : "Couldn't reserve usage."));
@@ -196,7 +216,7 @@ export async function runGoogleSearchAs({ user, workspace }: Ctx, input: unknown
 
   const jobId = await asQ(user.id, (q) => createJob(q, workspace.id, user.id, query, f, GOOGLE_PROVIDER));
   try {
-    await asQ(user.id, (q) => reserve(q, workspace.id, jobId, f.maxResults));
+    await reserveDiscovery(user.id, workspace.id, jobId, f.maxResults);
   } catch (e) {
     const quota = String((e as Error).message).includes("quota_exceeded");
     await asQ(user.id, (q) => finishJob(q, jobId, "failed", 0, quota ? "Not enough discovery units left." : "Couldn't reserve usage."));

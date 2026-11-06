@@ -296,7 +296,7 @@ export function ApisTab({ d, days }: { d: Of<"apis">; days: number }) {
     <div className="space-y-5">
       <Tiles
         items={[
-          { label: "Google Maps searches today", value: `${num(today)} / ${num(d.placesLimit)}`, hint: "shared daily limit (GOOGLE_PLACES_DAILY_LIMIT)", tone: today >= d.placesLimit ? "warn" : undefined },
+          { label: "Google Maps searches today", value: d.placesLimit === null ? num(today) : `${num(today)} / ${num(d.placesLimit)}`, hint: d.placesLimit === null ? "no Locenti cap; Google's quota applies" : "Locenti cap (GOOGLE_PLACES_DAILY_LIMIT)", tone: d.placesLimit !== null && today >= d.placesLimit ? "warn" : undefined },
           { label: `Google Maps searches, ${days} days`, value: num(d.apis.places.reduce((a, p) => a + p.calls, 0)) },
           { label: `Built-in AI units, ${days} days`, value: num(d.apis.ai.reduce((a, p) => a + p.units, 0)), hint: "Gemini, shared key" },
           { label: "Agent (MCP) tokens", value: num(d.apis.tokens.active), hint: `${d.apis.tokens.used7} used this week · ${d.apis.tokens.workspaces} workspaces` },

@@ -8,10 +8,9 @@ import type { ProviderError, Result } from "./types";
  *   Text Search:   POST https://places.googleapis.com/v1/places:searchText
  *   Place Details: GET  https://places.googleapis.com/v1/places/{placeId}
  *
- * Cost control: every call first takes a slot from a global daily counter
- * (GOOGLE_PLACES_DAILY_LIMIT, default 30). 30 a day stays under the 1,000
- * free Enterprise-tier requests a month. Also set a matching per-day quota in
- * Google Cloud; that is the hard cap on Google's side.
+ * Every call is counted per day (for the admin panel). By default Locenti adds
+ * no cap of its own: Google's per-day quota on the project is the limit. Set
+ * GOOGLE_PLACES_DAILY_LIMIT to add a Locenti-side cap as well.
  */
 
 const BASE = "https://places.googleapis.com/v1";
@@ -25,9 +24,12 @@ export function googlePlacesConfigured() {
   return !!placesApiKey();
 }
 
-export function dailyLimit(): number {
-  const n = Number(process.env.GOOGLE_PLACES_DAILY_LIMIT);
-  return Number.isInteger(n) && n >= 0 && n <= 10_000 ? n : 30;
+/** Locenti's own daily cap, or null for none (the default: Google's quota decides). */
+export function dailyLimit(): number | null {
+  const raw = process.env.GOOGLE_PLACES_DAILY_LIMIT?.trim();
+  if (!raw) return null;
+  const n = Number(raw);
+  return Number.isInteger(n) && n >= 0 && n <= 1_000_000 ? n : null;
 }
 
 const err = (code: ProviderError["code"], message: string, retryable: boolean): { ok: false; error: ProviderError } => ({
@@ -41,9 +43,20 @@ export const TAKE_SLOT_SQL = `insert into app.provider_daily_calls (provider, da
   where app.provider_daily_calls.calls < $2
   returning calls`;
 
+/** Counts a call without any cap. */
+export const COUNT_CALL_SQL = `insert into app.provider_daily_calls (provider, day, calls) values ($1, (now() at time zone 'utc')::date, 1)
+  on conflict (provider, day) do update set calls = app.provider_daily_calls.calls + 1`;
+
 /** Takes `n` slots from today's limit (UTC day), all or nothing. */
 async function takeSlots(n: number): Promise<boolean> {
   const limit = dailyLimit();
+  if (limit === null) {
+    // No Locenti cap: just count, and never block a search on the counter.
+    await withService(async (q) => {
+      for (let i = 0; i < n; i++) await q.query(COUNT_CALL_SQL, [PROVIDER]);
+    }).catch(() => undefined);
+    return true;
+  }
   if (n > limit) return false;
   try {
     return await withService(async (q) => {
@@ -59,11 +72,14 @@ async function takeSlots(n: number): Promise<boolean> {
   }
 }
 
-export async function remainingToday(): Promise<number> {
+/** Calls left today under Locenti's own cap, or null when there is none. */
+export async function remainingToday(): Promise<number | null> {
+  const limit = dailyLimit();
+  if (limit === null) return null;
   const r = await withService((q) =>
     q.query<{ calls: number }>("select calls from app.provider_daily_calls where provider = $1 and day = (now() at time zone 'utc')::date", [PROVIDER]),
   );
-  return Math.max(0, dailyLimit() - (r.rows[0]?.calls ?? 0));
+  return Math.max(0, limit - (r.rows[0]?.calls ?? 0));
 }
 
 async function call(url: string, init: RequestInit & { fieldMask: string }): Promise<Result<unknown>> {
@@ -84,7 +100,7 @@ async function call(url: string, init: RequestInit & { fieldMask: string }): Pro
   if (res.ok) return { ok: true, value: json };
   const g = parseGoogleError(json);
   if (res.status === 429 || g.status === "RESOURCE_EXHAUSTED")
-    return err("quota_exceeded", "Google's quota for this project is used up for now (check the per-day quota in Google Cloud).", false);
+    return err("quota_exceeded", "Google's daily limit for Maps searches is reached for now. Try again later, or use OpenStreetMap search.", false);
   if (res.status === 403 || res.status === 401 || g.status === "PERMISSION_DENIED")
     return err("unauthorized", "Google rejected the API key. Check that Places API (New) is enabled and the key is allowed to use it.", false);
   if (res.status === 400) return err("invalid_request", "Google couldn't use this search. Try different words.", false);

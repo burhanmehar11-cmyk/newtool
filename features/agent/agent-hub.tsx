@@ -329,8 +329,8 @@ function Usage({ tokens, ai, google }: Pick<AgentHubProps, "tokens" | "ai" | "go
         </div>
         <div className="rounded-xl border border-line p-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate">Google Maps today</p>
-          <p className="mt-1 font-display text-3xl font-semibold tabular-nums text-ink">{google.configured ? (google.left ?? "–") : "–"}</p>
-          <p className="text-xs text-slate">{google.configured ? "searches left, shared by the app and agents" : "Not set up on this server"}</p>
+          <p className="mt-1 font-display text-3xl font-semibold tabular-nums text-ink">{google.configured ? (google.left ?? "No cap") : "–"}</p>
+          <p className="text-xs text-slate">{google.configured ? (google.left === null ? "limited only by Google's quota" : "searches left, shared by the app and agents") : "Not set up on this server"}</p>
         </div>
         <div className="rounded-xl border border-line p-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate">Agent AI costs</p>
