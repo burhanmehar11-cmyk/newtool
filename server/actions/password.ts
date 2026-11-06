@@ -32,7 +32,7 @@ export type FormState = {
 
 const email = z.string().trim().toLowerCase().email("Enter a valid email address.").max(254);
 const NOT_CONFIGURED: FormState = { error: "Sign-in isn't configured in this environment yet." };
-const NO_EMAIL: FormState = { error: "Email sign-up isn't available yet. Continue with Google instead." };
+const NO_EMAIL: FormState = { error: "Email sign-up isn't available right now. Continue with Google instead." };
 const NOT_INVITED = "This email doesn't have access yet. Ask the workspace owner to add it.";
 
 const svc = <T,>(fn: (q: Q) => Promise<T>) => withService((q) => fn(q as unknown as Q));
@@ -77,8 +77,9 @@ export async function signUpWithPasswordAction(_: FormState, form: FormData): Pr
     } else {
       await sendEmail(parsed.data.email, "You already have an account", existingAccountText(`${origin}/sign-in`, `${origin}/forgot-password`));
     }
-  } catch {
-    return { values, error: "We couldn't send the confirmation email. Try again in a few minutes." };
+  } catch (e) {
+    console.error("[sign-up] confirmation email failed:", (e as Error).message);
+    return { values, error: "We couldn't send the confirmation email just now. Try again in a minute, or continue with Google." };
   }
   // Same message either way, so the form doesn't reveal which emails have accounts.
   return { message: `Check ${parsed.data.email} for a confirmation link. It expires in 24 hours.` };

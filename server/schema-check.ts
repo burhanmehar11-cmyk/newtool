@@ -31,10 +31,11 @@ let cache: { at: number; missing: string[] } | null = null;
 export async function missingMigrations(): Promise<string[]> {
   if (cache && Date.now() - cache.at < 5 * 60_000) return cache.missing;
   try {
+    // One round trip for every marker (matters when the database is far away).
     const missing = await withService(async (q) => {
-      const out: string[] = [];
-      for (const m of MARKERS) if (!(await (q as unknown as Q).query(m.sql)).rows.length) out.push(m.file);
-      return out;
+      const sql = `select ${MARKERS.map((m, i) => `exists (${m.sql}) as m${i}`).join(", ")}`;
+      const row = (await (q as unknown as Q).query<Record<string, boolean>>(sql)).rows[0] ?? {};
+      return MARKERS.filter((_, i) => !row[`m${i}`]).map((m) => m.file);
     });
     cache = { at: Date.now(), missing };
     return missing;

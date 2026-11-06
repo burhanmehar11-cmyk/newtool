@@ -28,6 +28,7 @@ async function systemMailbox(): Promise<SystemMailbox | null> {
   const explicit = process.env.SYSTEM_EMAIL_FROM?.trim().toLowerCase() ?? "";
   const admins = adminEmails();
   let value: SystemMailbox | null = null;
+  let looked = false;
   if (explicit || admins.length) {
     try {
       value =
@@ -44,11 +45,14 @@ async function systemMailbox(): Promise<SystemMailbox | null> {
             ),
           )
         ).rows[0] ?? null;
-    } catch {
-      value = null;
+      looked = true;
+    } catch (e) {
+      // A slow or failed lookup must not switch email off for everyone: don't remember it.
+      console.error("[email] couldn't look up the sending mailbox:", (e as Error).message);
+      return null;
     }
-  }
-  mailboxCache = { at: Date.now(), value };
+  } else looked = true;
+  if (looked) mailboxCache = { at: Date.now(), value };
   return value;
 }
 
