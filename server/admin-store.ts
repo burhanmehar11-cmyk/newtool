@@ -350,3 +350,107 @@ export async function setPlan(q: Q, adminEmail: string, workspaceId: string, p: 
   ]);
   return true;
 }
+
+/* ------------------------------------------------------------ activity */
+
+export const ACTIVITY_FILTERS = ["all", "signups", "signins", "team", "prospecting", "outreach", "billing"] as const;
+export type ActivityFilter = (typeof ACTIVITY_FILTERS)[number];
+export type ActivityRow = { at: string; kind: string; email: string | null; workspace: string | null; summary: string };
+
+/** Each event source, tagged with the filter it belongs to. All return (at, kind, email, workspace, summary). */
+const ACTIVITY_PARTS: { filter: Exclude<ActivityFilter, "all">; sql: string }[] = [
+  {
+    filter: "signups",
+    sql: `select u.created_at as at, 'signup' as kind, u.email, null::text as workspace,
+            (case when u.auth_subject like 'google:%' then 'Signed up with Google' else 'Signed up with email' end)
+            || case when u.auth_subject not like 'google:%' and u.email_verified_at is null then ' (not confirmed yet)' else '' end
+            || coalesce(' · from ' || a.source, '') || coalesce(' (' || a.campaign || ')', '') as summary
+          from auth.users u left join app.signup_attribution a on a.user_id = u.id`,
+  },
+  {
+    filter: "signups",
+    sql: `select u.email_verified_at, 'confirm', u.email, null, 'Confirmed their email address'
+          from auth.users u where u.auth_subject like 'email:%' and u.email_verified_at is not null`,
+  },
+  { filter: "signins", sql: `select s.created_at, 'signin', u.email, null, 'Signed in' from auth.sessions s join auth.users u on u.id = s.user_id` },
+  { filter: "team", sql: `select w.created_at, 'workspace', u.email, w.name, 'Created the workspace' from public.workspaces w left join auth.users u on u.id = w.created_by` },
+  {
+    filter: "team",
+    sql: `select i.created_at, 'invite', u.email, w.name, 'Invited ' || i.email || ' as ' || i.role
+          from public.workspace_invites i join public.workspaces w on w.id = i.workspace_id left join auth.users u on u.id = i.invited_by`,
+  },
+  {
+    filter: "team",
+    sql: `select i.accepted_at, 'joined', u.email, w.name, 'Joined through an invite (' || i.role || ')'
+          from public.workspace_invites i join public.workspaces w on w.id = i.workspace_id left join auth.users u on u.id = i.accepted_by where i.accepted_at is not null`,
+  },
+  { filter: "team", sql: `select t.created_at, 'token', u.email, w.name, 'Created an agent token "' || t.name || '"' from public.api_tokens t join public.workspaces w on w.id = t.workspace_id left join auth.users u on u.id = t.user_id` },
+  {
+    filter: "prospecting",
+    sql: `select j.created_at, 'search', u.email, w.name,
+            (case when j.provider = 'google_places' then 'Searched Google Maps: ' else 'Searched OpenStreetMap: ' end) || j.query
+            || case j.status when 'failed' then ' (failed)' when 'completed' then ' (' || j.charged_units || ' found)' else '' end
+          from public.discovery_jobs j join public.workspaces w on w.id = j.workspace_id left join auth.users u on u.id = j.created_by`,
+  },
+  {
+    filter: "prospecting",
+    sql: `select max(l.created_at), 'leads', u.email, w.name,
+            'Saved ' || count(*) || case when count(*) = 1 then ' lead' else ' leads' end || case when bool_or(l.source = 'import') then ' (CSV import)' else '' end
+          from public.leads l join public.workspaces w on w.id = l.workspace_id left join auth.users u on u.id = l.saved_by
+          group by u.email, w.name, date_trunc('minute', l.created_at)`,
+  },
+  {
+    filter: "outreach",
+    sql: `select a.approved_at, 'campaign', u.email, w.name, 'Approved campaign "' || c.name || '" (' || cardinality(a.recipient_lead_ids) || ' recipients)'
+          from public.approvals a join public.campaigns c on c.id = a.campaign_id join public.workspaces w on w.id = a.workspace_id left join auth.users u on u.id = a.approved_by`,
+  },
+  {
+    filter: "outreach",
+    sql: `select max(x.accepted_at), 'sent', null, w.name, 'Sent ' || count(*) || case when count(*) = 1 then ' email' else ' emails' end || coalesce(' (' || c.name || ')', '')
+          from public.dispatches x join public.workspaces w on w.id = x.workspace_id left join public.campaigns c on c.id = x.campaign_id
+          where x.status = 'accepted' group by w.name, c.name, date_trunc('hour', x.accepted_at)`,
+  },
+  {
+    filter: "outreach",
+    sql: `select m.occurred_at, 'reply', m.from_addr, w.name, 'Reply received (' || replace(t.classification, '_', ' ') || ')'
+          from public.messages m join public.threads t on t.id = m.thread_id join public.workspaces w on w.id = m.workspace_id where m.direction = 'inbound'`,
+  },
+  { filter: "billing", sql: `select a.created_at, 'admin', a.admin_email, a.target, 'Plan changed: ' || coalesce(a.details->>'from', '?') || ' → ' || coalesce(a.details->>'to', '?') from app.admin_audit a where a.action = 'set_plan'` },
+  {
+    filter: "billing",
+    sql: `select e.received_at, 'payment', null, w.name,
+            case when e.amount_minor is not null then 'Payment received: ' || to_char(e.amount_minor / 100.0, 'FM999999990.00') || ' ' || coalesce(e.currency, '') else 'Billing: ' || e.type end
+          from app.billing_events e left join public.workspaces w on w.id = e.workspace_id`,
+  },
+];
+
+/** Recent activity across the platform, newest first. Billing parts are skipped if their tables aren't there yet. */
+export async function activity(q: Q, filter: ActivityFilter, search: string, limit = 200): Promise<ActivityRow[]> {
+  const parts = ACTIVITY_PARTS.filter((p) => filter === "all" || p.filter === filter);
+  const billingReady = (await q.query<{ ok: boolean }>("select to_regclass('app.billing_events') is not null as ok")).rows[0]?.ok;
+  const usable = parts.filter((p) => billingReady || !p.sql.includes("app.billing_events"));
+  if (!usable.length) return [];
+  return (
+    await q.query<ActivityRow>(
+      `select * from (${usable.map((p) => `(${p.sql})`).join(" union all ")}) as a(at, kind, email, workspace, summary)
+       where a.at is not null and ($1 = '' or a.email ilike '%' || $1 || '%' or a.workspace ilike '%' || $1 || '%' or a.summary ilike '%' || $1 || '%')
+       order by a.at desc limit $2`,
+      [search, limit],
+    )
+  ).rows;
+}
+
+/** Sign-up counts for the activity header. */
+export async function signupCounts(q: Q) {
+  const r = (
+    await q.query(
+      `select count(*) filter (where created_at > now() - interval '1 day') as today,
+              count(*) filter (where created_at > now() - interval '7 days') as week,
+              count(*) filter (where auth_subject like 'email:%') as by_email,
+              count(*) filter (where auth_subject like 'google:%') as by_google,
+              count(*) filter (where auth_subject like 'email:%' and email_verified_at is null) as unconfirmed
+       from auth.users`,
+    )
+  ).rows[0] as Record<string, unknown>;
+  return { today: n(r.today), week: n(r.week), byEmail: n(r.by_email), byGoogle: n(r.by_google), unconfirmed: n(r.unconfirmed) };
+}

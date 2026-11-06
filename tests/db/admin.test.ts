@@ -82,3 +82,18 @@ describe("admin numbers", () => {
     expect(await admin.setPlan(q, "owner@locenti.com", "00000000-0000-4000-8000-000000000000", { plan: "free", trialEndsAt: null, note: null })).toBe(false);
   });
 });
+
+describe("activity feed", () => {
+  it("lists sign-ups, workspaces, leads and plan changes, newest first, and every filter runs", async () => {
+    const all = await admin.activity(q, "all", "");
+    const kinds = all.map((r) => r.kind);
+    expect(kinds).toEqual(expect.arrayContaining(["signup", "workspace", "leads", "admin"]));
+    const ann = all.find((r) => r.kind === "signup" && r.email === "ann@agency.example");
+    expect(ann?.summary).toMatch(/^Signed up with Google · from linkedin \(launch\)$/);
+    expect(all.map((r) => new Date(r.at).getTime())).toEqual([...all.map((r) => new Date(r.at).getTime())].sort((a, b) => b - a));
+    for (const f of admin.ACTIVITY_FILTERS) await expect(admin.activity(q, f, "")).resolves.toBeInstanceOf(Array);
+    expect((await admin.activity(q, "signups", "")).every((r) => r.kind === "signup" || r.kind === "confirm")).toBe(true);
+    expect((await admin.activity(q, "all", "bob@studio")).every((r) => r.email === "bob@studio.example")).toBe(true);
+    expect(await admin.signupCounts(q)).toMatchObject({ today: 2, byGoogle: 2, byEmail: 0, unconfirmed: 0 });
+  });
+});

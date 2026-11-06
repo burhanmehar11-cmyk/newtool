@@ -4,7 +4,7 @@ import { Suspense } from "react";
 import { ArrowLeft, ShieldCheck } from "lucide-react";
 import { LogoMark } from "@/components/brand/logo";
 import { Skeleton } from "@/components/ui/misc";
-import { AdminsTab, ApisTab, EmailsTab, FunnelTab, OverviewTab, RevenueTab, UsageTab, UsersTab, WorkspacesTab } from "@/features/admin/sections";
+import { ActivityTab, AdminsTab, ApisTab, EmailsTab, FunnelTab, OverviewTab, RevenueTab, UsageTab, UsersTab, WorkspacesTab } from "@/features/admin/sections";
 import { ADMIN_TABS, getAdminTab, type AdminTab } from "@/server/services/admin";
 import { cn } from "@/lib/utils";
 
@@ -12,6 +12,7 @@ export const metadata: Metadata = { title: "Admin · Locenti", robots: { index: 
 
 const LABELS: Record<AdminTab, string> = {
   overview: "Overview",
+  activity: "Activity",
   funnel: "Sign-ups & sources",
   users: "People",
   workspaces: "Workspaces & plans",
@@ -49,7 +50,8 @@ async function Admin({ searchParams }: { searchParams: PageProps<"/admin">["sear
   const tab: AdminTab = ADMIN_TABS.includes(sp.tab as AdminTab) ? (sp.tab as AdminTab) : "overview";
   const days = PERIODS.includes(Number(sp.days)) ? Number(sp.days) : 30;
   const search = typeof sp.q === "string" ? sp.q.trim().slice(0, 100) : "";
-  const d = await getAdminTab(tab, days, search);
+  const filter = typeof sp.f === "string" ? sp.f : "all";
+  const d = await getAdminTab(tab, days, search, filter);
   const href = (t: AdminTab, dd = days) => `/admin?tab=${t}${WITH_PERIOD.includes(t) ? `&days=${dd}` : ""}`;
 
   return (
@@ -101,6 +103,7 @@ async function Admin({ searchParams }: { searchParams: PageProps<"/admin">["sear
           ) : null}
         </div>
         {d.tab === "overview" ? <OverviewTab d={d} days={days} /> : null}
+        {d.tab === "activity" ? <ActivityTab d={d} search={search} /> : null}
         {d.tab === "funnel" ? <FunnelTab d={d} days={days} /> : null}
         {d.tab === "users" ? <UsersTab d={d} search={search} /> : null}
         {d.tab === "workspaces" ? <WorkspacesTab d={d} search={search} /> : null}

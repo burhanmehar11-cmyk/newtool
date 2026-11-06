@@ -478,3 +478,66 @@ export function AdminsTab({ d }: { d: Of<"admins"> }) {
     </div>
   );
 }
+
+const ACTIVITY_LABELS: Record<string, string> = { all: "Everything", signups: "Sign-ups", signins: "Sign-ins", team: "Workspaces & team", prospecting: "Searches & leads", outreach: "Campaigns & replies", billing: "Plans & payments" };
+const KIND_TONE: Record<string, "green" | "info" | "warn" | "neutral" | "outline"> = { signup: "green", confirm: "green", signin: "outline", workspace: "info", invite: "info", joined: "info", token: "neutral", search: "neutral", leads: "neutral", campaign: "green", sent: "outline", reply: "info", admin: "warn", payment: "green" };
+const KIND_LABEL: Record<string, string> = { signup: "Sign-up", confirm: "Confirmed", signin: "Sign-in", workspace: "Workspace", invite: "Invite", joined: "Joined", token: "Agent token", search: "Search", leads: "Leads", campaign: "Campaign", sent: "Emails", reply: "Reply", admin: "Admin", payment: "Billing" };
+
+export function ActivityTab({ d, search }: { d: Of<"activity">; search: string }) {
+  const c = d.counts;
+  return (
+    <div className="space-y-5">
+      <Tiles
+        items={[
+          { label: "Sign-ups today", value: num(c.today), hint: `${num(c.week)} in the last 7 days` },
+          { label: "Signed up with email", value: num(c.byEmail), hint: c.unconfirmed ? `${c.unconfirmed} haven't confirmed yet` : "all confirmed", tone: c.unconfirmed ? "warn" : undefined },
+          { label: "Signed up with Google", value: num(c.byGoogle) },
+          { label: "Shown below", value: num(d.rows.length), hint: d.rows.length === 200 ? "newest 200 events" : "events" },
+        ]}
+      />
+      <Panel
+        title="Activity"
+        description="Everything happening across Locenti, newest first."
+        flush
+        actions={
+          <form method="get" action="/admin" className="flex gap-2">
+            <input type="hidden" name="tab" value="activity" />
+            <input type="hidden" name="f" value={d.filter} />
+            <input name="q" defaultValue={search} placeholder="Email, workspace or text" aria-label="Search activity" className="h-9 w-56 rounded-lg border border-line bg-surface px-3 text-sm text-ink placeholder:text-slate/70" />
+            <button className="h-9 rounded-lg border border-line px-3 text-sm font-medium text-ink hover:bg-canvas">Search</button>
+          </form>
+        }
+      >
+        <nav aria-label="Filter activity" className="flex flex-wrap gap-1.5 border-b border-line px-5 py-3">
+          {Object.entries(ACTIVITY_LABELS).map(([k, label]) => (
+            <Link
+              key={k}
+              href={`/admin?tab=activity&f=${k}${search ? `&q=${encodeURIComponent(search)}` : ""}`}
+              aria-current={d.filter === k ? "page" : undefined}
+              className={`rounded-lg border px-3 py-1.5 text-sm font-medium ${d.filter === k ? "border-ink bg-ink text-white" : "border-line text-slate hover:text-ink"}`}
+            >
+              {label}
+            </Link>
+          ))}
+        </nav>
+        {d.rows.length ? (
+          <Table caption="Activity" minWidth={760} head={["When", "What", "Who", "Workspace", ""]}>
+            {d.rows.map((r, i) => (
+              <tr key={i}>
+                <td className="whitespace-nowrap text-xs text-slate">{formatDateTime(r.at)}</td>
+                <td className="max-w-[420px] text-sm text-ink">{r.summary}</td>
+                <td className="max-w-[220px] truncate text-xs">{r.email ?? <span className="text-slate">—</span>}</td>
+                <td className="max-w-[180px] truncate text-xs text-slate">{r.workspace ?? "—"}</td>
+                <td className="text-right">
+                  <Badge tone={KIND_TONE[r.kind] ?? "outline"}>{KIND_LABEL[r.kind] ?? r.kind}</Badge>
+                </td>
+              </tr>
+            ))}
+          </Table>
+        ) : (
+          <p className="px-5 py-6 text-sm text-slate">Nothing here{search ? ` matching “${search}”` : ""} yet.</p>
+        )}
+      </Panel>
+    </div>
+  );
+}
