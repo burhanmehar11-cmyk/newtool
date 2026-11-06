@@ -134,12 +134,14 @@ export async function runDispatch(opts: { workspaceId?: string | null; now?: Dat
     } else if (sent.code === "network") {
       await svc((q) => recordFailure(q, dispatchId, due.id, "ambiguous", sent.message, due.step));
       summary.failed++;
-    } else if (sent.code === "auth" || sent.code === "permission" || sent.code === "rate_limited") {
+    } else if (sent.code === "auth" || sent.code === "permission" || sent.code === "api_disabled" || sent.code === "rate_limited") {
       // Mailbox-level problem: put this email back and pause, rather than failing every recipient.
       await svc(async (q) => {
         await q.query("delete from public.dispatches where id = $1", [dispatchId]);
         await pauseCampaign(q, c.id);
-        if (sent.code !== "rate_limited") await markMailbox(q, c.account_id, { status: "needs_reconnect", lastError: sent.message });
+        // A project setting (API off) or Gmail's limit isn't the mailbox's fault: keep it connected.
+        if (sent.code === "auth" || sent.code === "permission") await markMailbox(q, c.account_id, { status: "needs_reconnect", lastError: sent.message });
+        else await markMailbox(q, c.account_id, { lastError: sent.message });
       });
       summary.skipped.push(`${c.id}: ${sent.message} (campaign paused)`);
     } else {

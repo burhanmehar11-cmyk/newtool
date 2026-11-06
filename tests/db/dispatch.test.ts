@@ -148,6 +148,18 @@ describe("sending pass", () => {
     expect(h.send).toHaveBeenCalledTimes(1);
   });
 
+  it("pauses but keeps the mailbox connected when the Gmail API is turned off in the project", async () => {
+    const c = await runningCampaign(["apioff@shop.example"]);
+    await only(c.id);
+    h.send.mockResolvedValue({ ok: false, code: "api_disabled", message: "The Gmail API is turned off in your Google Cloud project." });
+    await runDispatch({ workspaceId: ws, ignoreGap: true });
+    expect(await status(c.id)).toBe("paused");
+    expect(await dispatches(c.id)).toEqual([]);
+    expect((await enrollments(c.id))[0].state).toBe("queued");
+    const box = (await db.query<{ status: string; last_error: string }>("select status, last_error from public.sending_accounts where id = $1", [c.mailbox])).rows[0];
+    expect(box).toMatchObject({ status: "connected", last_error: expect.stringMatching(/Gmail API is turned off/) });
+  });
+
   it("pauses without sending when the stored token can't be refreshed", async () => {
     const c = await runningCampaign(["token@shop.example"]);
     await only(c.id);

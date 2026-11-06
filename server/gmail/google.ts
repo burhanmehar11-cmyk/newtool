@@ -48,7 +48,7 @@ export async function refreshAccessToken(refreshToken: string): Promise<Refreshe
   return { ok: false, revoked: false, message: `Google couldn't refresh access (HTTP ${res.status}).` };
 }
 
-export type SendResult = { ok: true; id: string; threadId: string } | { ok: false; code: "auth" | "permission" | "rate_limited" | "rejected" | "network"; message: string };
+export type SendResult = { ok: true; id: string; threadId: string } | { ok: false; code: "auth" | "permission" | "api_disabled" | "rate_limited" | "rejected" | "network"; message: string };
 
 /** Sends a raw RFC 5322 message. With threadId, Gmail files it in that thread (follow-ups). */
 export async function sendRaw(accessToken: string, raw: string, threadId?: string): Promise<SendResult> {
@@ -63,6 +63,8 @@ export async function sendRaw(accessToken: string, raw: string, threadId?: strin
   const json = (await res.json().catch(() => ({}))) as { id?: string; threadId?: string; error?: { message?: string } };
   if (res.ok && json.id) return { ok: true, id: json.id, threadId: json.threadId ?? json.id };
   if (res.status === 401) return { ok: false, code: "auth", message: "Gmail rejected the mailbox's access. Reconnect it." };
+  if (res.status === 403 && /has not been used in project|is disabled|accessNotConfigured|SERVICE_DISABLED/i.test(json.error?.message ?? ""))
+    return { ok: false, code: "api_disabled", message: "The Gmail API is turned off in your Google Cloud project. Enable it (Google Cloud → APIs & Services → Library → Gmail API → Enable), wait a few minutes, then resume." };
   if (res.status === 403) return { ok: false, code: "permission", message: `Gmail refused to send (${json.error?.message ?? "permission denied"}). Check that the Gmail API is enabled and the send permission was granted.` };
   if (res.status === 429) return { ok: false, code: "rate_limited", message: "Gmail's sending limit was reached. Try again later." };
   return { ok: false, code: "rejected", message: `Gmail didn't accept the email (HTTP ${res.status}${json.error?.message ? `: ${json.error.message}` : ""}).` };
