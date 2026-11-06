@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { BookmarkPlus, Download, ExternalLink, Loader2, Mail, MapPinned, Send, Star } from "lucide-react";
+import { BookmarkPlus, Download, ExternalLink, Globe, Loader2, Mail, MapPinned, Phone, Send, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox, FieldError, FieldHint, Input, Label, Select } from "@/components/ui/field";
@@ -54,6 +54,10 @@ export function GoogleSearchForm({ available, remainingToday, onResult, prefill 
   const [error, setError] = React.useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = React.useState<Record<string, string>>({});
   const [maxResults, setMaxResults] = React.useState(20);
+  const [requireEmail, setRequireEmail] = React.useState(true);
+  const [requirePhone, setRequirePhone] = React.useState(false);
+  const [requireWebsite, setRequireWebsite] = React.useState(false);
+  const [openOnly, setOpenOnly] = React.useState(true);
   const over = maxResults > available;
   const noCalls = remainingToday !== null && remainingToday < 1;
 
@@ -65,7 +69,8 @@ export function GoogleSearchForm({ available, remainingToday, onResult, prefill 
       onSubmit={(e) => {
         e.preventDefault();
         const fd = new FormData(e.currentTarget);
-        const values = Object.fromEntries(fd);
+        // Unticked checkboxes send nothing: say explicitly which filters are on.
+        const values = { ...Object.fromEntries(fd), requireEmail, requirePhone, requireWebsite: requireWebsite || requireEmail, openOnly };
         setError(null);
         setFieldErrors({});
         start(async () => {
@@ -101,6 +106,26 @@ export function GoogleSearchForm({ available, remainingToday, onResult, prefill 
           {fieldErrors.businessType ? <FieldError>{fieldErrors.businessType}</FieldError> : <FieldHint>Type any kind of business, or pick a suggestion.</FieldHint>}
         </div>
         <LocationFields prefillPlace={prefill?.place} prefillCountry={prefill?.country} prefillState={prefill?.state} placeError={fieldErrors.place} />
+        <fieldset className="space-y-2 sm:col-span-2">
+          <legend className="text-sm font-medium text-ink">Must have</legend>
+          <div className="flex flex-wrap gap-2">
+            {[
+              { name: "requireEmail", label: "Email", icon: Mail, on: requireEmail, set: setRequireEmail },
+              { name: "requirePhone", label: "Phone number", icon: Phone, on: requirePhone, set: setRequirePhone },
+              { name: "requireWebsite", label: "Website", icon: Globe, on: requireWebsite || requireEmail, set: setRequireWebsite, locked: requireEmail },
+            ].map((c) => (
+              <label
+                key={c.name}
+                title={c.locked ? "Emails are found on websites, so this is on while Email is ticked." : undefined}
+                className={cn("inline-flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition-colors", c.on ? "border-green bg-mint-soft text-ink" : "border-line text-slate hover:text-ink", c.locked && "cursor-default opacity-80")}
+              >
+                <Checkbox name={c.name} checked={c.on} disabled={c.locked} onChange={(e) => c.set(e.target.checked)} className="sr-only" />
+                <c.icon aria-hidden className={cn("size-4", c.on ? "text-green" : "text-slate")} /> {c.label}
+              </label>
+            ))}
+          </div>
+          <FieldHint>Only businesses with everything ticked are shown, and only those use units.</FieldHint>
+        </fieldset>
         <div className="space-y-1.5">
           <Label htmlFor="g-rating">Google rating</Label>
           <Select id="g-rating" name="minRating" defaultValue="0">
@@ -111,15 +136,19 @@ export function GoogleSearchForm({ available, remainingToday, onResult, prefill 
           </Select>
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="g-website">Website</Label>
-          <Select id="g-website" name="website" defaultValue="has">
-            <option value="has">Has a website (needed for research)</option>
-            <option value="any">Any</option>
-            <option value="none">No website listed</option>
+          <Label htmlFor="g-reviews">Number of reviews</Label>
+          <Select id="g-reviews" name="minReviews" defaultValue="0">
+            <option value="0">Any</option>
+            <option value="10">10 or more</option>
+            <option value="50">50 or more</option>
+            <option value="100">100 or more</option>
           </Select>
         </div>
+        <label className="inline-flex items-center gap-2 text-sm text-ink sm:col-span-2">
+          <Checkbox name="openOnly" checked={openOnly} onChange={(e) => setOpenOnly(e.target.checked)} /> Open businesses only (leave out temporarily closed)
+        </label>
         <div className="space-y-1.5">
-          <Label htmlFor="g-max">Businesses with email</Label>
+          <Label htmlFor="g-max">How many</Label>
           <Select id="g-max" name="maxResults" value={maxResults} onChange={(e) => setMaxResults(Number(e.target.value))}>
             {[20, 40, 60].map((m) => (
               <option key={m} value={m}>
@@ -128,7 +157,7 @@ export function GoogleSearchForm({ available, remainingToday, onResult, prefill 
             ))}
           </Select>
           <FieldHint>
-            Only businesses that show a public email are returned, and only those use units (you have {available}). Locenti checks up to 60 Google Maps results to find them
+            Uses one unit per business returned (you have {available}). Locenti checks up to 60 Google Maps results to find matches
             {remainingToday !== null ? ` (${remainingToday} Google requests left today)` : ""}.
           </FieldHint>
         </div>
@@ -158,9 +187,19 @@ function download(filename: string, text: string) {
 
 export function GoogleResults({ result }: { result: Done }) {
   const router = useRouter();
+  const leftOut = [
+    result.noEmail ? `${result.noEmail} without an email` : "",
+    result.noWebsite ? `${result.noWebsite} without a website` : "",
+    result.noPhone ? `${result.noPhone} without a phone` : "",
+    result.fewReviews ? `${result.fewReviews} with too few reviews` : "",
+    result.closed ? `${result.closed} temporarily closed` : "",
+  ]
+    .filter(Boolean)
+    .join(", ");
   const [rows, setRows] = React.useState<GoogleResult[]>(result.results);
-  const selectable = rows.map((r) => r.placeId);
-  const [selected, setSelected] = React.useState<string[]>(() => rows.filter((r) => !r.saved).map((r) => r.placeId));
+  // Saving needs a website (research reads it), so rows without one can't be selected.
+  const selectable = rows.filter((r) => r.website).map((r) => r.placeId);
+  const [selected, setSelected] = React.useState<string[]>(() => rows.filter((r) => !r.saved && r.website).map((r) => r.placeId));
   const [pending, start] = React.useTransition();
   const [busy, setBusy] = React.useState<null | "save" | "csv" | "campaign">(null);
   const [status, setStatus] = React.useState<{ tone: "green" | "danger" | "info"; text: string; href?: string; link?: string } | null>(null);
@@ -169,7 +208,7 @@ export function GoogleResults({ result }: { result: Done }) {
     return (
       <div className="p-5">
         <EmptyState icon={<MapPinned />} title="No businesses with a public email here">
-          We checked {result.scanned} businesses on Google Maps: {result.noWebsite} have no website and {result.noEmail} don&apos;t show an email on it. Nothing was charged. Try a nearby city or another business type.
+          We checked {result.scanned} businesses on Google Maps and none matched your filters{leftOut ? ` (${leftOut})` : ""}. Nothing was charged. Try loosening a filter, a nearby city or another business type.
         </EmptyState>
       </div>
     );
@@ -204,8 +243,8 @@ export function GoogleResults({ result }: { result: Done }) {
       <div className="flex flex-wrap items-center gap-3 border-b border-line px-5 py-2.5 text-sm text-slate">
         <Mail aria-hidden className="size-3.5 text-green" />
         <span>
-          <span className="font-medium tabular-nums text-ink">{rows.length}</span> businesses with a public email
-          <span className="text-xs"> · checked {result.scanned} on Google Maps; {result.noWebsite + result.noEmail} without an email were left out and not charged</span>
+          <span className="font-medium tabular-nums text-ink">{rows.length}</span> matching businesses
+          <span className="text-xs"> · checked {result.scanned} on Google Maps{leftOut ? `; left out and not charged: ${leftOut}` : ""}</span>
         </span>
       </div>
       <div className="flex flex-wrap items-center gap-2 border-b border-line bg-mint-soft/40 px-5 py-2.5">
@@ -287,7 +326,7 @@ export function GoogleResults({ result }: { result: Done }) {
               return (
                 <tr key={r.placeId} className={cn("border-b border-line last:border-b-0", on && "bg-mint-soft/30")}>
                   <td className="px-5 py-3">
-                    <Checkbox aria-label={`Select ${r.name}`} checked={on} onChange={() => setSelected((xs) => (on ? xs.filter((x) => x !== r.placeId) : [...xs, r.placeId]))} />
+                    <Checkbox aria-label={`Select ${r.name}`} checked={on} disabled={!r.website} title={r.website ? undefined : "No website, so it can't be saved or researched"} onChange={() => setSelected((xs) => (on ? xs.filter((x) => x !== r.placeId) : [...xs, r.placeId]))} />
                   </td>
                   <td className="py-3 pr-3">
                     <a href={googleMapsLink(r.placeId, r.name)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-ink hover:text-green hover:underline">
@@ -310,9 +349,13 @@ export function GoogleResults({ result }: { result: Done }) {
                     )}
                   </td>
                   <td className="max-w-[200px] truncate py-3 pr-3 font-mono text-xs text-slate">
-                    <a href={r.website!} target="_blank" rel="noopener noreferrer nofollow" className="hover:text-green hover:underline">
-                      {r.website!.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "")}
-                    </a>
+                    {r.website ? (
+                      <a href={r.website} target="_blank" rel="noopener noreferrer nofollow" className="hover:text-green hover:underline">
+                        {r.website.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "")}
+                      </a>
+                    ) : (
+                      "Not listed"
+                    )}
                   </td>
                   <td className="max-w-[230px] py-3 pr-3 text-xs">
                     <EmailCell r={r} />

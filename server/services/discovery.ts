@@ -156,6 +156,8 @@ export async function getLeads() {
 
 /* ------------------------------------------------------------ Google Maps */
 
+const flag = z.preprocess((v) => v === true || v === "on" || v === "true" || v === "1", z.boolean());
+
 export const googleSearchSchema = z.object({
   // Any business type: free text, or a preset's id or label.
   businessType: z.string().trim().min(2, "Describe the type of business, like “dentists” or “wedding photographers”.").max(80),
@@ -168,14 +170,21 @@ export const googleSearchSchema = z.object({
   state: z.string().trim().max(60).optional(),
   place: z.string().trim().min(2, "Enter a city or area, like “Austin”.").max(100),
   minRating: z.coerce.number().refine((v) => (MIN_RATINGS as readonly number[]).includes(v), "Choose a rating."),
-  website: z.enum(["any", "has", "none"]),
+  minReviews: z.coerce.number().refine((v) => [0, 10, 50, 100].includes(v), "Choose a number of reviews.").default(0),
+  // Checkboxes: "on" when ticked (forms), or true/false (agents and the API).
+  requireEmail: flag.default(true),
+  requirePhone: flag.default(false),
+  requireWebsite: flag.default(false),
+  openOnly: flag.default(true),
+  // Older callers: website "has" means requireWebsite.
+  website: z.enum(["any", "has", "none"]).optional(),
   maxResults: z.coerce.number().refine((v) => [20, 40, 60].includes(v), "Choose a maximum."),
 });
 
 export type GoogleResult = GooglePlace & { saved: boolean; emails: FoundEmail[]; siteName: string | null };
 type FoundEmail = EmailLookup["emails"][number];
 export type GoogleSearchOutcome =
-  | { ok: true; jobId: string; query: string; niche: string | null; results: GoogleResult[]; filteredOut: number; requests: number; scanned: number; noWebsite: number; noEmail: number }
+  | { ok: true; jobId: string; query: string; niche: string | null; results: GoogleResult[]; filteredOut: number; requests: number; scanned: number; noWebsite: number; noEmail: number; noPhone: number; fewReviews: number; closed: number }
   | { ok: false; error: string; fieldErrors?: Record<string, string> };
 
 export async function googleStatus() {
@@ -212,7 +221,11 @@ export async function runGoogleSearchAs({ user, workspace }: Ctx, input: unknown
     state: d.state || null,
     place: d.place,
     minRating: d.minRating,
-    website: d.website,
+    minReviews: d.minReviews,
+    requireEmail: d.requireEmail,
+    requirePhone: d.requirePhone,
+    requireWebsite: d.requireWebsite || d.website === "has",
+    openOnly: d.openOnly,
     maxResults: d.maxResults,
   };
   const query = `${f.businessType} in ${placeLabel({ city: f.place, state: f.state, country: f.country })}`;
@@ -226,9 +239,9 @@ export async function runGoogleSearchAs({ user, workspace }: Ctx, input: unknown
     return { ok: false, error: quota ? "This search could use more discovery units than you have left. Lower the maximum results." : "Couldn't start the search. Try again." };
   }
 
-  // Only businesses with a public email count: read each result's website now,
-  // keep those with an email, and fetch the next page of 20 (up to 3 pages)
-  // until there are enough. People are charged only for what they get.
+  // Cheap filters first (open, reviews, phone, website), then each remaining
+  // website is read for a public email. Next page of 20 (up to 3 pages) until
+  // there are enough. People are charged only for the businesses returned.
   const target = f.maxResults;
   const results: GoogleResult[] = [];
   const seen = new Set<string>();
@@ -237,6 +250,9 @@ export async function runGoogleSearchAs({ user, workspace }: Ctx, input: unknown
   let scanned = 0;
   let noWebsite = 0;
   let noEmail = 0;
+  let noPhone = 0;
+  let fewReviews = 0;
+  let closed = 0;
   let lastError: string | null = null;
   for (let page = 0; page < 3 && results.length < target; page++) {
     const r = await searchPage({ query, pageToken: token, minRating: f.minRating, regionCode: f.country });
@@ -248,17 +264,24 @@ export async function runGoogleSearchAs({ user, workspace }: Ctx, input: unknown
     const fresh = r.value.places.filter((p) => p.status !== "CLOSED_PERMANENTLY" && !seen.has(p.placeId));
     fresh.forEach((p) => seen.add(p.placeId));
     scanned += fresh.length;
-    const withSite = fresh.filter((p) => !!p.website);
-    noWebsite += fresh.length - withSite.length;
-    const lookups = await pool(withSite, 20, async (p) => {
-      const l = await findEmailsOnWebsite(p.website!, { budgetMs: 7_000 }).catch(() => null);
+    const candidates = fresh.filter((p) => {
+      if (f.openOnly && p.status === "CLOSED_TEMPORARILY") return void closed++, false;
+      if (f.minReviews && (p.ratingCount ?? 0) < f.minReviews) return void fewReviews++, false;
+      if (f.requirePhone && !p.phone) return void noPhone++, false;
+      if ((f.requireEmail || f.requireWebsite) && !p.website) return void noWebsite++, false;
+      return true;
+    });
+    const lookups = await pool(candidates, 20, async (p) => {
+      if (!p.website) return null;
+      const l = await findEmailsOnWebsite(p.website, { budgetMs: 7_000 }).catch(() => null);
       // Keep only addresses whose domain can actually receive email (free DNS check).
       return l ? { ...l, emails: await deliverableEmails(l.emails) } : null;
     });
-    withSite.forEach((p, i) => {
+    candidates.forEach((p, i) => {
       const l = lookups[i];
-      if (l && l.emails.length) results.push({ ...p, saved: false, emails: l.emails, siteName: l.siteName });
-      else noEmail++;
+      const emails = l?.emails ?? [];
+      if (f.requireEmail && !emails.length) return void noEmail++;
+      results.push({ ...p, saved: false, emails, siteName: l?.siteName ?? null });
     });
     token = r.value.nextPageToken;
     if (!token) break;
@@ -282,11 +305,14 @@ export async function runGoogleSearchAs({ user, workspace }: Ctx, input: unknown
     query,
     niche: f.niche,
     results: kept.map((p) => ({ ...p, saved: saved.has(p.placeId) })),
-    filteredOut: noWebsite + noEmail,
+    filteredOut: noWebsite + noEmail + noPhone + fewReviews + closed,
     requests,
     scanned,
     noWebsite,
     noEmail,
+    noPhone,
+    fewReviews,
+    closed,
   };
 }
 

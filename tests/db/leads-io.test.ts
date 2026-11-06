@@ -93,3 +93,33 @@ describe("Google Maps search returns only businesses with an email", () => {
     expect(await committed()).toBe(before);
   });
 });
+
+describe("search filters", () => {
+  const ctx = () => ({ user: { id: U }, workspace: { id: h.ws, name: "IO", role: "owner" } });
+  const base = { businessType: "dentists", place: "Austin", country: "US", maxResults: 20, minRating: 0 };
+
+  it("applies phone, review and open filters before reading websites, and reports what was left out", async () => {
+    const places = [
+      { ...place(700, "https://a700.example"), phone: "+1 512 000 0000", ratingCount: 120 },
+      { ...place(701, "https://a701.example"), phone: null, ratingCount: 120 }, // no phone
+      { ...place(702, "https://a702.example"), phone: "+1 512 000 0001", ratingCount: 3 }, // few reviews
+      { ...place(703, "https://a703.example"), phone: "+1 512 000 0002", ratingCount: 80, status: "CLOSED_TEMPORARILY" }, // closed
+    ];
+    h.page.mockResolvedValueOnce({ ok: true, value: { places, nextPageToken: null } });
+    h.find.mockResolvedValue({ status: "found", emails: [{ email: "hi@a.example", kind: "role", url: "https://a.example" }], siteName: null, note: "" });
+    const r = await runGoogleSearchAs(ctx(), { ...base, requirePhone: true, minReviews: 50, openOnly: true });
+    if (!r.ok) throw new Error(JSON.stringify(r));
+    expect(r.results.map((x) => x.placeId)).toEqual([places[0].placeId]);
+    expect(r).toMatchObject({ noPhone: 1, fewReviews: 1, closed: 1, noEmail: 0 });
+    expect(h.find).toHaveBeenCalledTimes(1); // websites read only for businesses passing the cheap filters
+  });
+
+  it("can return businesses without an email when that filter is off", async () => {
+    h.page.mockResolvedValueOnce({ ok: true, value: { places: [place(800, "https://b800.example"), place(801, null)], nextPageToken: null } });
+    h.find.mockResolvedValue({ status: "none", emails: [], siteName: null, note: "" });
+    const r = await runGoogleSearchAs(ctx(), { ...base, requireEmail: "off", requireWebsite: "off" });
+    if (!r.ok) throw new Error(JSON.stringify(r));
+    expect(r.results).toHaveLength(2);
+    expect(r.results.every((x) => x.emails.length === 0)).toBe(true);
+  });
+});

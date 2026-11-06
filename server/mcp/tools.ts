@@ -72,8 +72,12 @@ export const mcpTools: ToolDef<McpCtx>[] = [
         state: { type: "string", description: "State or province (optional), e.g. 'Texas'." },
         country: { type: "string", description: "Two-letter country code (optional), e.g. 'US', 'PK', 'GB'. Biases results to that country." },
         min_rating: { type: "number", enum: [0, 3.5, 4, 4.5], default: 0 },
-        website: { type: "string", enum: ["has", "any", "none"], default: "has", description: "'has' keeps businesses with a website (needed for research and emails)." },
-        max_results: { type: "number", enum: [20, 40, 60], default: 20 },
+        min_reviews: { type: "number", enum: [0, 10, 50, 100], default: 0 },
+        require_email: { type: "boolean", default: true, description: "Only businesses whose website shows a public email (found during the search)." },
+        require_phone: { type: "boolean", default: false },
+        require_website: { type: "boolean", default: true },
+        open_only: { type: "boolean", default: true, description: "Leave out temporarily closed businesses." },
+        max_results: { type: "number", enum: [20, 40, 60], default: 20, description: "How many matching businesses to return (up to 60 Google results are checked)." },
       },
       required: ["business_type", "place"],
       additionalProperties: false,
@@ -87,18 +91,22 @@ export const mcpTools: ToolDef<McpCtx>[] = [
           state: z.string().max(60).optional(),
           country: z.string().length(2).optional(),
           min_rating: z.number().default(0),
-          website: z.enum(["has", "any", "none"]).default("has"),
+          min_reviews: z.number().default(0),
+          require_email: z.boolean().default(true),
+          require_phone: z.boolean().default(false),
+          require_website: z.boolean().default(true),
+          open_only: z.boolean().default(true),
           max_results: z.number().default(20),
         }),
         args,
       );
       const preset = discoveryNiches.find((n) => n.id === a.business_type);
-      const r = await runGoogleSearchAs(ctx, { businessType: preset ? preset.label : a.business_type, place: a.place, state: a.state, country: a.country, minRating: a.min_rating, website: a.website, maxResults: a.max_results });
+      const r = await runGoogleSearchAs(ctx, { businessType: preset ? preset.label : a.business_type, place: a.place, state: a.state, country: a.country, minRating: a.min_rating, minReviews: a.min_reviews, requireEmail: a.require_email, requirePhone: a.require_phone, requireWebsite: a.require_website, openOnly: a.open_only, maxResults: a.max_results });
       if (!r.ok) throw new ToolError(r.error);
       return {
         query: r.query,
         note: "Live Google Maps results; Locenti doesn't store them. Save the ones you want.",
-        results: r.results.map((p) => ({ place_id: p.placeId, name: p.name, address: p.address, website: p.website, phone: p.phone, rating: p.rating, reviews: p.ratingCount, category: p.category, already_saved: p.saved })),
+        results: r.results.map((p) => ({ place_id: p.placeId, name: p.name, address: p.address, website: p.website, phone: p.phone, emails: p.emails.map((e) => e.email), rating: p.rating, reviews: p.ratingCount, category: p.category, already_saved: p.saved })),
       };
     },
   },
