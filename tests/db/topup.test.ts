@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { PGlite } from "@electric-sql/pglite";
 import { as, createTestDb, createUser } from "./harness";
 
@@ -8,7 +8,8 @@ vi.mock("@/server/db", () => ({
   withUser: (userId: string, fn: (q: unknown) => Promise<unknown>) => h.as(h.db, userId, () => fn(h.db)),
 }));
 
-const { reserveDiscovery } = await import("@/server/services/discovery");
+const { reserveDiscovery, monthlyDiscovery, monthlyResetDate } = await import("@/server/services/discovery");
+const { settle } = await import("@/server/discovery-store");
 
 const U = "00000000-0000-4000-8000-00000000f0f0";
 let db: PGlite;
@@ -26,6 +27,13 @@ beforeAll(async () => {
 }, 60_000);
 
 describe("discovery units while billing isn't enforced", () => {
+  beforeAll(() => {
+    process.env.DISCOVERY_MONTHLY_LIMIT = "off";
+  });
+  afterAll(() => {
+    delete process.env.DISCOVERY_MONTHLY_LIMIT;
+  });
+
   it("tops a workspace up instead of blocking, and still records the usage", async () => {
     const start = await allowance();
     // Use up the whole allowance in one go.
@@ -44,5 +52,60 @@ describe("discovery units while billing isn't enforced", () => {
     } finally {
       delete process.env.BILLING_ENFORCE;
     }
+  });
+});
+
+describe("monthly limit per workspace (default 200)", () => {
+  const V = "00000000-0000-4000-8000-00000000f0f1";
+  let w: string;
+  const jobFor = async () => (await as(db, V, () => db.query<{ id: string }>("insert into public.discovery_jobs (workspace_id, created_by, query, filters, provider, estimated_units) values ($1, $2, 'q', '{}'::jsonb, 'google_places', 60) returning id", [w, V]))).rows[0].id;
+  beforeAll(async () => {
+    await createUser(db, V, "monthly@agency.example");
+    w = await as(db, V, async () => (await db.query<{ id: string }>("select public.create_workspace('Monthly') as id")).rows[0].id);
+  });
+
+  it("gives fewer units than asked near the limit, then refuses until next month", async () => {
+    // Three full searches that each return 60: 180 used.
+    for (let i = 0; i < 3; i++) {
+      const j = await jobFor();
+      expect(await reserveDiscovery(V, w, j, 60)).toBe(60);
+      await as(db, V, () => settle(db as never, w, `${j}`, 60));
+    }
+    expect(await monthlyDiscovery(V, w)).toMatchObject({ limit: 200, used: 180, left: 20 });
+    // Only 20 left: the next search may return at most 20.
+    const j = await jobFor();
+    expect(await reserveDiscovery(V, w, j, 60)).toBe(20);
+    // While it runs, its 20 count as used.
+    await expect(reserveDiscovery(V, w, await jobFor(), 20)).rejects.toThrow(/monthly_limit/);
+    // It returned only 5, so 15 come back.
+    await as(db, V, () => settle(db as never, w, j, 5));
+    expect((await monthlyDiscovery(V, w)).left).toBe(15);
+  });
+
+  it("doesn't count last month's searches", async () => {
+    await db.query("update public.usage_ledger set created_at = created_at - interval '40 days' where workspace_id = $1", [w]);
+    expect(await monthlyDiscovery(V, w)).toMatchObject({ used: 0, left: 200 });
+  });
+
+  it("doesn't apply to paid or complimentary plans, or when switched off", async () => {
+    await db.query("update public.workspaces set plan = 'comp' where id = $1", [w]);
+    expect((await monthlyDiscovery(V, w)).limit).toBeNull();
+    await db.query("update public.workspaces set plan = 'trial' where id = $1", [w]);
+    process.env.DISCOVERY_MONTHLY_LIMIT = "off";
+    try {
+      expect((await monthlyDiscovery(V, w)).limit).toBeNull();
+    } finally {
+      delete process.env.DISCOVERY_MONTHLY_LIMIT;
+    }
+    process.env.DISCOVERY_MONTHLY_LIMIT = "50";
+    try {
+      expect((await monthlyDiscovery(V, w)).limit).toBe(50);
+    } finally {
+      delete process.env.DISCOVERY_MONTHLY_LIMIT;
+    }
+  });
+
+  it("resets on the 1st of next month (UTC)", () => {
+    expect(monthlyResetDate(new Date("2026-12-31T23:30:00Z")).toISOString()).toBe("2027-01-01T00:00:00.000Z");
   });
 });

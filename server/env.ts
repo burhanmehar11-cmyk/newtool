@@ -48,3 +48,19 @@ export function configuredSiteUrl(): string | null {
   const vercel = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim();
   return vercel ? `https://${vercel}` : null;
 }
+
+/**
+ * Businesses (discovery units) each workspace may find per calendar month on
+ * the trial, free and lapsed plans, so the shared Google allowance stretches
+ * across more people. DISCOVERY_MONTHLY_LIMIT overrides it; 0 or "off"
+ * removes the limit. Paid and complimentary plans, and workspaces owned by
+ * someone in ADMIN_EMAILS, have no monthly limit.
+ */
+export const DEFAULT_DISCOVERY_MONTHLY_LIMIT = 200;
+export function discoveryMonthlyLimit(raw: string | undefined = process.env.DISCOVERY_MONTHLY_LIMIT): number | null {
+  const v = raw?.trim().toLowerCase();
+  if (!v) return DEFAULT_DISCOVERY_MONTHLY_LIMIT;
+  if (v === "off" || v === "0") return null;
+  const n = Number(v);
+  return Number.isInteger(n) && n > 0 && n <= 1_000_000 ? n : DEFAULT_DISCOVERY_MONTHLY_LIMIT;
+}

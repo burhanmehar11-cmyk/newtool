@@ -53,13 +53,13 @@ export function GoogleSearchForm({ available, remainingToday, onResult, prefill 
   const [pending, start] = React.useTransition();
   const [error, setError] = React.useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = React.useState<Record<string, string>>({});
-  // As many as Google gives (60), unless the remaining units only cover fewer.
-  const [maxResults, setMaxResults] = React.useState(() => [60, 40, 20].find((m) => m <= available) ?? 20);
+  // As many as Google gives (60); with fewer units left, the search returns that many.
+  const [maxResults, setMaxResults] = React.useState(60);
   const [requireEmail, setRequireEmail] = React.useState(true);
   const [requirePhone, setRequirePhone] = React.useState(false);
   const [requireWebsite, setRequireWebsite] = React.useState(false);
   const [openOnly, setOpenOnly] = React.useState(true);
-  const over = maxResults > available;
+  const over = available < 1;
   const noCalls = remainingToday !== null && remainingToday < 1;
 
   return (
@@ -158,7 +158,7 @@ export function GoogleSearchForm({ available, remainingToday, onResult, prefill 
             ))}
           </Select>
           <FieldHint>
-            Uses one unit per business returned (you have {available}). Locenti checks up to 60 Google Maps results to find matches
+            Uses one unit per business returned ({available} left{available < maxResults ? `, so this search returns up to ${available}` : ""}). Locenti checks up to 60 Google Maps results to find matches
             {remainingToday !== null ? ` (${remainingToday} Google requests left today)` : ""}.
           </FieldHint>
         </div>
@@ -168,7 +168,7 @@ export function GoogleSearchForm({ available, remainingToday, onResult, prefill 
         {pending ? <Loader2 aria-hidden className="animate-spin" /> : <MapPinned aria-hidden />}
         {pending ? "Searching and finding emails… (up to a minute)" : "Search Google Maps"}
       </Button>
-      {over ? <p className="text-xs text-danger-fg">Lower the maximum results to fit your remaining units.</p> : null}
+      {over ? <p className="text-xs text-danger-fg">No businesses left this month. Google Maps search opens again on the 1st.</p> : null}
       {noCalls ? <p className="text-xs text-danger-fg">Today&apos;s Google Maps limit is used up. It resets at midnight UTC; OpenStreetMap search still works.</p> : null}
     </form>
   );

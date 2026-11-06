@@ -136,7 +136,7 @@ docs/                    PRODUCT, BRAND, ARCHITECTURE, MILESTONES, DECISIONS, HA
 
 ## Known limitations
 
-- Google Maps results are shown live and not stored (Google's terms); saved Google leads keep only the place ID and website. Daily limit `GOOGLE_PLACES_DAILY_LIMIT` (default 30).
+- Google Maps results are shown live and not stored (Google's terms); saved Google leads keep only the place ID and website. No site-wide daily cap unless `GOOGLE_PLACES_DAILY_LIMIT` is set. Each trial/free workspace can find 200 businesses a month (`DISCOVERY_MONTHLY_LIMIT`; paid and complimentary plans and the owner's own workspace have no monthly limit).
 - Email check is DNS-only and never marks an address valid. No AI, sending or billing provider is connected yet (M2 steps 4–6).
 - Live OpenStreetMap and website fetches haven't been run from this development environment (its network blocks them).
 - Legal pages are drafts marked for owner and legal review.

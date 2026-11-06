@@ -12,7 +12,8 @@ import { ResultsTable } from "@/features/product/results-table";
 import { OsmCredit } from "@/features/product/osm-credit";
 import { requireWorkspace } from "@/server/auth";
 import { getUsage } from "@/server/services/workspaces";
-import { getRecentSearches, getSearch, googleStatus } from "@/server/services/discovery";
+import { getMonthlyDiscovery, getRecentSearches, getSearch, googleStatus } from "@/server/services/discovery";
+import { billingConfig } from "@/server/services/billing";
 import { formatDateTime } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Discover" };
@@ -34,9 +35,12 @@ async function Discover({ searchParams }: { searchParams: PageProps<"/app/discov
   const { workspace } = await requireWorkspace("/app/discover");
   const sp = await searchParams;
   const jobId = typeof sp.job === "string" ? sp.job : null;
-  const [usage, recent, search, google] = await Promise.all([getUsage(workspace), getRecentSearches(), jobId ? getSearch(jobId) : Promise.resolve(null), googleStatus()]);
+  const [usage, recent, search, google, month] = await Promise.all([getUsage(workspace), getRecentSearches(), jobId ? getSearch(jobId) : Promise.resolve(null), googleStatus(), getMonthlyDiscovery()]);
   const discovery = usage.find((u) => u.kind === "discovery")!;
-  const available = Math.max(0, discovery.allowance - discovery.used - discovery.reserved);
+  const planLeft = Math.max(0, discovery.allowance - discovery.used - discovery.reserved);
+  // The monthly limit when there is one (the plan allowance only counts once billing is enforced).
+  const available = month.left === null ? planLeft : billingConfig().enforce ? Math.min(planLeft, month.left) : month.left;
+  const resets = new Date(`${month.resetsOn}T00:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
   const found = recent.reduce((a, j) => a + (j.status === "completed" || j.status === "partial" ? j.charged_units : 0), 0);
 
   return (
@@ -50,7 +54,9 @@ async function Discover({ searchParams }: { searchParams: PageProps<"/app/discov
           google.configured && google.remainingToday == null
             ? { label: "Google Maps search", value: "Available", hint: "limited only by Google's quota" }
             : { label: "Google Maps searches left today", value: google.configured ? String(google.remainingToday) : "Not set up" },
-          { label: "Discovery units available", value: available.toLocaleString("en-US") },
+          month.limit !== null
+            ? { label: "Businesses left this month", value: `${available.toLocaleString("en-US")} of ${month.limit.toLocaleString("en-US")}`, hint: `resets ${resets}` }
+            : { label: "Discovery units available", value: available.toLocaleString("en-US") },
           { label: "Businesses found recently", value: found.toLocaleString("en-US"), hint: recent.length ? `in your last ${recent.length} search${recent.length === 1 ? "" : "es"}` : "no searches yet" },
         ]}
       />

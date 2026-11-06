@@ -63,6 +63,25 @@ export async function reserve(q: Q, ws: string, jobId: string, units: number) {
   await q.query("select public.reserve_usage($1, 'discovery', $2, $3, $4)", [ws, units, `discovery:${jobId}`, "Search reservation"]);
 }
 
+/** Discovery units used this calendar month (UTC): charged minus refunded, plus searches still running. */
+export async function monthlyDiscoveryUse(q: Q, ws: string): Promise<number> {
+  const r = await q.query<{ used: number }>(
+    `with l as (
+       select * from public.usage_ledger
+       where workspace_id = $1 and kind = 'discovery' and created_at >= date_trunc('month', now() at time zone 'utc') at time zone 'utc'
+     )
+     select (
+       coalesce((select sum(units) from l where entry_type = 'charge'), 0)
+       - coalesce((select sum(units) from l where entry_type = 'refund'), 0)
+       + coalesce((select sum(greatest(r.units - coalesce((select sum(s.units) from public.usage_ledger s
+           where s.workspace_id = $1 and s.reservation_key = r.idempotency_key and s.entry_type in ('charge', 'release')), 0), 0))
+         from l r where r.entry_type = 'reserve'), 0)
+     )::int as used`,
+    [ws],
+  );
+  return Number(r.rows[0]?.used ?? 0);
+}
+
 /** Charges what was returned and releases the rest. Idempotent. */
 export async function settle(q: Q, ws: string, jobId: string, used: number) {
   await q.query("select public.settle_usage($1, $2, $3, $4)", [ws, `discovery:${jobId}`, used, `Search returned ${used}`]);

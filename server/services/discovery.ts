@@ -12,6 +12,8 @@ import { findEmailsOnWebsite, type EmailLookup } from "@/server/research/find-em
 import { deliverableEmails } from "@/server/research/email-check";
 import { GOOGLE_PROVIDER, MIN_RATINGS, PLACE_ID, type GooglePlace } from "@/lib/discovery/google-places";
 import { isCountryCode, placeLabel } from "@/lib/geo/regions";
+import { isAdminEmail } from "@/lib/admin";
+import { discoveryMonthlyLimit } from "@/server/env";
 
 /** Maps free text like "dentists" or "Dental clinics" to a preset business type, when one fits. */
 export function matchNiche(text: string): string | null {
@@ -25,6 +27,7 @@ import {
   getJob,
   jobResults,
   listLeads,
+  monthlyDiscoveryUse,
   persistResults,
   recentJobs,
   reserve,
@@ -60,19 +63,77 @@ const asQ = <T,>(userId: string, fn: (q: Q) => Promise<T>) => withUser(userId, (
  * (BILLING_ENFORCE off), a workspace that runs out is topped up instead of
  * blocked, so only Google's own quota limits searches; usage is still recorded.
  */
-export async function reserveDiscovery(userId: string, workspaceId: string, jobId: string, units: number) {
-  try {
-    await asQ(userId, (q) => reserve(q, workspaceId, jobId, units));
-  } catch (e) {
-    if (!String((e as Error).message).includes("quota_exceeded") || billingConfig().enforce) throw e;
+/** Monthly limit for this workspace, or null for none (paid and complimentary plans, and the platform owner's own workspace). */
+async function monthlyLimitFor(workspaceId: string): Promise<number | null> {
+  const limit = discoveryMonthlyLimit();
+  if (limit === null) return null;
+  const w = await withService((q) =>
+    q.query<{ plan: string | null; owner: string | null }>(
+      `select to_jsonb(w)->>'plan' as plan,
+         (select u.email from public.memberships m join auth.users u on u.id = m.user_id where m.workspace_id = w.id and m.role = 'owner' limit 1) as owner
+       from public.workspaces w where w.id = $1`,
+      [workspaceId],
+    ),
+  );
+  const row = w.rows[0];
+  if (row && (row.plan === "paid" || row.plan === "comp" || isAdminEmail(row.owner))) return null;
+  return limit;
+}
+
+/** First day of next month (UTC), when the monthly limit resets. */
+export function monthlyResetDate(now = new Date()): Date {
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+}
+
+/** This month's allowance for a workspace: null limit means none. */
+export async function monthlyDiscovery(userId: string, workspaceId: string): Promise<{ limit: number | null; used: number; left: number | null; resetsOn: string }> {
+  const limit = await monthlyLimitFor(workspaceId);
+  const used = limit === null ? 0 : await asQ(userId, (q) => monthlyDiscoveryUse(q, workspaceId));
+  return { limit, used, left: limit === null ? null : Math.max(0, limit - used), resetsOn: monthlyResetDate().toISOString().slice(0, 10) };
+}
+
+/**
+ * Reserves units for a search and returns how many it may use: fewer than
+ * asked when the workspace's monthly limit (200 businesses by default) has
+ * less left. Throws "monthly_limit" when none is left, and "quota_exceeded"
+ * when billing is enforced and the plan's units are used up. Until billing is
+ * enforced, the plan allowance is topped up instead of blocking.
+ */
+export async function reserveDiscovery(userId: string, workspaceId: string, jobId: string, units: number): Promise<number> {
+  const limit = await monthlyLimitFor(workspaceId);
+  if (!billingConfig().enforce) {
     await withService((q) =>
       q.query(
         "update public.workspace_allowances set units = greatest(units, app.committed_units($1, 'discovery') + $2) where workspace_id = $1 and kind = 'discovery'",
         [workspaceId, units],
       ),
     );
-    await asQ(userId, (q) => reserve(q, workspaceId, jobId, units));
   }
+  return asQ(userId, async (q) => {
+    // One search at a time per workspace while the month's use is counted, so two searches can't both take the last units.
+    await q.query("select pg_advisory_xact_lock(hashtext($1))", [`discovery-month:${workspaceId}`]);
+    const n = limit === null ? units : Math.min(units, limit - (await monthlyDiscoveryUse(q, workspaceId)));
+    if (n < 1) throw new Error("monthly_limit");
+    await reserve(q, workspaceId, jobId, n);
+    return n;
+  });
+}
+
+/** What to tell someone when a search can't reserve units. */
+async function reserveError(e: unknown, workspaceId: string): Promise<{ log: string; error: string }> {
+  const msg = String((e as Error)?.message);
+  if (msg.includes("monthly_limit")) {
+    const limit = (await monthlyLimitFor(workspaceId)) ?? 0;
+    const on = monthlyResetDate().toLocaleDateString("en-US", { month: "long", day: "numeric", timeZone: "UTC" });
+    return { log: "Monthly limit reached.", error: `You've used this month's ${limit} businesses. Google Maps search opens again on ${on}.` };
+  }
+  if (msg.includes("quota_exceeded")) return { log: "Not enough discovery units left.", error: "This search could use more discovery units than you have left. Lower the maximum results." };
+  return { log: "Couldn't reserve usage.", error: "Couldn't start the search. Try again." };
+}
+
+export async function getMonthlyDiscovery() {
+  const { user, workspace } = await requireWorkspace("/app/discover");
+  return monthlyDiscovery(user.id, workspace.id);
 }
 
 export async function runSearch(input: unknown): Promise<SearchOutcome> {
@@ -90,11 +151,11 @@ export async function runSearch(input: unknown): Promise<SearchOutcome> {
 
   const jobId = await asQ(user.id, (q) => createJob(q, workspace.id, user.id, query, f));
   try {
-    await reserveDiscovery(user.id, workspace.id, jobId, f.maxResults);
+    f.maxResults = await reserveDiscovery(user.id, workspace.id, jobId, f.maxResults);
   } catch (e) {
-    const quota = String((e as Error).message).includes("quota_exceeded");
-    await asQ(user.id, (q) => finishJob(q, jobId, "failed", 0, quota ? "Not enough discovery units left." : "Couldn't reserve usage."));
-    return { ok: false, jobId, error: quota ? "This search could use more discovery units than you have left. Lower the maximum results." : "Couldn't start the search. Try again." };
+    const why = await reserveError(e, workspace.id);
+    await asQ(user.id, (q) => finishJob(q, jobId, "failed", 0, why.log));
+    return { ok: false, jobId, error: why.error };
   }
 
   const fail = async (message: string) => {
@@ -239,18 +300,20 @@ export async function runGoogleSearchAs({ user, workspace }: Ctx, input: unknown
   const query = `${f.businessType} in ${placeLabel({ city: f.place, state: f.state, country: f.country })}`;
 
   const jobId = await asQ(user.id, (q) => createJob(q, workspace.id, user.id, query, f, GOOGLE_PROVIDER));
+  let allowed: number;
   try {
-    await reserveDiscovery(user.id, workspace.id, jobId, f.maxResults);
+    allowed = await reserveDiscovery(user.id, workspace.id, jobId, f.maxResults);
   } catch (e) {
-    const quota = String((e as Error).message).includes("quota_exceeded");
-    await asQ(user.id, (q) => finishJob(q, jobId, "failed", 0, quota ? "Not enough discovery units left." : "Couldn't reserve usage."));
-    return { ok: false, error: quota ? "This search could use more discovery units than you have left. Lower the maximum results." : "Couldn't start the search. Try again." };
+    const why = await reserveError(e, workspace.id);
+    await asQ(user.id, (q) => finishJob(q, jobId, "failed", 0, why.log));
+    return { ok: false, error: why.error };
   }
 
   // Cheap filters first (open, reviews, phone, website), then each remaining
   // website is read for a public email. Next page of 20 (up to 3 pages) until
   // there are enough. People are charged only for the businesses returned.
-  const target = f.maxResults;
+  // Fewer than asked when only that many are left this month.
+  const target = allowed;
   const results: GoogleResult[] = [];
   const withoutEmail: GoogleResult[] = [];
   const seen = new Set<string>();

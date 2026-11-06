@@ -151,7 +151,7 @@ Google Maps search uses the official **Places API (New)**. Google requires a bil
 2. **APIs & Services → Library** → search **Places API (New)** → **Enable**. (Not the old "Places API": new projects can't enable it, and the page keeps reloading.)
 3. **APIs & Services → Places API (New) → Quotas & System Limits** → the **per day** limit for Text Search requests is the only limit on searches (Locenti adds none). Leave it at Google's default to let every user search freely; lower it only if you want a hard spending cap. Requests beyond Google's free monthly allowance are billed to your Google account, so also set a **budget alert** (Billing → Budgets & alerts).
 4. **APIs & Services → Credentials → Create credentials → API key**. On the key: **API restrictions → Restrict key → Places API (New)** → Save. Don't type or paste the key into chat.
-5. Vercel → Settings → Environment Variables: `GOOGLE_PLACES_API_KEY` = the key (Production and Preview), optionally `GOOGLE_PLACES_DAILY_LIMIT` if you ever want Locenti to cap searches per day (unset = no Locenti cap). Redeploy.
+5. Vercel → Settings → Environment Variables: `GOOGLE_PLACES_API_KEY` = the key (Production and Preview), optionally `GOOGLE_PLACES_DAILY_LIMIT` if you ever want Locenti to cap searches per day (unset = no Locenti cap), and optionally `DISCOVERY_MONTHLY_LIMIT` to change the 200 businesses each trial/free workspace may find per month (`off` removes it). Redeploy.
 6. Run `database/migrations/0004_google_places.sql` in Neon's SQL Editor (adds the daily call counter).
 
 Check: in the app, **Discover** shows a **Google Maps** / **OpenStreetMap** switch.

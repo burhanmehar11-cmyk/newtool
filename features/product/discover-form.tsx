@@ -16,7 +16,7 @@ export function DiscoverForm({ available }: { available: number }) {
   const [error, setError] = React.useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = React.useState<Record<string, string>>({});
   const [maxResults, setMaxResults] = React.useState(25);
-  const over = maxResults > available;
+  const over = available < 1;
 
   return (
     <form
