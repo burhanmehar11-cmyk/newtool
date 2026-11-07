@@ -7,12 +7,12 @@ import { PlanEditor } from "@/features/admin/plan-editor";
 import { Panel, Table, Tiles, delta, num, pct } from "@/features/admin/parts";
 import { sourceLabel } from "@/lib/attribution";
 import { formatDate as fmtDate, formatDateTime as fmtDateTime } from "@/lib/utils";
-import { adminTimeZone } from "@/lib/admin";
+import { adminTimeZone, zoneAbbreviation, zoneName } from "@/lib/admin";
 
-// Admin times are shown in the owner's time zone (Pacific by default, ADMIN_TIMEZONE to change).
+// Admin times are shown in the owner's time zone (Pakistan Standard Time by default, ADMIN_TIMEZONE to change).
 const formatDate = (iso: string) => fmtDate(iso, undefined, adminTimeZone());
-const formatDateTime = (iso: string) => fmtDateTime(iso, adminTimeZone(), true);
-const zoneLabel = () => (adminTimeZone() === "America/Los_Angeles" ? "Pacific time" : adminTimeZone().replace(/_/g, " "));
+const formatDateTime = (iso: string) => `${fmtDateTime(iso, adminTimeZone())} ${zoneAbbreviation(adminTimeZone(), new Date(iso))}`;
+const zoneLabel = () => `${zoneName(adminTimeZone())} (${zoneAbbreviation(adminTimeZone())})`;
 import type { getAdminTab } from "@/server/services/admin";
 
 type Data = Awaited<ReturnType<typeof getAdminTab>>;

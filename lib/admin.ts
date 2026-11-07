@@ -18,9 +18,9 @@ export function trialDays(v: string | undefined = process.env.TRIAL_DAYS): numbe
 
 /**
  * Time zone for the admin panel's times and per-day charts: ADMIN_TIMEZONE
- * (an IANA name such as "America/New_York"), Pacific time by default.
+ * (an IANA name such as "America/New_York"), Pakistan Standard Time by default.
  */
-export const DEFAULT_ADMIN_TIMEZONE = "America/Los_Angeles";
+export const DEFAULT_ADMIN_TIMEZONE = "Asia/Karachi";
 export function adminTimeZone(v: string | undefined = process.env.ADMIN_TIMEZONE): string {
   const tz = v?.trim();
   if (!tz || !/^[A-Za-z_]+(\/[A-Za-z0-9_+-]+){0,2}$/.test(tz)) return DEFAULT_ADMIN_TIMEZONE;
@@ -30,4 +30,21 @@ export function adminTimeZone(v: string | undefined = process.env.ADMIN_TIMEZONE
   } catch {
     return DEFAULT_ADMIN_TIMEZONE;
   }
+}
+
+/** Readable names for zones whose browser abbreviation is only an offset ("GMT+5"). */
+const ZONE_NAMES: Record<string, { short: string; long: string }> = {
+  "Asia/Karachi": { short: "PKT", long: "Pakistan Standard Time" },
+  "America/Los_Angeles": { short: "", long: "Pacific time" },
+};
+
+/** "PKT", or what the browser calls the zone at that moment ("PST", "EDT", "GMT+1"). */
+export function zoneAbbreviation(timeZone: string, at: Date = new Date()): string {
+  const fixed = ZONE_NAMES[timeZone]?.short;
+  if (fixed) return fixed;
+  return new Intl.DateTimeFormat("en-US", { timeZone, timeZoneName: "short" }).formatToParts(at).find((p) => p.type === "timeZoneName")?.value ?? timeZone;
+}
+
+export function zoneName(timeZone: string): string {
+  return ZONE_NAMES[timeZone]?.long ?? timeZone.replace(/_/g, " ");
 }
