@@ -266,6 +266,17 @@ Google checks three things before approving the app: you own the home page, the 
 
 If Google refuses a `*.vercel.app` address, the dependable fix is a custom domain (Vercel → Settings → Domains), verified in Search Console as a **Domain** property.
 
+Check the tag is live before clicking **Verify**: open your home page, **View page source**, and search for `google-site-verification`. If it's missing, the variable was added without a redeploy (or to Preview only instead of Production).
+
+### Mailboxes asking to be reconnected every few days
+
+While the consent screen's publishing status is **Testing**, Google gives connected Gmail mailboxes access that ends after **7 days**. After that, sending fails and Locenti asks for a reconnect. Two ways out:
+
+- **Publish the app** (Audience → **Publish app**) even before verification finishes. Access then no longer ends after a week. Until Google verifies the app, people connecting see a "Google hasn't verified this app" warning (Advanced → Continue), and an unverified app is limited to 100 users.
+- **Get the app verified** (Part J). Then the warning goes away too.
+
+Locenti also rechecks a mailbox marked for reconnecting before asking (on the Mailboxes page, when launching or resuming a campaign, and before each sending pass), so a passing Google error or a Gmail API that was off for a while no longer leaves it stuck.
+
 ## Part F: First sign-in (owner)
 
 1. Open `https://YOUR-URL/sign-in` → **Continue with Google** → pick a Gmail account that is both a **test user** (Part B) and on `BETA_ALLOWED_EMAILS` (Part E).

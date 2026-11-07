@@ -26,7 +26,28 @@ export async function connectMailbox(p: { userId: string; workspaceId: string; e
 
 export async function getMailboxes() {
   const { user, workspace } = await requireWorkspace("/app/mailboxes");
-  return asQ(user.id, (q) => listMailboxes(q, workspace.id));
+  const boxes = await asQ(user.id, (q) => listMailboxes(q, workspace.id));
+  // A mailbox marked for reconnecting may be fine again (a passing Google error, or the Gmail API turned back on): check before asking.
+  const flagged = boxes.filter((b) => b.status === "needs_reconnect").slice(0, 5);
+  if (!flagged.length) return boxes;
+  const healed = await Promise.all(flagged.map((b) => healMailbox(b.id)));
+  return healed.some(Boolean) ? asQ(user.id, (q) => listMailboxes(q, workspace.id)) : boxes;
+}
+
+/**
+ * For a mailbox marked "needs reconnecting": asks Google for fresh access with
+ * the stored grant. If Google gives it, the grant is still good, so the
+ * mailbox is marked connected again. True when it's usable.
+ */
+export async function healMailbox(accountId: string): Promise<boolean> {
+  const box = (await svc((q) => q.query<{ status: string }>("select status from public.sending_accounts where id = $1", [accountId]))).rows[0];
+  if (!box || box.status === "disconnected" || box.status === "revoked") return false;
+  if (box.status === "connected") return true;
+  accessCache.delete(accountId);
+  const t = await accessTokenFor(accountId);
+  if (!t.ok) return false;
+  await svc((q) => markMailbox(q, accountId, { status: "connected", lastError: null }));
+  return true;
 }
 
 // Short-lived access tokens, kept in memory only (they last about an hour).

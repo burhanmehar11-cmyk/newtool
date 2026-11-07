@@ -65,6 +65,9 @@ export async function sendRaw(accessToken: string, raw: string, threadId?: strin
   if (res.status === 401) return { ok: false, code: "auth", message: "Gmail rejected the mailbox's access. Reconnect it." };
   if (res.status === 403 && /has not been used in project|is disabled|accessNotConfigured|SERVICE_DISABLED/i.test(json.error?.message ?? ""))
     return { ok: false, code: "api_disabled", message: "The Gmail API is turned off in your Google Cloud project. Enable it (Google Cloud → APIs & Services → Library → Gmail API → Enable), wait a few minutes, then resume." };
+  // Gmail reports sending limits as 403 too: those aren't a reason to reconnect.
+  if (res.status === 403 && /rate ?limit|ratelimitexceeded|dailylimitexceeded|quota|limit exceeded|too many/i.test(json.error?.message ?? ""))
+    return { ok: false, code: "rate_limited", message: "Gmail's sending limit for this mailbox was reached. Sending continues later." };
   if (res.status === 403) return { ok: false, code: "permission", message: `Gmail refused to send (${json.error?.message ?? "permission denied"}). Check that the Gmail API is enabled and the send permission was granted.` };
   if (res.status === 429) return { ok: false, code: "rate_limited", message: "Gmail's sending limit was reached. Try again later." };
   return { ok: false, code: "rejected", message: `Gmail didn't accept the email (HTTP ${res.status}${json.error?.message ? `: ${json.error.message}` : ""}).` };

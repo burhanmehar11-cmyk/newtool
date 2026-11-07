@@ -21,12 +21,13 @@ const h = vi.hoisted(() => {
     db: null as unknown as PGlite,
     send: vi.fn(),
     token: vi.fn(),
+    heal: vi.fn(),
   };
 });
 
 vi.mock("@/server/db", () => ({ withService: (fn: (q: unknown) => Promise<unknown>) => fn(h.db) }));
 vi.mock("@/server/gmail/google", () => ({ sendRaw: (...a: unknown[]) => h.send(...a) }));
-vi.mock("@/server/services/mailboxes", () => ({ accessTokenFor: (...a: unknown[]) => h.token(...a) }));
+vi.mock("@/server/services/mailboxes", () => ({ accessTokenFor: (...a: unknown[]) => h.token(...a), healMailbox: (...a: unknown[]) => h.heal(...a) }));
 
 const { runDispatch } = await import("@/server/services/dispatch");
 
@@ -87,6 +88,8 @@ beforeEach(() => {
   h.send.mockReset();
   h.token.mockReset();
   h.token.mockResolvedValue({ ok: true, token: "access-token" });
+  h.heal.mockReset();
+  h.heal.mockResolvedValue(false);
   h.send.mockResolvedValue({ ok: true, id: `gm-${Math.random().toString(16).slice(2)}`, threadId: `th${Math.random().toString(16).slice(2, 12)}` });
 });
 
@@ -169,6 +172,31 @@ describe("sending pass", () => {
     expect(await status(c.id)).toBe("paused");
     expect(await dispatches(c.id)).toEqual([]);
     expect((await enrollments(c.id))[0].state).toBe("queued");
+  });
+
+  it("doesn't pause when Google is only briefly unreachable", async () => {
+    const c = await runningCampaign(["blip@shop.example"]);
+    await only(c.id);
+    h.token.mockResolvedValue({ ok: false, message: "Couldn't reach Google.", reconnect: false });
+    const r = await runDispatch({ workspaceId: ws, ignoreGap: true });
+    expect(r.skipped.join()).toMatch(/will retry/);
+    expect(await status(c.id)).toBe("running");
+    expect(await dispatches(c.id)).toEqual([]);
+    expect((await enrollments(c.id))[0].state).toBe("queued");
+  });
+
+  it("sends again without reconnecting when a mailbox marked for reconnecting works after all", async () => {
+    const c = await runningCampaign(["healed@shop.example"]);
+    await only(c.id);
+    await db.query("update public.sending_accounts set status = 'needs_reconnect' where id = $1", [c.mailbox]);
+    h.heal.mockImplementation(async (id: string) => {
+      await db.query("update public.sending_accounts set status = 'connected' where id = $1", [id]);
+      return true;
+    });
+    await runDispatch({ workspaceId: ws, ignoreGap: true });
+    expect(h.heal).toHaveBeenCalledWith(c.mailbox);
+    expect(await status(c.id)).not.toBe("paused");
+    expect(await dispatches(c.id)).toEqual(["accepted"]);
   });
 
   it("stops the enrollment, but not the campaign, when Gmail rejects one email", async () => {

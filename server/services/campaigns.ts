@@ -1,4 +1,5 @@
 import "server-only";
+import { healMailbox } from "@/server/services/mailboxes";
 import { accessProblem } from "@/server/services/billing";
 import { z } from "zod";
 import { followUpProblem, MAX_FOLLOW_UPS, type FollowUp } from "@/lib/campaigns/followups";
@@ -241,6 +242,7 @@ export async function approveAndLaunch(campaignId: string, revision: number, con
     if (why) return { ok: false, error: why };
   }
   if (!uuid.safeParse(campaignId).success || !Number.isInteger(revision)) return { ok: false, error: "Campaign not found." };
+  await healCampaignMailbox(user.id, campaignId);
   try {
     const { enrolled } = await asQ(user.id, (q) => approveCampaign(q, workspace.id, user.id, campaignId, revision));
     const r = await runDispatch({ workspaceId: workspace.id });
@@ -250,9 +252,21 @@ export async function approveAndLaunch(campaignId: string, revision: number, con
   }
 }
 
+/** Before launching or resuming: if the campaign's mailbox is marked for reconnecting, check whether it actually works now. */
+async function healCampaignMailbox(userId: string, campaignId: string) {
+  if (!uuid.safeParse(campaignId).success) return;
+  const box = (
+    await asQ(userId, (q) =>
+      q.query<{ id: string; status: string }>("select sa.id, sa.status from public.campaigns c join public.sending_accounts sa on sa.id = c.sending_account_id where c.id = $1", [campaignId]),
+    )
+  ).rows[0];
+  if (box?.status === "needs_reconnect") await healMailbox(box.id);
+}
+
 export async function changeCampaignStatus(campaignId: string, action: "pause" | "resume" | "cancel"): Promise<R> {
   const { user, workspace } = await requireWorkspace(`/app/campaigns/${campaignId}`);
   if (!canManage(workspace.role) || !uuid.safeParse(campaignId).success) return { ok: false, error: "Not allowed." };
+  if (action === "resume") await healCampaignMailbox(user.id, campaignId);
   const ok = await asQ(user.id, (q) =>
     action === "pause"
       ? setCampaignStatus(q, campaignId, ["running"], "paused")

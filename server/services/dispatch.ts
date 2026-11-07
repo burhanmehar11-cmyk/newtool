@@ -10,7 +10,7 @@ import type { Q } from "@/server/auth-store";
 import { withService } from "@/server/db";
 import { configuredSiteUrl, sessionSecret } from "@/server/env";
 import { sendRaw } from "@/server/gmail/google";
-import { accessTokenFor } from "@/server/services/mailboxes";
+import { accessTokenFor, healMailbox } from "@/server/services/mailboxes";
 import { claimDispatch, completeFinished, isSuppressedEmail, mailboxUsage, nextDue, pauseCampaign, recordAccepted, recordFailure, runningCampaigns } from "@/server/dispatch-store";
 import { markMailbox } from "@/server/mailbox-store";
 import { emitWebhook } from "@/server/services/webhooks";
@@ -54,7 +54,7 @@ export async function runDispatch(opts: { workspaceId?: string | null; now?: Dat
       summary.skipped.push(`${c.id}: plan ended (sending resumes after subscribing)`);
       continue;
     }
-    if (c.account_status !== "connected") {
+    if (c.account_status !== "connected" && !(c.account_status === "needs_reconnect" && (await healMailbox(c.account_id)))) {
       await svc((q) => pauseCampaign(q, c.id));
       summary.skipped.push(`${c.id}: mailbox not connected (campaign paused)`);
       continue;
@@ -89,12 +89,13 @@ export async function runDispatch(opts: { workspaceId?: string | null; now?: Dat
 
     const token = await accessTokenFor(c.account_id);
     if (!token.ok) {
-      // Release the claim so the email goes out once the mailbox is reconnected.
+      // Release the claim so the email goes out later. Pause only when Google ended the access;
+      // a passing problem (Google unreachable) just waits for the next pass.
       await svc(async (q) => {
         await q.query("delete from public.dispatches where id = $1", [dispatchId]);
-        await pauseCampaign(q, c.id);
+        if (token.reconnect) await pauseCampaign(q, c.id);
       });
-      summary.skipped.push(`${c.id}: ${token.message} (campaign paused)`);
+      summary.skipped.push(`${c.id}: ${token.message}${token.reconnect ? " (campaign paused)" : " (will retry)"}`);
       continue;
     }
 
