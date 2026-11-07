@@ -6,17 +6,19 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /** Stable, locale-fixed date formatting so server and client render identically. */
-export function formatDate(iso: string, opts: Intl.DateTimeFormatOptions = { month: "short", day: "numeric", year: "numeric" }) {
-  return new Intl.DateTimeFormat("en-US", { timeZone: "UTC", ...opts }).format(new Date(iso));
+export function formatDate(iso: string, opts: Intl.DateTimeFormatOptions = { month: "short", day: "numeric", year: "numeric" }, timeZone = "UTC") {
+  return new Intl.DateTimeFormat("en-US", { timeZone, ...opts }).format(new Date(iso));
 }
 
-export function formatDateTime(iso: string) {
+/** "Nov 7, 9:14 AM"; with showZone, "Nov 7, 9:14 AM PST". */
+export function formatDateTime(iso: string, timeZone = "UTC", showZone = false) {
   return new Intl.DateTimeFormat("en-US", {
-    timeZone: "UTC",
+    timeZone,
     month: "short",
     day: "numeric",
     hour: "numeric",
     minute: "2-digit",
+    ...(showZone ? { timeZoneName: "short" } : {}),
   }).format(new Date(iso));
 }
 

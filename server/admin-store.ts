@@ -1,4 +1,5 @@
 import type { Q } from "@/server/auth-store";
+import { adminTimeZone } from "@/lib/admin";
 
 /**
  * Platform-wide numbers for the admin panel. Runs on the service connection
@@ -77,18 +78,19 @@ export async function overview(q: Q, trialDays: number): Promise<Overview> {
 
 /** Daily series for the last `days` days: sign-ups, first visits, searches, leads, emails, replies, AI drafts. */
 export async function daily(q: Q, days: number) {
+  const tz = adminTimeZone();
   return (
     await q.query<Record<string, string | number>>(
-      `with d as (select generate_series((now() at time zone 'utc')::date - ($1::int - 1), (now() at time zone 'utc')::date, interval '1 day')::date as day)
+      `with d as (select generate_series((now() at time zone '${tz}')::date - ($1::int - 1), (now() at time zone '${tz}')::date, interval '1 day')::date as day)
        select to_char(d.day, 'YYYY-MM-DD') as day,
-         (select count(*)::int from auth.users u where (u.created_at at time zone 'utc')::date = d.day) as signups,
+         (select count(*)::int from auth.users u where (u.created_at at time zone '${tz}')::date = d.day) as signups,
          (select coalesce(sum(v.visits), 0)::int from app.site_visits v where v.day = d.day) as visits,
-         (select count(*)::int from public.discovery_jobs j where (j.created_at at time zone 'utc')::date = d.day) as searches,
-         (select count(*)::int from public.leads l where (l.created_at at time zone 'utc')::date = d.day) as leads,
-         (select count(*)::int from public.briefs b where (b.created_at at time zone 'utc')::date = d.day) as research,
-         (select count(*)::int from public.drafts dr where dr.origin in ('ai', 'agent') and (dr.created_at at time zone 'utc')::date = d.day) as ai_drafts,
-         (select count(*)::int from public.dispatches x where x.status = 'accepted' and (x.accepted_at at time zone 'utc')::date = d.day) as sent,
-         (select count(*)::int from public.messages m where m.direction = 'inbound' and (m.occurred_at at time zone 'utc')::date = d.day) as replied
+         (select count(*)::int from public.discovery_jobs j where (j.created_at at time zone '${tz}')::date = d.day) as searches,
+         (select count(*)::int from public.leads l where (l.created_at at time zone '${tz}')::date = d.day) as leads,
+         (select count(*)::int from public.briefs b where (b.created_at at time zone '${tz}')::date = d.day) as research,
+         (select count(*)::int from public.drafts dr where dr.origin in ('ai', 'agent') and (dr.created_at at time zone '${tz}')::date = d.day) as ai_drafts,
+         (select count(*)::int from public.dispatches x where x.status = 'accepted' and (x.accepted_at at time zone '${tz}')::date = d.day) as sent,
+         (select count(*)::int from public.messages m where m.direction = 'inbound' and (m.occurred_at at time zone '${tz}')::date = d.day) as replied
        from d order by d.day`,
       [days],
     )
@@ -296,9 +298,9 @@ export async function sharedApis(q: Q, days: number) {
   ).rows;
   const ai = (
     await q.query<{ day: string; units: number }>(
-      `with d as (select generate_series((now() at time zone 'utc')::date - ($1::int - 1), (now() at time zone 'utc')::date, interval '1 day')::date as day)
+      `with d as (select generate_series((now() at time zone '${adminTimeZone()}')::date - ($1::int - 1), (now() at time zone '${adminTimeZone()}')::date, interval '1 day')::date as day)
        select to_char(d.day, 'YYYY-MM-DD') as day,
-         coalesce((select sum(units) from public.usage_ledger l where l.kind = 'ai' and l.entry_type = 'charge' and (l.created_at at time zone 'utc')::date = d.day), 0)::int as units
+         coalesce((select sum(units) from public.usage_ledger l where l.kind = 'ai' and l.entry_type = 'charge' and (l.created_at at time zone '${adminTimeZone()}')::date = d.day), 0)::int as units
        from d order by d.day`,
       [days],
     )
@@ -444,7 +446,8 @@ export async function activity(q: Q, filter: ActivityFilter, search: string, lim
 export async function signupCounts(q: Q) {
   const r = (
     await q.query(
-      `select count(*) filter (where created_at > now() - interval '1 day') as today,
+      // "Today" starts at midnight in the admin time zone.
+      `select count(*) filter (where created_at >= (date_trunc('day', now() at time zone '${adminTimeZone()}') at time zone '${adminTimeZone()}')) as today,
               count(*) filter (where created_at > now() - interval '7 days') as week,
               count(*) filter (where auth_subject like 'email:%') as by_email,
               count(*) filter (where auth_subject like 'google:%') as by_google,

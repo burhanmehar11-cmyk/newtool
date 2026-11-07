@@ -6,7 +6,13 @@ import { TrendChart } from "@/features/analytics/trend-chart";
 import { PlanEditor } from "@/features/admin/plan-editor";
 import { Panel, Table, Tiles, delta, num, pct } from "@/features/admin/parts";
 import { sourceLabel } from "@/lib/attribution";
-import { formatDate, formatDateTime } from "@/lib/utils";
+import { formatDate as fmtDate, formatDateTime as fmtDateTime } from "@/lib/utils";
+import { adminTimeZone } from "@/lib/admin";
+
+// Admin times are shown in the owner's time zone (Pacific by default, ADMIN_TIMEZONE to change).
+const formatDate = (iso: string) => fmtDate(iso, undefined, adminTimeZone());
+const formatDateTime = (iso: string) => fmtDateTime(iso, adminTimeZone(), true);
+const zoneLabel = () => (adminTimeZone() === "America/Los_Angeles" ? "Pacific time" : adminTimeZone().replace(/_/g, " "));
 import type { getAdminTab } from "@/server/services/admin";
 
 type Data = Awaited<ReturnType<typeof getAdminTab>>;
@@ -296,7 +302,7 @@ export function ApisTab({ d, days }: { d: Of<"apis">; days: number }) {
     <div className="space-y-5">
       <Tiles
         items={[
-          { label: "Google Maps searches today", value: d.placesLimit === null ? num(today) : `${num(today)} / ${num(d.placesLimit)}`, hint: d.placesLimit === null ? "no Locenti cap; Google's quota applies" : "Locenti cap (GOOGLE_PLACES_DAILY_LIMIT)", tone: d.placesLimit !== null && today >= d.placesLimit ? "warn" : undefined },
+          { label: "Google Maps searches today (UTC)", value: d.placesLimit === null ? num(today) : `${num(today)} / ${num(d.placesLimit)}`, hint: d.placesLimit === null ? "no Locenti cap; Google's quota applies" : "Locenti cap (GOOGLE_PLACES_DAILY_LIMIT)", tone: d.placesLimit !== null && today >= d.placesLimit ? "warn" : undefined },
           { label: `Google Maps searches, ${days} days`, value: num(d.apis.places.reduce((a, p) => a + p.calls, 0)) },
           { label: `Built-in AI units, ${days} days`, value: num(d.apis.ai.reduce((a, p) => a + p.units, 0)), hint: "Gemini, shared key" },
           { label: "Agent (MCP) tokens", value: num(d.apis.tokens.active), hint: `${d.apis.tokens.used7} used this week · ${d.apis.tokens.workspaces} workspaces` },
@@ -497,7 +503,7 @@ export function ActivityTab({ d, search }: { d: Of<"activity">; search: string }
       />
       <Panel
         title="Activity"
-        description="Everything happening across Locenti, newest first."
+        description={`Everything happening across Locenti, newest first. Times in ${zoneLabel()}.`}
         flush
         actions={
           <form method="get" action="/admin" className="flex gap-2">
