@@ -10,7 +10,7 @@ import { geocode, searchBusinesses } from "@/server/providers/osm";
 import { googlePlacesConfigured, placeDetails, remainingToday, searchPage } from "@/server/providers/google-places";
 import { findEmailsOnWebsite, type EmailLookup } from "@/server/research/find-emails";
 import { deliverableEmails } from "@/server/research/email-check";
-import { GOOGLE_PROVIDER, MIN_RATINGS, PLACE_ID, type GooglePlace } from "@/lib/discovery/google-places";
+import { extendBox, GOOGLE_PROVIDER, gridTiles, MIN_RATINGS, PLACE_ID, type Box, type GooglePlace } from "@/lib/discovery/google-places";
 import { isCountryCode, placeLabel } from "@/lib/geo/regions";
 import { isAdminEmail } from "@/lib/admin";
 import { discoveryMonthlyLimit } from "@/server/env";
@@ -23,6 +23,7 @@ export function matchNiche(text: string): string | null {
 }
 import {
   createJob,
+  addToJob,
   finishJob,
   getJob,
   jobResults,
@@ -243,6 +244,21 @@ export const googleSearchSchema = z.object({
 });
 
 export type GoogleResult = GooglePlace & { saved: boolean; emails: FoundEmail[]; siteName: string | null };
+
+/** Where a search goes on: the area it covered and the searches still to run (-1 = the search itself, 0–8 = grid areas). */
+type QueueItem = { tile: number; token: string | null };
+export type SearchCursor = { box: Box | null; queue: QueueItem[] };
+/** Rounds after the first (each up to ~45 s). */
+export const MAX_ROUNDS = 8;
+
+const boxSchema = z.object({ s: z.number().min(-90).max(90), w: z.number().min(-180).max(180), n: z.number().min(-90).max(90), e: z.number().min(-180).max(180) });
+const continuationSchema = z.object({
+  jobId: z.string().uuid(),
+  round: z.number().int().min(1).max(MAX_ROUNDS),
+  found: z.number().int().min(0).max(60),
+  seen: z.array(z.string().regex(PLACE_ID)).max(3000),
+  cursor: z.object({ box: boxSchema.nullable(), queue: z.array(z.object({ tile: z.number().int().min(-1).max(8), token: z.string().max(2000).nullable() })).max(20) }),
+});
 type FoundEmail = EmailLookup["emails"][number];
 export type GoogleSearchOutcome =
   | {
@@ -253,6 +269,10 @@ export type GoogleSearchOutcome =
       results: GoogleResult[];
       /** Businesses with a website that showed no email we could find: shown (not charged) so nothing silently disappears. */
       withoutEmail: GoogleResult[];
+      /** Set when there's more to search: pass it back (with the place ids seen) for the next round. */
+      cursor: SearchCursor | null;
+      /** Places checked in this round, so the next round skips them. */
+      seenIds: string[];
       filteredOut: number; requests: number; scanned: number; noWebsite: number; noEmail: number; noPhone: number; fewReviews: number; closed: number }
   | { ok: false; error: string; fieldErrors?: Record<string, string> };
 
@@ -299,25 +319,41 @@ export async function runGoogleSearchAs({ user, workspace }: Ctx, input: unknown
   };
   const query = `${f.businessType} in ${placeLabel({ city: f.place, state: f.state, country: f.country })}`;
 
-  const jobId = await asQ(user.id, (q) => createJob(q, workspace.id, user.id, query, f, GOOGLE_PROVIDER));
+  // A continuation round goes on with the same search: same job, its own reservation.
+  const cont = continuationSchema.safeParse((input as { continuation?: unknown } | null)?.continuation);
+  const more = cont.success ? cont.data : null;
+  let jobId: string;
+  if (more) {
+    const job = await asQ(user.id, (q) => getJob(q, more.jobId));
+    if (!job || job.query !== query) return { ok: false, error: "That search can't be continued. Start a new one." };
+    jobId = job.id;
+  } else jobId = await asQ(user.id, (q) => createJob(q, workspace.id, user.id, query, f, GOOGLE_PROVIDER));
+  const reservation = more ? `${jobId}:r${more.round}` : jobId;
+  const wanted = Math.max(1, f.maxResults - (more?.found ?? 0));
   let allowed: number;
   try {
-    allowed = await reserveDiscovery(user.id, workspace.id, jobId, f.maxResults);
+    allowed = await reserveDiscovery(user.id, workspace.id, reservation, wanted);
   } catch (e) {
     const why = await reserveError(e, workspace.id);
-    await asQ(user.id, (q) => finishJob(q, jobId, "failed", 0, why.log));
+    if (!more) await asQ(user.id, (q) => finishJob(q, jobId, "failed", 0, why.log));
     return { ok: false, error: why.error };
   }
 
-  // Cheap filters first (open, reviews, phone, website), then each remaining
-  // website is read for a public email. Next page of 20 (up to 3 pages) until
-  // there are enough. People are charged only for the businesses returned.
-  // Fewer than asked when only that many are left this month.
+  // Google returns at most 60 places per search. Start with the search itself;
+  // once its pages run out, search a 3 × 3 grid of smaller areas inside the area
+  // it covered, each up to 60 more, skipping places already checked. Cheap
+  // filters first (open, reviews, phone, website), then each website is read
+  // for a public email. Each round stops starting new pages after ~36 s (the
+  // browser asks for the next round); people are charged only for businesses
+  // returned with an email.
+  const started = Date.now();
   const target = allowed;
   const results: GoogleResult[] = [];
   const withoutEmail: GoogleResult[] = [];
-  const seen = new Set<string>();
-  let token: string | null = null;
+  const seen = new Set<string>(more?.seen ?? []);
+  const seenNow: string[] = [];
+  const queue: QueueItem[] = more ? more.cursor.queue : [{ tile: -1, token: null }];
+  let box: Box | null = more?.cursor.box ?? null;
   let requests = 0;
   let scanned = 0;
   let noWebsite = 0;
@@ -326,15 +362,33 @@ export async function runGoogleSearchAs({ user, workspace }: Ctx, input: unknown
   let fewReviews = 0;
   let closed = 0;
   let lastError: string | null = null;
-  for (let page = 0; page < 3 && results.length < target; page++) {
-    const r = await searchPage({ query, pageToken: token, minRating: f.minRating, regionCode: f.country });
-    if (!r.ok) {
-      lastError = r.error.message;
-      break;
-    }
-    requests++;
-    const fresh = r.value.places.filter((p) => p.status !== "CLOSED_PERMANENTLY" && !seen.has(p.placeId));
-    fresh.forEach((p) => seen.add(p.placeId));
+  while (queue.length && results.length < target && Date.now() - started < 36_000) {
+    // The search itself page by page; area searches two at a time.
+    const batch = queue[0].tile === -1 ? queue.splice(0, 1) : queue.splice(0, 2);
+    const tiles = box ? gridTiles(box) : [];
+    const pages = await Promise.all(
+      batch.map((t) => searchPage({ query, pageToken: t.token, minRating: f.minRating, regionCode: f.country, box: t.tile >= 0 ? tiles[t.tile] : null })),
+    );
+    const fresh: GooglePlace[] = [];
+    pages.forEach((r, k) => {
+      const t = batch[k];
+      if (!r.ok) {
+        lastError = r.error.message;
+        return;
+      }
+      requests++;
+      for (const p of r.value.places) {
+        if (t.tile === -1 && typeof p.lat === "number" && typeof p.lng === "number") box = extendBox(box, p.lat, p.lng);
+        if (p.status === "CLOSED_PERMANENTLY" || seen.has(p.placeId)) continue;
+        seen.add(p.placeId);
+        seenNow.push(p.placeId);
+        fresh.push(p);
+      }
+      if (r.value.nextPageToken) queue.push({ tile: t.tile, token: r.value.nextPageToken });
+      // The search itself is used up: go on in smaller areas.
+      else if (t.tile === -1 && box) queue.push(...gridTiles(box).map((_, i) => ({ tile: i, token: null })));
+    });
+    if (pages.every((r) => !r.ok)) break;
     scanned += fresh.length;
     const candidates = fresh.filter((p) => {
       if (f.openOnly && p.status === "CLOSED_TEMPORARILY") return void closed++, false;
@@ -343,29 +397,28 @@ export async function runGoogleSearchAs({ user, workspace }: Ctx, input: unknown
       if ((f.requireEmail || f.requireWebsite) && !p.website) return void noWebsite++, false;
       return true;
     });
-    const lookups = await pool(candidates, 20, async (p) => {
+    const lookups = await pool(candidates, 40, async (p) => {
       if (!p.website) return null;
-      const l = await findEmailsOnWebsite(p.website, { budgetMs: 11_000, businessName: p.name }).catch(() => null);
+      const l = await findEmailsOnWebsite(p.website, { budgetMs: 10_000, businessName: p.name }).catch(() => null);
       // Keep only addresses whose domain can actually receive email (free DNS check).
       return l ? { ...l, emails: await deliverableEmails(l.emails) } : null;
     });
     candidates.forEach((p, i) => {
       const l = lookups[i];
       const emails = l?.emails ?? [];
+      const row = { ...p, lat: undefined, lng: undefined, saved: false, emails, siteName: l?.siteName ?? null };
       if (f.requireEmail && !emails.length) {
         noEmail++;
-        withoutEmail.push({ ...p, saved: false, emails, siteName: l?.siteName ?? null });
+        withoutEmail.push(row);
         return;
       }
-      results.push({ ...p, saved: false, emails, siteName: l?.siteName ?? null });
+      results.push(row);
     });
-    token = r.value.nextPageToken;
-    if (!token) break;
   }
   if (!requests) {
     await asQ(user.id, async (q) => {
-      await settle(q, workspace.id, jobId, 0);
-      await finishJob(q, jobId, "failed", 0, lastError ?? "Search failed.");
+      await settle(q, workspace.id, reservation, 0);
+      if (!more) await finishJob(q, jobId, "failed", 0, lastError ?? "Search failed.");
     });
     return { ok: false, error: lastError ?? "Couldn't search Google Maps. Try again." };
   }
@@ -373,9 +426,12 @@ export async function runGoogleSearchAs({ user, workspace }: Ctx, input: unknown
   const extra = withoutEmail.slice(0, 60);
   const saved = new Set(await asQ(user.id, (q) => savedPlaceIds(q, workspace.id, [...kept, ...extra].map((p) => p.placeId))));
   await asQ(user.id, async (q) => {
-    await settle(q, workspace.id, jobId, kept.length);
-    await finishJob(q, jobId, "completed", kept.length, null);
+    await settle(q, workspace.id, reservation, kept.length);
+    if (more) await addToJob(q, jobId, kept.length);
+    else await finishJob(q, jobId, "completed", kept.length, null);
   });
+  // More to search, and the person still wants (and has units for) more.
+  const cursor = queue.length && kept.length < wanted && allowed === wanted && (more?.round ?? 0) < MAX_ROUNDS ? { box, queue: queue.slice(0, 20) } : null;
   return {
     ok: true,
     jobId,
@@ -391,6 +447,8 @@ export async function runGoogleSearchAs({ user, workspace }: Ctx, input: unknown
     noPhone,
     fewReviews,
     closed,
+    cursor,
+    seenIds: seenNow,
   };
 }
 

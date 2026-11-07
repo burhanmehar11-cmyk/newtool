@@ -27,6 +27,8 @@ export const TEXT_SEARCH_FIELD_MASK = [
   "places.userRatingCount",
   "places.businessStatus",
   "places.primaryTypeDisplayName",
+  // Where each place is: lets a search continue in smaller areas once Google's 60 are used.
+  "places.location",
   "nextPageToken",
 ].join(",");
 
@@ -43,11 +45,17 @@ export type TextSearchRequest = {
   minRating?: number;
   /** Two-letter country code: biases results to that country. */
   regionCode?: string;
+  /** Only places inside this rectangle. */
+  locationRestriction?: { rectangle: { low: { latitude: number; longitude: number }; high: { latitude: number; longitude: number } } };
 };
 
-export function buildTextSearchBody(p: { query: string; pageToken?: string | null; minRating?: number | null; regionCode?: string | null }): TextSearchRequest {
+/** A map rectangle in degrees: south, west, north, east. */
+export type Box = { s: number; w: number; n: number; e: number };
+
+export function buildTextSearchBody(p: { query: string; pageToken?: string | null; minRating?: number | null; regionCode?: string | null; box?: Box | null }): TextSearchRequest {
   const body: TextSearchRequest = { textQuery: p.query.trim().slice(0, 200), pageSize: PAGE_SIZE };
   if (p.pageToken) body.pageToken = p.pageToken;
+  if (p.box) body.locationRestriction = { rectangle: { low: { latitude: p.box.s, longitude: p.box.w }, high: { latitude: p.box.n, longitude: p.box.e } } };
   if (p.minRating && p.minRating > 0) body.minRating = p.minRating;
   if (p.regionCode && /^[A-Z]{2}$/.test(p.regionCode)) body.regionCode = p.regionCode;
   return body;
@@ -67,7 +75,35 @@ export type GooglePlace = {
   ratingCount: number | null;
   category: string | null;
   status: "OPERATIONAL" | "CLOSED_TEMPORARILY" | "CLOSED_PERMANENTLY" | null;
+  /** Position, held in memory only (never stored). */
+  lat?: number | null;
+  lng?: number | null;
 };
+
+/** Grows a box to include a point (a search's covered area, built from its results). */
+export function extendBox(box: Box | null, lat: number, lng: number): Box {
+  return box ? { s: Math.min(box.s, lat), w: Math.min(box.w, lng), n: Math.max(box.n, lat), e: Math.max(box.e, lng) } : { s: lat, w: lng, n: lat, e: lng };
+}
+
+/**
+ * Splits the area a search covered into size × size smaller rectangles, a
+ * little larger than the results' spread (and at least ~4 km across), so each
+ * can be searched for up to 60 more places.
+ */
+export function gridTiles(box: Box, size = 3): Box[] {
+  const MIN = 0.04;
+  const padLat = Math.max((box.n - box.s) * 0.1, (MIN - (box.n - box.s)) / 2, 0);
+  const padLng = Math.max((box.e - box.w) * 0.1, (MIN - (box.e - box.w)) / 2, 0);
+  const s = Math.max(-90, box.s - padLat);
+  const n = Math.min(90, box.n + padLat);
+  const w = Math.max(-180, box.w - padLng);
+  const e = Math.min(180, box.e + padLng);
+  const dLat = (n - s) / size;
+  const dLng = (e - w) / size;
+  const tiles: Box[] = [];
+  for (let i = 0; i < size; i++) for (let j = 0; j < size; j++) tiles.push({ s: s + i * dLat, n: s + (i + 1) * dLat, w: w + j * dLng, e: w + (j + 1) * dLng });
+  return tiles;
+}
 
 /** Place IDs are URL-safe base64-like strings. */
 export const PLACE_ID = /^[A-Za-z0-9_-]{10,300}$/;
@@ -94,6 +130,8 @@ export function parsePlace(raw: unknown): GooglePlace | null {
     ratingCount: num(r.userRatingCount),
     category: str(type?.text),
     status: status === "OPERATIONAL" || status === "CLOSED_TEMPORARILY" || status === "CLOSED_PERMANENTLY" ? status : null,
+    lat: num((r.location as { latitude?: unknown } | undefined)?.latitude),
+    lng: num((r.location as { longitude?: unknown } | undefined)?.longitude),
   };
 }
 

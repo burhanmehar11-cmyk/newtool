@@ -84,6 +84,58 @@ describe("Google Maps search returns only businesses with an email", () => {
     expect((await committed()) - before).toBe(20); // charged only for businesses with an email
   });
 
+  it("goes on in smaller areas when Google's own results run out, until enough have an email", async () => {
+    process.env.GOOGLE_PLACES_API_KEY = "test";
+    const at = (n: number, lat: number, lng: number) => ({ ...place(n, `https://deep${n}.example`), lat, lng });
+    // The search itself: 20 places across the city, only 2 with an email.
+    const base = Array.from({ length: 20 }, (_, i) => at(1000 + i, 30.2 + (i % 5) * 0.02, -97.8 + Math.floor(i / 5) * 0.02));
+    let area = 0;
+    h.page.mockImplementation(async (p: { box?: unknown; pageToken?: string | null }) => {
+      if (!p.box) return { ok: true, value: { places: base, nextPageToken: null } };
+      // Each smaller area: 5 new places plus one already seen.
+      area++;
+      return { ok: true, value: { places: [base[0], ...Array.from({ length: 5 }, (_, i) => at(2000 + area * 10 + i, 30.25, -97.75))], nextPageToken: null } };
+    });
+    h.find.mockImplementation(async (site: string) => {
+      const n = Number(/deep(\d+)/.exec(site)![1]);
+      const has = n < 2000 ? n < 1002 : n % 2 === 0;
+      return has ? { status: "found", emails: [{ email: `hi@deep${n}.example`, kind: "role", url: site }], siteName: null, note: "" } : { status: "none", emails: [], siteName: null, note: "" };
+    });
+    const before = await committed();
+    const r = await runGoogleSearchAs({ user: { id: U }, workspace: { id: h.ws, name: "IO", role: "owner" } }, { businessType: "dentists", place: "Austin", country: "US", maxResults: 20, minRating: 0 });
+    if (!r.ok) throw new Error(JSON.stringify(r));
+    expect(r.results).toHaveLength(20);
+    expect(h.page.mock.calls.some(([p]) => p.box)).toBe(true); // searched smaller areas
+    // Places already checked weren't read again.
+    expect(h.find.mock.calls.filter(([site]) => site === "https://deep1000.example")).toHaveLength(1);
+    expect((await committed()) - before).toBe(20);
+  });
+
+  it("continues a search in a later round without repeating places, charging that round separately", async () => {
+    process.env.GOOGLE_PLACES_API_KEY = "test";
+    const ctx = { user: { id: U }, workspace: { id: h.ws, name: "IO", role: "owner" as const } };
+    const input = { businessType: "dentists", place: "Austin", country: "US", maxResults: 20, minRating: 0 };
+    h.page.mockResolvedValueOnce({ ok: true, value: { places: [place(3000, "https://r3000.example")], nextPageToken: null } });
+    h.find.mockResolvedValue({ status: "found", emails: [{ email: "hi@r.example", kind: "role", url: "https://r.example" }], siteName: null, note: "" });
+    const first = await runGoogleSearchAs(ctx, input);
+    if (!first.ok) throw new Error(JSON.stringify(first));
+    expect(first.results).toHaveLength(1);
+
+    const box = { s: 30.2, w: -97.9, n: 30.4, e: -97.6 };
+    h.page.mockResolvedValueOnce({ ok: true, value: { places: [place(3000, "https://r3000.example"), place(3001, "https://r3001.example")], nextPageToken: null } });
+    const before = await committed();
+    const next = await runGoogleSearchAs(ctx, { ...input, continuation: { jobId: first.jobId, round: 1, found: 1, seen: first.seenIds, cursor: { box, queue: [{ tile: 4, token: null }] } } });
+    if (!next.ok) throw new Error(JSON.stringify(next));
+    expect(next.results.map((x) => x.placeId)).toEqual([place(3001, null).placeId]); // 3000 was seen in round 0
+    expect(h.page).toHaveBeenLastCalledWith(expect.objectContaining({ box: expect.objectContaining({ s: expect.any(Number) }) }));
+    expect((await committed()) - before).toBe(1);
+    const job = (await db.query<{ charged_units: number }>("select charged_units from public.discovery_jobs where id = $1", [first.jobId])).rows[0];
+    expect(job.charged_units).toBe(2);
+    // Someone else's or a mismatched job can't be continued.
+    const bad = await runGoogleSearchAs(ctx, { ...input, place: "Dallas", continuation: { jobId: first.jobId, round: 2, found: 2, seen: [], cursor: { box, queue: [{ tile: 0, token: null }] } } });
+    expect(bad).toMatchObject({ ok: false });
+  });
+
   it("charges nothing when no business shows an email", async () => {
     h.page.mockResolvedValueOnce({ ok: true, value: { places: [place(500, "https://none.example")], nextPageToken: null } });
     h.find.mockResolvedValue({ status: "none", emails: [], siteName: null, note: "" });

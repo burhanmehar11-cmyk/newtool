@@ -87,6 +87,11 @@ export async function settle(q: Q, ws: string, jobId: string, used: number) {
   await q.query("select public.settle_usage($1, $2, $3, $4)", [ws, `discovery:${jobId}`, used, `Search returned ${used}`]);
 }
 
+/** A later round of the same search: adds what it returned. */
+export async function addToJob(q: Q, jobId: string, charged: number) {
+  await q.query("update public.discovery_jobs set status = 'completed', charged_units = charged_units + $2, error = null, finished_at = now() where id = $1", [jobId, charged]);
+}
+
 export async function finishJob(q: Q, jobId: string, status: "completed" | "failed", charged: number, error: string | null) {
   await q.query("update public.discovery_jobs set status = $2, charged_units = $3, error = $4, finished_at = now() where id = $1", [jobId, status, charged, error]);
 }

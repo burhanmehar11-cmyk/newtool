@@ -1,5 +1,5 @@
 import "server-only";
-import { buildTextSearchBody, parseGoogleError, parsePlace, parseTextSearch, PLACE_ID, TEXT_SEARCH_FIELD_MASK, type GooglePlace } from "@/lib/discovery/google-places";
+import { buildTextSearchBody, parseGoogleError, parsePlace, parseTextSearch, PLACE_ID, TEXT_SEARCH_FIELD_MASK, type Box, type GooglePlace } from "@/lib/discovery/google-places";
 import { withService } from "@/server/db";
 import type { ProviderError, Result } from "./types";
 
@@ -108,13 +108,13 @@ async function call(url: string, init: RequestInit & { fieldMask: string }): Pro
 }
 
 /** One page of Text Search (up to 20 places, one API request). For display only; never stored. */
-export async function searchPage(p: { query: string; pageToken?: string | null; minRating?: number | null; regionCode?: string | null }): Promise<Result<{ places: GooglePlace[]; nextPageToken: string | null }>> {
+export async function searchPage(p: { query: string; pageToken?: string | null; minRating?: number | null; regionCode?: string | null; box?: Box | null }): Promise<Result<{ places: GooglePlace[]; nextPageToken: string | null }>> {
   if (!placesApiKey()) return err("not_configured", "Google Maps search isn't set up. Add GOOGLE_PLACES_API_KEY on the server.", false);
   if (!(await takeSlots(1))) return err("quota_exceeded", `Today's Google Maps limit (${dailyLimit()} searches) is used up. It resets at midnight UTC. OpenStreetMap search still works.`, false);
   const r = await call(`${BASE}/places:searchText`, {
     method: "POST",
     fieldMask: TEXT_SEARCH_FIELD_MASK,
-    body: JSON.stringify(buildTextSearchBody({ query: p.query, pageToken: p.pageToken ?? null, minRating: p.minRating, regionCode: p.regionCode })),
+    body: JSON.stringify(buildTextSearchBody({ query: p.query, pageToken: p.pageToken ?? null, minRating: p.minRating, regionCode: p.regionCode, box: p.box ?? null })),
   });
   if (!r.ok) return r;
   const parsed = parseTextSearch(r.value);

@@ -55,6 +55,8 @@ describe("Google Places (New) helpers", () => {
     expect(r.places.map((p) => p.placeId)).toEqual(["ChIJ_fictional_place_0001", "ChIJ_fictional_place_0002", "ChIJ_fictional_place_0003"]);
     expect(r.places[0]).toEqual({
       placeId: "ChIJ_fictional_place_0001",
+      lat: null,
+      lng: null,
       name: "Sample Family Dental",
       address: "100 Example St, Austin, TX 78701, USA",
       phone: "(512) 555-0100",
@@ -94,5 +96,22 @@ describe("site name from the business's own homepage", () => {
     expect(siteNameOf("", "Smile Dental - Dentist in Austin, TX")).toBe("Smile Dental");
     expect(siteNameOf("", "Welcome")).toBeNull();
     expect(siteNameOf("", null)).toBeNull();
+  });
+
+  it("restricts a search to a rectangle and splits an area into a grid", async () => {
+    const { buildTextSearchBody, gridTiles, extendBox } = await import("@/lib/discovery/google-places");
+    expect(buildTextSearchBody({ query: "dentists in Austin", box: { s: 30, w: -98, n: 30.5, e: -97.5 } }).locationRestriction).toEqual({
+      rectangle: { low: { latitude: 30, longitude: -98 }, high: { latitude: 30.5, longitude: -97.5 } },
+    });
+    let box = extendBox(null, 30.2, -97.8);
+    box = extendBox(box, 30.4, -97.6);
+    const tiles = gridTiles(box);
+    expect(tiles).toHaveLength(9);
+    // The grid covers the whole area (a little beyond it).
+    expect(Math.min(...tiles.map((t) => t.s))).toBeLessThan(30.2);
+    expect(Math.max(...tiles.map((t) => t.n))).toBeGreaterThan(30.4);
+    // A single point still gives a usable area (about 4 km across).
+    const one = gridTiles(extendBox(null, 51.5, -0.12));
+    expect(Math.max(...one.map((t) => t.n)) - Math.min(...one.map((t) => t.s))).toBeCloseTo(0.04, 5);
   });
 });

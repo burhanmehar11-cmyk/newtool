@@ -16,7 +16,33 @@ import { exportPlacesAction, startCampaignFromPlacesAction } from "@/server/acti
 import type { GoogleResult, GoogleSearchOutcome } from "@/server/services/discovery";
 import { cn } from "@/lib/utils";
 
-type Done = Extract<GoogleSearchOutcome, { ok: true }> & { niche: string };
+type Round = Extract<GoogleSearchOutcome, { ok: true }>;
+/** All rounds of one search so far. */
+type Done = Round & { niche: string; round: number; seen: string[]; searching: boolean };
+
+/** Adds a later round's results to what's shown. */
+function mergeRound(acc: Done, r: Round, round: number, searching: boolean): Done {
+  const have = new Set([...acc.results, ...acc.withoutEmail].map((x) => x.placeId));
+  const results = [...acc.results, ...r.results.filter((x) => !have.has(x.placeId))];
+  const withEmail = new Set(results.map((x) => x.placeId));
+  return {
+    ...acc,
+    results,
+    withoutEmail: [...acc.withoutEmail.filter((x) => !withEmail.has(x.placeId)), ...r.withoutEmail.filter((x) => !have.has(x.placeId))].slice(0, 200),
+    filteredOut: acc.filteredOut + r.filteredOut,
+    requests: acc.requests + r.requests,
+    scanned: acc.scanned + r.scanned,
+    noWebsite: acc.noWebsite + r.noWebsite,
+    noEmail: acc.noEmail + r.noEmail,
+    noPhone: acc.noPhone + r.noPhone,
+    fewReviews: acc.fewReviews + r.fewReviews,
+    closed: acc.closed + r.closed,
+    cursor: r.cursor,
+    seen: [...acc.seen, ...r.seenIds].slice(-3000),
+    round,
+    searching,
+  };
+}
 
 /** Google's attribution for Places content shown without a Google map. */
 export function GoogleCredit() {
@@ -51,6 +77,8 @@ export function GoogleSearchForm({ available, remainingToday, onResult, prefill 
   }, [prefill?.runId, prefill?.place]);
   const router = useRouter();
   const [pending, start] = React.useTransition();
+  const [progress, setProgress] = React.useState<string | null>(null);
+  const stopRef = React.useRef(false);
   const [error, setError] = React.useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = React.useState<Record<string, string>>({});
   // As many as Google gives (60); with fewer units left, the search returns that many.
@@ -74,14 +102,37 @@ export function GoogleSearchForm({ available, remainingToday, onResult, prefill 
         const values = { ...Object.fromEntries(fd), requireEmail, requirePhone, requireWebsite: requireWebsite || requireEmail, openOnly };
         setError(null);
         setFieldErrors({});
+        stopRef.current = false;
         start(async () => {
-          const r = await runGoogleSearchAction(values);
-          if (r.ok) onResult({ ...r, niche: r.niche ?? "" });
-          else {
-            setError(r.error);
-            setFieldErrors(r.fieldErrors ?? {});
+          const first = await runGoogleSearchAction(values);
+          if (!first.ok) {
+            setError(first.error);
+            setFieldErrors(first.fieldErrors ?? {});
             onResult(null);
+            router.refresh();
+            return;
           }
+          const want = maxResults;
+          const goOn = (d: Done) => !!d.cursor && d.results.length < want && !stopRef.current;
+          let acc: Done = { ...first, niche: first.niche ?? "", round: 0, seen: first.seenIds, searching: false };
+          acc = { ...acc, searching: goOn(acc) };
+          onResult(acc);
+          // Google gives at most 60 places per search: keep going in smaller areas until there are enough with an email.
+          while (goOn(acc)) {
+            const round = acc.round + 1;
+            setProgress(`Found ${acc.results.length} of ${want} with an email so far (checked ${acc.scanned}). Searching more of the area…`);
+            const r = await runGoogleSearchAction({ ...values, continuation: { jobId: acc.jobId, round, found: acc.results.length, seen: acc.seen, cursor: acc.cursor } });
+            if (!r.ok) {
+              setError(acc.results.length ? `${r.error} Showing what was found.` : r.error);
+              acc = { ...acc, cursor: null, searching: false };
+              onResult(acc);
+              break;
+            }
+            acc = mergeRound(acc, r, round, false);
+            acc = { ...acc, searching: goOn(acc) };
+            onResult(acc);
+          }
+          setProgress(null);
           router.refresh();
         });
       }}
@@ -166,8 +217,16 @@ export function GoogleSearchForm({ available, remainingToday, onResult, prefill 
       {error ? <Callout tone="danger">{error}</Callout> : null}
       <Button type="submit" disabled={pending || over || noCalls}>
         {pending ? <Loader2 aria-hidden className="animate-spin" /> : <MapPinned aria-hidden />}
-        {pending ? "Searching and finding emails… (up to a minute)" : "Search Google Maps"}
+        {pending ? "Searching and finding emails…" : "Search Google Maps"}
       </Button>
+      {pending && progress ? (
+        <div className="flex flex-wrap items-center gap-3 text-sm text-slate" role="status">
+          <span>{progress}</span>
+          <Button type="button" size="sm" variant="secondary" onClick={() => (stopRef.current = true)}>
+            Stop here
+          </Button>
+        </div>
+      ) : null}
       {over ? <p className="text-xs text-danger-fg">No businesses left this month. Google Maps search opens again on the 1st.</p> : null}
       {noCalls ? <p className="text-xs text-danger-fg">Today&apos;s Google Maps limit is used up. It resets at midnight UTC; OpenStreetMap search still works.</p> : null}
     </form>

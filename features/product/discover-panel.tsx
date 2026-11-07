@@ -7,7 +7,7 @@ import { GoogleCredit, GoogleResults, GoogleSearchForm, type SearchPrefill } fro
 import type { GoogleSearchOutcome } from "@/server/services/discovery";
 import { cn } from "@/lib/utils";
 
-type Done = Extract<GoogleSearchOutcome, { ok: true }> & { niche: string };
+type Done = Extract<GoogleSearchOutcome, { ok: true }> & { niche: string; round: number; seen: string[]; searching: boolean };
 
 export function DiscoverPanel({
   available,
@@ -23,12 +23,13 @@ export function DiscoverPanel({
   const [source, setSource] = React.useState<"google" | "osm">(google.configured ? "google" : "osm");
   const [result, setResult] = React.useState<Done | null>(null);
   const resultsRef = React.useRef<HTMLDivElement>(null);
-  // When a search finishes, bring its results into view.
+  // When a search's first results arrive, bring them into view (not again on every later round).
+  const firstRound = result?.round === 0 ? result.jobId : null;
   React.useEffect(() => {
-    if (!result) return;
+    if (!firstRound) return;
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     resultsRef.current?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
-  }, [result]);
+  }, [firstRound]);
 
   return (
     <>
@@ -76,10 +77,10 @@ export function DiscoverPanel({
         <SectionCard
           className="mt-5"
           title={result.query}
-          description={`${result.results.length} with an email${result.withoutEmail?.length ? `, plus ${result.withoutEmail.length} without` : ""}, from ${result.requests} Google request${result.requests === 1 ? "" : "s"}. Save the ones you want; they aren't kept otherwise.`}
+          description={`${result.results.length} with an email${result.withoutEmail?.length ? `, plus ${result.withoutEmail.length} without` : ""}, from ${result.requests} Google request${result.requests === 1 ? "" : "s"}${result.searching ? " · still searching more of the area…" : ""}. Save the ones you want; they aren't kept otherwise.`}
           bodyClassName="p-0"
         >
-          <GoogleResults key={result.jobId} result={result} />
+          <GoogleResults key={`${result.jobId}:${result.round}`} result={result} />
           <div className="border-t border-line px-5 py-3">
             <GoogleCredit />
           </div>
