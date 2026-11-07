@@ -22,13 +22,10 @@ type Done = Round & { niche: string; round: number; seen: string[]; searching: b
 
 /** Adds a later round's results to what's shown. */
 function mergeRound(acc: Done, r: Round, round: number, searching: boolean): Done {
-  const have = new Set([...acc.results, ...acc.withoutEmail].map((x) => x.placeId));
-  const results = [...acc.results, ...r.results.filter((x) => !have.has(x.placeId))];
-  const withEmail = new Set(results.map((x) => x.placeId));
+  const have = new Set(acc.results.map((x) => x.placeId));
   return {
     ...acc,
-    results,
-    withoutEmail: [...acc.withoutEmail.filter((x) => !withEmail.has(x.placeId)), ...r.withoutEmail.filter((x) => !have.has(x.placeId))].slice(0, 200),
+    results: [...acc.results, ...r.results.filter((x) => !have.has(x.placeId))],
     filteredOut: acc.filteredOut + r.filteredOut,
     requests: acc.requests + r.requests,
     scanned: acc.scanned + r.scanned,
@@ -248,7 +245,7 @@ function download(filename: string, text: string) {
 export function GoogleResults({ result }: { result: Done }) {
   const router = useRouter();
   const leftOut = [
-    result.noEmail ? `${result.noEmail} without an email${result.withoutEmail?.length ? " (listed below)" : ""}` : "",
+    result.noEmail ? `${result.noEmail} without an email` : "",
     result.noWebsite ? `${result.noWebsite} without a website` : "",
     result.noPhone ? `${result.noPhone} without a phone` : "",
     result.fewReviews ? `${result.fewReviews} with too few reviews` : "",
@@ -256,9 +253,9 @@ export function GoogleResults({ result }: { result: Done }) {
   ]
     .filter(Boolean)
     .join(", ");
-  // Matches first, then businesses whose website showed no email we could find (listed so nothing silently disappears; not charged, not preselected).
-  const [rows, setRows] = React.useState<GoogleResult[]>(() => [...result.results, ...(result.withoutEmail ?? [])]);
-  const matches = result.results.length;
+  // Only businesses matching every filter (e.g. with an email and a website).
+  const [rows, setRows] = React.useState<GoogleResult[]>(result.results);
+  const matches = rows.length;
   // Saving needs a website (research reads it), so rows without one can't be selected.
   const selectable = rows.filter((r) => r.website).map((r) => r.placeId);
   const [selected, setSelected] = React.useState<string[]>(() => result.results.filter((r) => !r.saved && r.website).map((r) => r.placeId));
@@ -383,17 +380,10 @@ export function GoogleResults({ result }: { result: Done }) {
             </tr>
           </thead>
           <tbody>
-            {rows.map((r, i) => {
+            {rows.map((r) => {
               const on = selected.includes(r.placeId);
               return (
                 <React.Fragment key={r.placeId}>
-                {i === matches ? (
-                  <tr className="border-b border-line bg-canvas/60">
-                    <td colSpan={7} className="px-5 py-2.5 text-xs text-slate">
-                      <span className="font-medium text-ink">{rows.length - matches} {matches ? "more" : rows.length - matches === 1 ? "business" : "businesses"} with a website, but no email we could find on it.</span> Not charged. Open their site or call them, or save them to try research later.
-                    </td>
-                  </tr>
-                ) : null}
                 <tr className={cn("border-b border-line last:border-b-0", on && "bg-mint-soft/30")}>
                   <td className="px-5 py-3">
                     <Checkbox aria-label={`Select ${r.name}`} checked={on} disabled={!r.website} title={r.website ? undefined : "No website, so it can't be saved or researched"} onChange={() => setSelected((xs) => (on ? xs.filter((x) => x !== r.placeId) : [...xs, r.placeId]))} />

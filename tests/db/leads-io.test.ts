@@ -142,8 +142,6 @@ describe("Google Maps search returns only businesses with an email", () => {
     const before = await committed();
     const r = await runGoogleSearchAs({ user: { id: U }, workspace: { id: h.ws, name: "IO", role: "owner" } }, { businessType: "dentists", place: "Austin", country: "US", maxResults: 20, website: "any", minRating: 0 });
     expect(r).toMatchObject({ ok: true, results: [], noEmail: 1 });
-    // Still listed, so it doesn't silently disappear, but not charged.
-    if (r.ok) expect(r.withoutEmail.map((x) => x.website)).toEqual(["https://none.example"]);
     expect(await committed()).toBe(before);
   });
 });

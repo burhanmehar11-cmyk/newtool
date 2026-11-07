@@ -267,8 +267,6 @@ export type GoogleSearchOutcome =
       query: string;
       niche: string | null;
       results: GoogleResult[];
-      /** Businesses with a website that showed no email we could find: shown (not charged) so nothing silently disappears. */
-      withoutEmail: GoogleResult[];
       /** Set when there's more to search: pass it back (with the place ids seen) for the next round. */
       cursor: SearchCursor | null;
       /** Places checked in this round, so the next round skips them. */
@@ -349,7 +347,6 @@ export async function runGoogleSearchAs({ user, workspace }: Ctx, input: unknown
   const started = Date.now();
   const target = allowed;
   const results: GoogleResult[] = [];
-  const withoutEmail: GoogleResult[] = [];
   const seen = new Set<string>(more?.seen ?? []);
   const seenNow: string[] = [];
   const queue: QueueItem[] = more ? more.cursor.queue : [{ tile: -1, token: null }];
@@ -407,11 +404,8 @@ export async function runGoogleSearchAs({ user, workspace }: Ctx, input: unknown
       const l = lookups[i];
       const emails = l?.emails ?? [];
       const row = { ...p, lat: undefined, lng: undefined, saved: false, emails, siteName: l?.siteName ?? null };
-      if (f.requireEmail && !emails.length) {
-        noEmail++;
-        withoutEmail.push(row);
-        return;
-      }
+      // Only businesses matching every filter are shown (those without an email are counted, not listed).
+      if (f.requireEmail && !emails.length) return void noEmail++;
       results.push(row);
     });
   }
@@ -423,8 +417,7 @@ export async function runGoogleSearchAs({ user, workspace }: Ctx, input: unknown
     return { ok: false, error: lastError ?? "Couldn't search Google Maps. Try again." };
   }
   const kept = results.slice(0, target);
-  const extra = withoutEmail.slice(0, 60);
-  const saved = new Set(await asQ(user.id, (q) => savedPlaceIds(q, workspace.id, [...kept, ...extra].map((p) => p.placeId))));
+  const saved = new Set(await asQ(user.id, (q) => savedPlaceIds(q, workspace.id, kept.map((p) => p.placeId))));
   await asQ(user.id, async (q) => {
     await settle(q, workspace.id, reservation, kept.length);
     if (more) await addToJob(q, jobId, kept.length);
@@ -438,7 +431,6 @@ export async function runGoogleSearchAs({ user, workspace }: Ctx, input: unknown
     query,
     niche: f.niche,
     results: kept.map((p) => ({ ...p, saved: saved.has(p.placeId) })),
-    withoutEmail: extra.map((p) => ({ ...p, saved: saved.has(p.placeId) })),
     filteredOut: noWebsite + noEmail + noPhone + fewReviews + closed,
     requests,
     scanned,
