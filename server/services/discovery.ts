@@ -345,7 +345,7 @@ export async function runGoogleSearchAs({ user, workspace }: Ctx, input: unknown
     });
     const lookups = await pool(candidates, 20, async (p) => {
       if (!p.website) return null;
-      const l = await findEmailsOnWebsite(p.website, { budgetMs: 9_000 }).catch(() => null);
+      const l = await findEmailsOnWebsite(p.website, { budgetMs: 11_000, businessName: p.name }).catch(() => null);
       // Keep only addresses whose domain can actually receive email (free DNS check).
       return l ? { ...l, emails: await deliverableEmails(l.emails) } : null;
     });

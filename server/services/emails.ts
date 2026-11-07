@@ -81,7 +81,7 @@ export async function findMissingLeadEmails(): Promise<{ ok: true; checked: numb
   if (!batch.length) return { ok: true, checked: 0, found: 0, remaining: 0 };
   if (!takeLookups(user.id, batch.length)) return { ok: false, error: "That's a lot of websites in a short time. Wait a few minutes, then try again." };
   const results = await pool(batch, 5, async (b) => {
-    const l = await findEmailsOnWebsite(b.website).catch(() => null);
+    const l = await findEmailsOnWebsite(b.website, { businessName: b.name }).catch(() => null);
     return l ? { ...l, emails: await deliverableEmails(l.emails) } : null;
   });
   let found = 0;

@@ -43,10 +43,15 @@ const BOOKING_HOSTS: [RegExp, string][] = [
 
 const BOOK_TEXT = /\b(book (an |your )?(appointment|online|now|a visit|a consultation)|schedule (an |your )?(appointment|online|now|a visit|a consultation)|request (an |your )?appointment|online booking|book online)\b/i;
 const PHONE_ONLY = /\b(call (us )?(today )?(to|for|and) (schedule|book|make (an|your) appointment|set up (an|your) appointment)|please call (our office|us) to (schedule|book|complete)|appointments? (are )?(by|via) (phone|telephone) only)\b/i;
-const EMAIL_RE = /[a-z0-9._%+-]{1,64}@[a-z0-9.-]+\.[a-z]{2,24}/gi;
+const EMAIL_RE = /[a-z0-9._%+-]{1,64}@[a-z0-9.-]{1,253}\.[a-z]{2,24}/gi;
 
 function decodeEntities(s: string) {
   return s
+    // Numeric entities (sites write "info&#64;shop.com" to hide addresses from simple readers).
+    .replace(/&#(\d{1,7});/g, (_, n) => safeChar(Number(n)))
+    .replace(/&#x([0-9a-f]{1,6});/gi, (_, h) => safeChar(parseInt(h, 16)))
+    .replace(/&commat;/gi, "@")
+    .replace(/&period;/gi, ".")
     .replace(/&nbsp;/gi, " ")
     .replace(/&amp;/gi, "&")
     .replace(/&copy;|&#169;|&#xa9;/gi, "©")
@@ -54,6 +59,27 @@ function decodeEntities(s: string) {
     .replace(/&gt;/gi, ">")
     .replace(/&quot;/gi, '"')
     .replace(/&#39;|&apos;/gi, "'");
+}
+
+function safeChar(code: number) {
+  return code > 0 && code < 0x110000 && !(code >= 0xd800 && code < 0xe000) ? String.fromCodePoint(code) : " ";
+}
+
+/**
+ * Addresses anywhere in the page source, including scripts and page data
+ * (site builders such as Wix and Squarespace keep contact details there),
+ * after undoing common encodings (\u0040, %40, HTML entities).
+ */
+export function rawEmails(html: string): string[] {
+  const src = decodeEntities(html)
+    // Escapes in scripts and JSON: "\u0040", "\x40", and "\n" etc. (so "\ninfo@" isn't read as "ninfo@").
+    .replace(/\\u([0-9a-f]{4})/gi, (_, h) => safeChar(parseInt(h, 16)))
+    .replace(/\\x([0-9a-f]{2})/gi, (_, h) => safeChar(parseInt(h, 16)))
+    .replace(/\\[nrtfb/]/g, " ")
+    .replace(/%40/g, "@");
+  const out = new Set<string>();
+  for (const m of src.matchAll(EMAIL_RE)) out.add(m[0].toLowerCase().replace(/\.+$/, ""));
+  return [...out];
 }
 
 /** Visible text: scripts, styles, comments and tags removed; whitespace collapsed. */
@@ -150,7 +176,8 @@ export function extractPage(html: string, pageUrl: string, now = new Date()): Pa
       mailto.add(e);
     }
   for (const e of hiddenEmails(html, text)) emails.add(e);
-  for (const m of text.matchAll(EMAIL_RE)) emails.add(m[0].toLowerCase());
+  for (const m of text.matchAll(EMAIL_RE)) emails.add(m[0].toLowerCase().replace(/\.+$/, ""));
+  for (const e of rawEmails(html)) emails.add(e);
 
   const host = base.hostname.replace(/^www\./, "");
   const links = anchors.filter((a) => {
@@ -172,7 +199,7 @@ export function extractPage(html: string, pageUrl: string, now = new Date()): Pa
     phoneOnly,
     pdfForms,
     contactForm,
-    emails: [...emails].filter(plausibleEmail).slice(0, 15),
+    emails: [...emails].filter(plausibleEmail).slice(0, 40),
     mailto: [...mailto].filter(plausibleEmail),
     links,
   };
@@ -208,6 +235,24 @@ export function pickContactPages(home: PageSignals, max = 3): string[] {
     if (score > 0) scored.set(u.toString(), Math.max(score, scored.get(u.toString()) ?? 0));
   }
   return [...scored.entries()].sort((a, b) => b[1] - a[1]).slice(0, max).map(([u]) => u);
+}
+
+/** Contact-style pages listed in a sitemap.xml, best first (same site only). */
+export function contactPagesFromSitemap(xml: string, origin: string, max = 4): string[] {
+  const host = new URL(origin).hostname.replace(/^www\./, "");
+  const scored: [string, number][] = [];
+  for (const m of xml.matchAll(/<loc>\s*([^<\s]+)\s*<\/loc>/gi)) {
+    let u: URL;
+    try {
+      u = new URL(decodeEntities(m[1]));
+    } catch {
+      continue;
+    }
+    if (u.hostname.replace(/^www\./, "") !== host || /\.(xml|pdf|jpe?g|png|gif)$/i.test(u.pathname)) continue;
+    const score = CONTACT_PRIORITY.reduce((s, [re, w]) => Math.max(s, re.test(u.pathname) ? w : 0), 0);
+    if (score > 0) scored.push([u.toString(), score]);
+  }
+  return [...new Map(scored.sort((a, b) => b[1] - a[1])).keys()].slice(0, max);
 }
 
 /** Picks up to `max` same-site pages worth checking after the homepage. */
@@ -281,15 +326,28 @@ function brandOf(domain: string) {
   return (core ?? "").replace(/[^a-z0-9]/g, "");
 }
 
+// Words that say nothing about which business it is.
+const NAME_NOISE = /\b(the|and|of|ltd|llc|inc|co|corp|company|limited|plc|gmbh|pvt|services?|group|solutions|studio|agency|official)\b/g;
+
+/** Hosting, site-builder and tool domains: an address there is never the business's own. */
+const PLATFORM_DOMAINS = /@([a-z0-9-]+\.)*(wix|wixsite|squarespace|godaddy|shopify|weebly|webflow|hubspot|mailchimp|sendgrid|zendesk|freshdesk|intercom|sentry|cloudflare|google|facebook|instagram|linkedin|apple|microsoft|amazon|yelp)\.[a-z.]+$/i;
+
 /**
  * Keeps emails that plausibly belong to this business: its own domain (or a
- * related one with the same name, like influence-media.com for
- * influencemedia.co.uk), a common free mailbox, or a role address (info@,
- * hello@…) the site links to with mailto:.
+ * related one, like influence-media.com or influencemediagroup.com for
+ * influencemedia.co.uk, or one matching the business's name), a common free
+ * mailbox, a role address (info@, hello@…) the site links to with mailto:,
+ * or any address a contact page links to with mailto: (`trustMailto`).
  */
-export function businessEmails(emails: string[], domain: string | null, mailto: string[] = []): { email: string; kind: "role" | "named" }[] {
+export function businessEmails(
+  emails: string[],
+  domain: string | null,
+  mailto: string[] = [],
+  opts: { businessName?: string | null; trustMailto?: boolean } = {},
+): { email: string; kind: "role" | "named" }[] {
   const d = (domain ?? "").toLowerCase();
   const brand = d ? brandOf(d) : "";
+  const name = (opts.businessName ?? "").toLowerCase().replace(/&/g, " and ").replace(NAME_NOISE, " ").replace(/[^a-z0-9]/g, "");
   const linked = new Set(mailto);
   return [...new Set(emails)]
     .filter(plausibleEmail)
@@ -297,7 +355,13 @@ export function businessEmails(emails: string[], domain: string | null, mailto: 
       const ed = e.split("@")[1];
       if (d && (ed === d || ed.endsWith(`.${d}`))) return true;
       if (FREE_MAIL.test(e)) return true;
-      if (brand.length >= 4 && brandOf(ed) === brand) return true;
+      if (PLATFORM_DOMAINS.test(e)) return false;
+      const eb = brandOf(ed);
+      if (brand.length >= 4 && eb === brand) return true;
+      // One name contains the other: influencemedia ↔ influencemediagroup.
+      if (brand.length >= 5 && eb.length >= 5 && (eb.includes(brand) || brand.includes(eb))) return true;
+      if (name.length >= 5 && eb.length >= 5 && (eb.includes(name) || name.includes(eb))) return true;
+      if (linked.has(e) && opts.trustMailto) return true;
       return linked.has(e) && ROLE_LOCALS.test(e.split("@")[0]);
     })
     .slice(0, 5)

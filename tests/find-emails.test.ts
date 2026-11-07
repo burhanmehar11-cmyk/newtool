@@ -85,6 +85,68 @@ describe("harder websites", () => {
   });
 });
 
+describe("finding more (max mode)", () => {
+  it("decodes addresses written as HTML codes", async () => {
+    const s = fakeSite({ "/": { status: 200, body: home("Email: info&#64;cedardental&#46;example or &#x6f;ffice&#x40;cedardental.example") } });
+    const r = await findEmailsOnWebsite("https://cedardental.example", { fetcher: s.fetcher });
+    expect(r.emails.map((e) => e.email).sort()).toEqual(["info@cedardental.example", "office@cedardental.example"]);
+  });
+
+  it("reads addresses kept in page data (site builders), without gluing escapes onto them", async () => {
+    const s = fakeSite({ "/": { status: 200, body: home('<div id="root"></div><script>window.__DATA__={"footer":"<p>\\u003cb\\u003eWrite to\\ninfo\\u0040cedardental.example</p>"}</script>') } });
+    const r = await findEmailsOnWebsite("https://cedardental.example", { fetcher: s.fetcher });
+    expect(r.emails.map((e) => e.email)).toEqual(["info@cedardental.example"]);
+  });
+
+  it("asks for large pages in full (the address is often in the footer)", async () => {
+    const sizes: number[] = [];
+    const fetcher = (async (url: string, o: { maxBytes?: number }) => {
+      if (!url.endsWith("robots.txt")) sizes.push(o.maxBytes ?? 0);
+      return url.endsWith("robots.txt") ? { ok: false, reason: "HTTP 404" } : { ok: true, url, body: home(`${"x".repeat(700_000)} hello@cedardental.example`), contentType: "text/html" };
+    }) as never;
+    const r = await findEmailsOnWebsite("https://cedardental.example", { fetcher });
+    expect(r.status).toBe("found");
+    expect(Math.min(...sizes)).toBeGreaterThanOrEqual(2 * 1024 * 1024);
+  });
+
+  it("finds the contact page through the sitemap", async () => {
+    const s = fakeSite({
+      "/": { status: 200, body: home("Welcome") },
+      "/sitemap.xml": { status: 200, body: "<urlset><url><loc>https://cedardental.example/</loc></url><url><loc>https://cedardental.example/get-in-touch</loc></url><url><loc>https://other.example/contact</loc></url></urlset>" },
+      "/get-in-touch": { status: 200, body: home("Reach us at frontdesk@cedardental.example") },
+    });
+    const r = await findEmailsOnWebsite("https://cedardental.example", { fetcher: s.fetcher });
+    expect(r.emails.map((e) => e.email)).toEqual(["frontdesk@cedardental.example"]);
+    expect(r.emails[0].url).toBe("https://cedardental.example/get-in-touch");
+  });
+
+  it("tries the www address when the bare one doesn't answer", async () => {
+    const fetcher = (async (url: string) => {
+      const u = new URL(url);
+      if (u.hostname !== "www.cedardental.example") return { ok: false, reason: "timed out" };
+      if (u.pathname === "/robots.txt") return { ok: false, reason: "HTTP 404" };
+      return { ok: true, url, body: home("hello@cedardental.example"), contentType: "text/html" };
+    }) as never;
+    const r = await findEmailsOnWebsite("https://cedardental.example", { fetcher });
+    expect(r.emails.map((e) => e.email)).toEqual(["hello@cedardental.example"]);
+  });
+
+  it("accepts an address matching the business's name, and any address a contact page links to", async () => {
+    const s = fakeSite({
+      "/": { status: 200, body: home('Questions? hello@cedarfamilydentistry.example · <a href="/contact">Contact</a>') },
+    });
+    const named = await findEmailsOnWebsite("https://cedardental.example", { fetcher: s.fetcher, businessName: "Cedar Family Dentistry Ltd" });
+    expect(named.emails.map((e) => e.email)).toEqual(["hello@cedarfamilydentistry.example"]);
+
+    const c = fakeSite({
+      "/": { status: 200, body: home('Site by bob@webdesigner.example <a href="/contact">Contact</a>') },
+      "/contact": { status: 200, body: home('<a href="mailto:dr.ana@anasmilecare.example">Email Dr Ana</a> <a href="mailto:help@wix.com">Wix help</a>') },
+    });
+    const r = await findEmailsOnWebsite("https://cedardental.example", { fetcher: c.fetcher });
+    expect(r.emails.map((e) => e.email)).toEqual(["dr.ana@anasmilecare.example"]); // not the designer's, not the site builder's
+  });
+});
+
 describe("emails sent back when saving", () => {
   it("keeps only emails found on the business's own site", () => {
     const out = trustedEmails(
