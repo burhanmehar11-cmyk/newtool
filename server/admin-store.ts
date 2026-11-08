@@ -52,7 +52,7 @@ export async function overview(q: Q, trialDays: number): Promise<Overview> {
          (select count(*) from public.messages where direction = 'inbound' and occurred_at > now() - interval '30 days') as replies30,
          (select count(*) from public.discovery_jobs where created_at > now() - interval '30 days') as searches30,
          (select count(*) from public.leads where created_at > now() - interval '30 days') as leads30,
-         (select coalesce(sum(visits), 0) from app.site_visits where day > (now() at time zone 'utc')::date - 30) as visits30`,
+         (select coalesce(sum(visits), 0) from app.site_visits where day > (now() at time zone '${adminTimeZone()}')::date - 30) as visits30`,
       [trialDays],
     )
   ).rows[0] as Record<string, unknown>;
@@ -116,7 +116,7 @@ export async function signupFunnel(q: Q, days: number): Promise<{ visits: number
          (select count(distinct o.user_id) from own o where exists (select 1 from public.campaigns cp where cp.workspace_id = o.workspace_id and cp.status <> 'draft')) as campaign,
          (select count(distinct o.user_id) from own o where exists (select 1 from public.messages ms where ms.workspace_id = o.workspace_id and ms.direction = 'inbound')) as reply,
          (select count(distinct o.user_id) from own o join public.workspaces w on w.id = o.workspace_id where w.plan = 'paid') as paid,
-         (select coalesce(sum(visits), 0) from app.site_visits where day > (now() at time zone 'utc')::date - $1::int) as visits`,
+         (select coalesce(sum(visits), 0) from app.site_visits where day > (now() at time zone '${adminTimeZone()}')::date - $1::int) as visits`,
       [days],
     )
   ).rows[0] as Record<string, unknown>;
@@ -146,7 +146,7 @@ export async function sources(q: Q, days: number): Promise<SourceRow[]> {
          from auth.users u left join app.signup_attribution a on a.user_id = u.id
          where u.created_at > now() - make_interval(days => $1::int)
        ), v as (
-         select source, sum(visits)::int as visits from app.site_visits where day > (now() at time zone 'utc')::date - $1::int group by source
+         select source, sum(visits)::int as visits from app.site_visits where day > (now() at time zone '${adminTimeZone()}')::date - $1::int group by source
        ), k as (select source from s union select source from v)
        select k.source,
          coalesce((select v.visits from v where v.source = k.source), 0)::int as visits,

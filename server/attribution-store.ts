@@ -1,5 +1,6 @@
 import type { Attribution } from "@/lib/attribution";
 import type { Q } from "@/server/auth-store";
+import { adminTimeZone } from "@/lib/admin";
 
 /** Service connection. Saves how a new account found us; only for accounts created in the last 30 minutes, and only once. */
 export async function recordAttribution(q: Q, userId: string, a: Attribution): Promise<boolean> {
@@ -16,7 +17,8 @@ export async function recordAttribution(q: Q, userId: string, a: Attribution): P
 /** Service connection. One more anonymous first visit for this source today (UTC). */
 export async function bumpVisit(q: Q, source: string) {
   await q.query(
-    `insert into app.site_visits (day, source, visits) values ((now() at time zone 'utc')::date, $1, 1)
+    // Counted per day in the admin panel's time zone, so the daily charts line up with sign-ups and the rest.
+    `insert into app.site_visits (day, source, visits) values ((now() at time zone '${adminTimeZone()}')::date, $1, 1)
      on conflict (day, source) do update set visits = app.site_visits.visits + 1`,
     [source],
   );
