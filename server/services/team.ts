@@ -1,4 +1,5 @@
 import "server-only";
+import { track } from "@/server/events";
 import { createHash, randomBytes } from "node:crypto";
 import { z } from "zod";
 import { brand } from "@/config/brand";
@@ -69,7 +70,9 @@ export async function inviteToTeam(input: unknown): Promise<Result<{ link: strin
 export async function revokeTeamInvite(id: string): Promise<Result> {
   const { user } = await requireWorkspace("/app/team");
   if (!z.string().uuid().safeParse(id).success) return { ok: false, error: "Invite not found." };
-  return (await asQ(user.id, (q) => revokeInvite(q, id))) ? { ok: true, value: undefined } : { ok: false, error: "Invite not found." };
+  const ok = await asQ(user.id, (q) => revokeInvite(q, id));
+  if (ok) await track({ userId: user.id, kind: "invite_revoked", area: "team", outcome: "info", summary: "Cancelled a team invite" });
+  return ok ? { ok: true, value: undefined } : { ok: false, error: "Invite not found." };
 }
 
 export async function changeMemberRole(userId: string, role: unknown): Promise<Result> {
@@ -77,7 +80,10 @@ export async function changeMemberRole(userId: string, role: unknown): Promise<R
   const r = z.enum(["admin", "member", "viewer"]).safeParse(role);
   if (!r.success || !z.string().uuid().safeParse(userId).success) return { ok: false, error: "Choose Admin, Member or Viewer." };
   try {
-    return (await asQ(user.id, (q) => setMemberRole(q, workspace.id, userId, r.data))) ? { ok: true, value: undefined } : { ok: false, error: "The owner's role can't be changed." };
+    const ok = await asQ(user.id, (q) => setMemberRole(q, workspace.id, userId, r.data));
+    await track({ workspaceId: workspace.id, userId: user.id, kind: "team_role", area: "team", outcome: ok ? "info" : "failed", summary: ok ? `Changed a teammate's role to ${r.data}` : "Changing a role failed: the owner's role can't be changed" });
+    if (ok) await track({ workspaceId: workspace.id, kind: "team_role_notice", area: "team", outcome: "info", summary: `Role changed to ${r.data}`, notify: { title: `Your role is now ${r.data}`, body: `In ${workspace.name}.`, href: "/app/team", to: { userId } } });
+    return ok ? { ok: true, value: undefined } : { ok: false, error: "The owner's role can't be changed." };
   } catch (e) {
     return { ok: false, error: friendly(e) };
   }
@@ -89,6 +95,7 @@ export async function removeFromTeam(userId: string): Promise<Result<{ left: boo
   if (!z.string().uuid().safeParse(userId).success) return { ok: false, error: "Member not found." };
   try {
     const ok = await asQ(user.id, (q) => removeMember(q, workspace.id, userId));
+    await track({ workspaceId: workspace.id, userId: user.id, kind: userId === user.id ? "team_left" : "team_removed", area: "team", outcome: ok ? "info" : "failed", summary: ok ? (userId === user.id ? "Left the workspace" : "Removed a teammate") : "Removing a teammate failed: the owner can't be removed" });
     return ok ? { ok: true, value: { left: userId === user.id } } : { ok: false, error: "The owner can't be removed." };
   } catch (e) {
     return { ok: false, error: friendly(e) };
@@ -100,12 +107,28 @@ export async function getInvitePreview(token: string): Promise<InvitePreview | n
   return withService((q) => previewInvite(q as unknown as Q, hashInviteToken(token)));
 }
 
+/** Someone joined through an invite: tell the workspace's owners and admins. */
+async function joined(user: { id: string; email: string | null }, workspaceId: string) {
+  await track({
+    workspaceId,
+    userId: user.id,
+    kind: "team_joined_notice",
+    area: "team",
+    outcome: "success",
+    summary: "Joined the workspace through an invite",
+    notify: { title: `${user.email ?? "A teammate"} joined your workspace`, href: "/app/team", level: "success", to: "managers", dedupeKey: `joined:${user.id}` },
+  });
+}
+
 export async function acceptTeamInvite(token: string): Promise<Result<{ workspaceId: string }>> {
   const user = await requireUser(`/invite/${token}`);
   if (!TOKEN_RE.test(token)) return { ok: false, error: MESSAGES.invalid };
   try {
-    return { ok: true, value: { workspaceId: await asQ(user.id, (q) => acceptInvite(q, hashInviteToken(token))) } };
+    const workspaceId = await asQ(user.id, (q) => acceptInvite(q, hashInviteToken(token)));
+    await joined(user, workspaceId);
+    return { ok: true, value: { workspaceId } };
   } catch (e) {
+    await track({ userId: user.id, kind: "invite_failed", area: "team", outcome: "failed", summary: `Accepting a team invite failed: ${friendly(e)}` });
     return { ok: false, error: friendly(e) };
   }
 }
@@ -124,8 +147,11 @@ export async function acceptMyInvite(id: string): Promise<Result<{ workspaceId: 
   const user = await requireUser("/app/onboarding");
   if (!z.string().uuid().safeParse(id).success) return { ok: false, error: MESSAGES.invalid };
   try {
-    return { ok: true, value: { workspaceId: await asQ(user.id, (q) => acceptInviteById(q, id)) } };
+    const workspaceId = await asQ(user.id, (q) => acceptInviteById(q, id));
+    await joined(user, workspaceId);
+    return { ok: true, value: { workspaceId } };
   } catch (e) {
+    await track({ userId: user.id, kind: "invite_failed", area: "team", outcome: "failed", summary: `Accepting a team invite failed: ${friendly(e)}` });
     return { ok: false, error: friendly(e) };
   }
 }

@@ -33,7 +33,7 @@ export function Hero() {
           <div data-reveal className="mt-8 flex flex-wrap items-center justify-center gap-3">
             <Button asChild variant="mint" size="lg">
               <Link href="/sign-up">
-                Get started <ArrowRight aria-hidden />
+                Start free trial <ArrowRight aria-hidden />
               </Link>
             </Button>
             <Button asChild variant="outline-dark" size="lg">

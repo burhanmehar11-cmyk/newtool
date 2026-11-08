@@ -27,7 +27,11 @@ const h = vi.hoisted(() => {
 
 vi.mock("@/server/db", () => ({ withService: (fn: (q: unknown) => Promise<unknown>) => fn(h.db) }));
 vi.mock("@/server/gmail/google", () => ({ sendRaw: (...a: unknown[]) => h.send(...a) }));
-vi.mock("@/server/services/mailboxes", () => ({ accessTokenFor: (...a: unknown[]) => h.token(...a), healMailbox: (...a: unknown[]) => h.heal(...a) }));
+vi.mock("@/server/services/mailboxes", () => ({ accessTokenFor: (...a: unknown[]) => h.token(...a), healMailbox: (...a: unknown[]) => h.heal(...a),
+  flagReconnect: async (id: string, reason: string) => {
+    await h.db.query("update public.sending_accounts set status = 'needs_reconnect', last_error = $2 where id = $1", [id, reason]);
+  },
+}));
 
 const { runDispatch } = await import("@/server/services/dispatch");
 

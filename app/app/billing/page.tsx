@@ -65,7 +65,7 @@ async function Billing() {
                 ) : b.checkout && priceId ? (
                   <CheckoutButton priceId={priceId} workspaceId={b.workspace.id} email={user?.email ?? null} clientToken={b.checkout.clientToken} environment={b.checkout.environment} label={a?.status === "active" ? `Switch to ${p.name}` : `Choose ${p.name}`} variant={p.highlight ? "primary" : "secondary"} />
                 ) : (
-                  <p className="text-center text-xs text-slate">Not available yet.</p>
+                  <p className="text-center text-xs text-slate">You&apos;re on the free trial. Paid plans open soon.</p>
                 )}
               </div>
             </section>

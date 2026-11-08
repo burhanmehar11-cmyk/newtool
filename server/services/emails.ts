@@ -1,4 +1,5 @@
 import "server-only";
+import { track } from "@/server/events";
 import { accessProblem } from "@/server/services/billing";
 import { z } from "zod";
 import { PLACE_ID } from "@/lib/discovery/google-places";
@@ -99,5 +100,6 @@ export async function findMissingLeadEmails(): Promise<{ ok: true; checked: numb
       }
     }
   });
+  await track({ workspaceId: workspace.id, userId: user.id, kind: "email_lookup", area: "research", outcome: found ? "success" : "warning", summary: `Find missing emails: checked ${batch.length} website${batch.length === 1 ? "" : "s"}, found emails for ${found}` });
   return { ok: true, checked: batch.length, found, remaining: Math.max(0, todo.rows.length - batch.length) };
 }

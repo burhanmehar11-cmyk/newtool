@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { ArrowRight, CircleCheck, Circle, FileSearch, Inbox, Mail, MapPinned, Search, Send, Sparkles, Users } from "lucide-react";
 import { PageHeader, SectionCard } from "@/components/app/page-header";
+import { TakeTourButton } from "@/features/product/tour";
 import { Button } from "@/components/ui/button";
 import { PageLoading } from "@/features/product/page-loading";
 import { Kpi, pct } from "@/features/analytics/parts";
@@ -47,6 +48,7 @@ async function Dashboard() {
         description={`Your lead pipeline for ${workspace.name}, last 30 days.`}
         actions={
           <div className="flex flex-wrap gap-2">
+            <TakeTourButton className="h-10" />
             <Button asChild variant="secondary">
               <Link href="/app/analytics">Analytics</Link>
             </Button>

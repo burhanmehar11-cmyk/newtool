@@ -193,7 +193,7 @@ function FindPanel() {
         <p className="text-[13px] text-slate" aria-live="polite">
           {saved ? (
             <>
-              Preview only. <Link href="/sign-up" className="font-medium text-green underline underline-offset-2">Get started</Link> to run real searches and save leads.
+              Preview only. <Link href="/sign-up" className="font-medium text-green underline underline-offset-2">Start a free trial</Link> to run real searches and save leads.
             </>
           ) : selected.length ? (
             `${selected.length} selected`

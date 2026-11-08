@@ -1,4 +1,5 @@
 import "server-only";
+import { track } from "@/server/events";
 import { healMailbox } from "@/server/services/mailboxes";
 import { accessProblem } from "@/server/services/billing";
 import { z } from "zod";
@@ -85,7 +86,13 @@ export async function createCampaignWithDrafts(input: unknown): Promise<R<{ id: 
     }
     return id;
   });
+  await track({ workspaceId: workspace.id, userId: user.id, kind: "campaign_created", area: "campaign", outcome: "success", summary: `Created draft campaign "${parsed.data.name}" (${parsed.data.leadIds.length} lead${parsed.data.leadIds.length === 1 ? "" : "s"})` });
   return { ok: true, id };
+}
+
+/** A campaign's name, for activity lines. */
+async function campaignName(userId: string, id: string) {
+  return (await asQ(userId, (q) => q.query<{ name: string }>("select name from public.campaigns where id = $1", [id]))).rows[0]?.name ?? "a campaign";
 }
 
 /** Researches leads without a brief, a few at a time, within a time budget. Returns how many were researched and how many are left. */
@@ -246,9 +253,21 @@ export async function approveAndLaunch(campaignId: string, revision: number, con
   try {
     const { enrolled } = await asQ(user.id, (q) => approveCampaign(q, workspace.id, user.id, campaignId, revision));
     const r = await runDispatch({ workspaceId: workspace.id });
+    const name = await campaignName(user.id, campaignId);
+    await track({
+      workspaceId: workspace.id,
+      userId: user.id,
+      kind: "campaign_launched",
+      area: "campaign",
+      outcome: "success",
+      summary: `Launched campaign "${name}" to ${enrolled} recipient${enrolled === 1 ? "" : "s"} (${r.sent} sent right away)`,
+      notify: { title: `"${name}" is live`, body: `${enrolled} recipient${enrolled === 1 ? "" : "s"} approved. Emails go out within the sending hours and your mailbox's daily limit.`, href: `/app/campaigns/${campaignId}`, level: "success", dedupeKey: `launched:${campaignId}:${revision}` },
+    });
     return { ok: true, enrolled, sentNow: r.sent };
   } catch (e) {
-    return { ok: false, error: approveErrors[(e as Error).message] ?? "Couldn't approve the campaign. Try again." };
+    const error = approveErrors[(e as Error).message] ?? "Couldn't approve the campaign. Try again.";
+    await track({ workspaceId: workspace.id, userId: user.id, kind: "campaign_launch_failed", area: "campaign", outcome: "failed", summary: `Launching campaign "${await campaignName(user.id, campaignId)}" failed: ${error}` });
+    return { ok: false, error };
   }
 }
 
@@ -274,6 +293,8 @@ export async function changeCampaignStatus(campaignId: string, action: "pause" |
         ? setCampaignStatus(q, campaignId, ["paused"], "running")
         : setCampaignStatus(q, campaignId, ["draft", "running", "paused"], "cancelled"),
   );
+  const verb = { pause: "Paused", resume: "Resumed", cancel: "Stopped" }[action];
+  await track({ workspaceId: workspace.id, userId: user.id, kind: `campaign_${action}`, area: "campaign", outcome: ok ? "info" : "failed", summary: ok ? `${verb} campaign "${await campaignName(user.id, campaignId)}"` : `${verb} campaign failed: not possible in its current state` });
   return ok ? { ok: true } : { ok: false, error: "That change isn't possible in the campaign's current state." };
 }
 
@@ -294,6 +315,7 @@ export async function editLiveCampaign(campaignId: string, input: unknown): Prom
   if (p.data.endHour <= p.data.startHour) return { ok: false, error: "The end hour must be after the start hour." };
   const schedule: Schedule = { timezone: p.data.timezone, days: [...new Set(p.data.days)].sort(), startHour: p.data.startHour, endHour: p.data.endHour };
   const ok = await asQ(user.id, (q) => updateLiveSettings(q, campaignId, { name: p.data.name, schedule }));
+  if (ok) await track({ workspaceId: workspace.id, userId: user.id, kind: "campaign_edited", area: "campaign", outcome: "info", summary: `Changed name or sending hours of campaign "${p.data.name}"` });
   return ok ? { ok: true } : { ok: false, error: "Only running or paused campaigns can be changed this way." };
 }
 
@@ -302,6 +324,7 @@ export async function reopenCampaign(campaignId: string): Promise<R> {
   const { user, workspace } = await requireWorkspace(`/app/campaigns/${campaignId}`);
   if (!canManage(workspace.role) || !uuid.safeParse(campaignId).success) return { ok: false, error: "Only workspace owners and admins can change campaigns." };
   const ok = await asQ(user.id, (q) => reopenAsDraft(q, campaignId));
+  if (ok) await track({ workspaceId: workspace.id, userId: user.id, kind: "campaign_reopened", area: "campaign", outcome: "info", summary: `Reopened campaign "${await campaignName(user.id, campaignId)}" to edit its messages` });
   return ok ? { ok: true } : { ok: false, error: "Pause the campaign first, then edit its messages." };
 }
 
@@ -309,7 +332,9 @@ export async function removeCampaign(campaignId: string): Promise<R> {
   const { user, workspace } = await requireWorkspace("/app/campaigns");
   if (!canManage(workspace.role) || !uuid.safeParse(campaignId).success) return { ok: false, error: "Only workspace owners and admins can delete campaigns." };
   try {
+    const name = await campaignName(user.id, campaignId);
     const ok = await asQ(user.id, (q) => deleteCampaign(q, campaignId));
+    if (ok) await track({ workspaceId: workspace.id, userId: user.id, kind: "campaign_deleted", area: "campaign", outcome: "info", summary: `Deleted campaign "${name}"` });
     return ok ? { ok: true } : { ok: false, error: "Campaign not found." };
   } catch (e) {
     if (/deleted_at/.test((e as Error).message)) return { ok: false, error: "Deleting needs a database update first: run 0015_campaign_delete.sql in Neon." };

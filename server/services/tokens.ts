@@ -1,4 +1,5 @@
 import "server-only";
+import { track } from "@/server/events";
 import { createHash, randomBytes } from "node:crypto";
 import { z } from "zod";
 import { requireWorkspace } from "@/server/auth";
@@ -33,5 +34,7 @@ export async function myTokenStatus(id: string): Promise<{ found: boolean; lastU
 export async function revokeMyToken(id: string): Promise<boolean> {
   const { user } = await requireWorkspace("/app/agent");
   if (!z.string().uuid().safeParse(id).success) return false;
-  return asQ(user.id, (q) => revokeToken(q, id));
+  const ok = await asQ(user.id, (q) => revokeToken(q, id));
+  if (ok) await track({ userId: user.id, kind: "token_revoked", area: "agents", outcome: "info", summary: "Revoked an agent token" });
+  return ok;
 }

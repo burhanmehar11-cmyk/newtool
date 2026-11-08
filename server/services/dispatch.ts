@@ -1,4 +1,5 @@
 import "server-only";
+import { track } from "@/server/events";
 import { accessProblem } from "@/server/services/billing";
 import { randomUUID } from "node:crypto";
 import { brand } from "@/config/brand";
@@ -10,7 +11,7 @@ import type { Q } from "@/server/auth-store";
 import { withService } from "@/server/db";
 import { configuredSiteUrl, sessionSecret } from "@/server/env";
 import { sendRaw } from "@/server/gmail/google";
-import { accessTokenFor, healMailbox } from "@/server/services/mailboxes";
+import { accessTokenFor, flagReconnect, healMailbox } from "@/server/services/mailboxes";
 import { claimDispatch, completeFinished, isSuppressedEmail, mailboxUsage, nextDue, pauseCampaign, recordAccepted, recordFailure, runningCampaigns } from "@/server/dispatch-store";
 import { markMailbox } from "@/server/mailbox-store";
 import { emitWebhook } from "@/server/services/webhooks";
@@ -33,7 +34,29 @@ async function finish(c: { id: string; workspace_id: string }) {
   if (await svc((q) => completeFinished(q, c.id))) {
     const name = (await svc((q) => q.query<{ name: string }>("select name from public.campaigns where id = $1", [c.id]))).rows[0]?.name ?? "";
     await emitWebhook(c.workspace_id, "campaign.completed", c.id, { campaign_id: c.id, name, url: `${configuredSiteUrl() ?? brand.siteUrl}/app/campaigns/${c.id}` });
+    const n = (await svc((q) => q.query<{ sent: number }>("select count(*)::int as sent from public.dispatches where campaign_id = $1 and status = 'accepted'", [c.id]))).rows[0]?.sent ?? 0;
+    await track({
+      workspaceId: c.workspace_id,
+      kind: "campaign_completed",
+      area: "campaign",
+      outcome: "success",
+      summary: `Campaign "${name}" finished (${n} email${n === 1 ? "" : "s"} sent)`,
+      notify: { title: `"${name}" finished`, body: `Every email in this campaign has gone out (${n} sent). Replies arrive in your Inbox.`, href: `/app/campaigns/${c.id}`, level: "success", dedupeKey: `completed:${c.id}` },
+    });
   }
+}
+
+/** A campaign Locenti had to pause: recorded and told to the workspace's owners and admins (once a day per campaign). */
+async function autoPaused(c: { id: string; workspace_id: string }, reason: string) {
+  const name = (await svc((q) => q.query<{ name: string }>("select name from public.campaigns where id = $1", [c.id]))).rows[0]?.name ?? "A campaign";
+  await track({
+    workspaceId: c.workspace_id,
+    kind: "campaign_auto_paused",
+    area: "sending",
+    outcome: "failed",
+    summary: `Campaign "${name}" paused automatically: ${reason}`,
+    notify: { title: `"${name}" is paused`, body: `${reason} Fix it, then press Resume on the campaign.`, href: `/app/campaigns/${c.id}`, level: "failed", to: "managers", dedupeKey: `paused:${c.id}:${new Date().toISOString().slice(0, 10)}` },
+  });
 }
 
 export async function runDispatch(opts: { workspaceId?: string | null; now?: Date; ignoreGap?: boolean } = {}): Promise<DispatchSummary> {
@@ -56,6 +79,7 @@ export async function runDispatch(opts: { workspaceId?: string | null; now?: Dat
     }
     if (c.account_status !== "connected" && !(c.account_status === "needs_reconnect" && (await healMailbox(c.account_id)))) {
       await svc((q) => pauseCampaign(q, c.id));
+      await autoPaused(c, "Its mailbox isn't connected.");
       summary.skipped.push(`${c.id}: mailbox not connected (campaign paused)`);
       continue;
     }
@@ -95,6 +119,7 @@ export async function runDispatch(opts: { workspaceId?: string | null; now?: Dat
         await q.query("delete from public.dispatches where id = $1", [dispatchId]);
         if (token.reconnect) await pauseCampaign(q, c.id);
       });
+      if (token.reconnect) await autoPaused(c, token.message);
       summary.skipped.push(`${c.id}: ${token.message}${token.reconnect ? " (campaign paused)" : " (will retry)"}`);
       continue;
     }
@@ -141,9 +166,10 @@ export async function runDispatch(opts: { workspaceId?: string | null; now?: Dat
         await q.query("delete from public.dispatches where id = $1", [dispatchId]);
         await pauseCampaign(q, c.id);
         // A project setting (API off) or Gmail's limit isn't the mailbox's fault: keep it connected.
-        if (sent.code === "auth" || sent.code === "permission") await markMailbox(q, c.account_id, { status: "needs_reconnect", lastError: sent.message });
-        else await markMailbox(q, c.account_id, { lastError: sent.message });
+        if (sent.code !== "auth" && sent.code !== "permission") await markMailbox(q, c.account_id, { lastError: sent.message });
       });
+      if (sent.code === "auth" || sent.code === "permission") await flagReconnect(c.account_id, sent.message);
+      await autoPaused(c, sent.message);
       summary.skipped.push(`${c.id}: ${sent.message} (campaign paused)`);
     } else {
       await svc((q) => recordFailure(q, dispatchId, due.id, "failed", sent.message, due.step));

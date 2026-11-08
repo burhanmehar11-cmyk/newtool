@@ -1,4 +1,5 @@
 import "server-only";
+import { track } from "@/server/events";
 import { accessProblem } from "@/server/services/billing";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
@@ -27,7 +28,21 @@ export function aiWriterStatus() {
  * fails). Saved as a new draft version (origin "ai") for review; draft
  * campaigns containing the lead need approval again.
  */
+/** Writes a first email with AI and records how it went. */
 export async function writeDraftAs(ctx: Ctx, leadId: string): Promise<WriteResult> {
+  const r = await writeDraftInner(ctx, leadId);
+  await track({
+    workspaceId: ctx.workspace.id,
+    userId: ctx.user.id,
+    kind: r.ok ? "ai_draft" : "ai_draft_failed",
+    area: "writing",
+    outcome: r.ok ? "success" : "failed",
+    summary: r.ok ? `AI wrote a first email ("${r.subject.slice(0, 80)}")` : `AI writing failed: ${r.error}`,
+  });
+  return r;
+}
+
+async function writeDraftInner(ctx: Ctx, leadId: string): Promise<WriteResult> {
   if (!["owner", "admin"].includes(ctx.workspace.role)) return { ok: false, error: "Only workspace owners and admins can write drafts." };
   {
     const why = await accessProblem(ctx.workspace.id);

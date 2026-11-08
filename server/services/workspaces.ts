@@ -1,4 +1,5 @@
 import "server-only";
+import { track } from "@/server/events";
 import type { OfferProfile } from "@/lib/domain/types";
 import { offerProfileSchema, onboardingSchema } from "@/lib/domain/schemas";
 import { withUser } from "@/server/db";
@@ -73,8 +74,25 @@ export async function createWorkspaceWithOffer(input: unknown): Promise<ServiceR
       await q.query(UPSERT_OFFER, [id, ...toParams(offer), user.id]);
       return id;
     });
+    await track({
+      workspaceId,
+      userId: user.id,
+      kind: "onboarded",
+      area: "account",
+      outcome: "success",
+      summary: `Finished setup: workspace "${workspaceName}" with their offer`,
+      notify: {
+        title: "Welcome to Locenti",
+        body: "Next: connect a Gmail mailbox, then search Google Maps for businesses to contact. The tour (top of the Dashboard) shows where everything is.",
+        href: "/app/mailboxes",
+        level: "success",
+        to: { userId: user.id },
+        dedupeKey: "welcome",
+      },
+    });
     return { ok: true, value: { workspaceId } };
   } catch {
+    await track({ userId: user.id, kind: "onboarding_failed", area: "account", outcome: "failed", summary: "Creating their workspace failed" });
     return { ok: false, error: "Could not create the workspace. Nothing was saved. Try again." };
   }
 }

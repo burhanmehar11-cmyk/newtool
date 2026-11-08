@@ -1,4 +1,5 @@
 import "server-only";
+import { track } from "@/server/events";
 import { accessProblem } from "@/server/services/billing";
 import { z } from "zod";
 import { brand } from "@/config/brand";
@@ -45,7 +46,22 @@ export async function researchLead(leadId: string): Promise<ResearchResult> {
   return researchLeadAs(await requireWorkspace("/app/leads"), leadId);
 }
 
-export async function researchLeadAs({ user, workspace }: { user: { id: string }; workspace: WorkspaceRef }, leadId: string): Promise<ResearchResult> {
+/** Researches a lead and records how it went. */
+export async function researchLeadAs(ctx: { user: { id: string }; workspace: WorkspaceRef }, leadId: string): Promise<ResearchResult> {
+  const r = await researchLeadInner(ctx, leadId);
+  const name = (await asQ(ctx.user.id, (q) => q.query<{ name: string }>("select b.name from public.leads l join public.businesses b on b.id = l.business_id where l.id = $1", [leadId])).catch(() => null))?.rows[0]?.name ?? "a lead";
+  await track({
+    workspaceId: ctx.workspace.id,
+    userId: ctx.user.id,
+    kind: r.ok ? "research_done" : "research_failed",
+    area: "research",
+    outcome: !r.ok || r.status === "failed" ? "failed" : r.status === "ok" ? "success" : "warning",
+    summary: r.ok ? `Researched ${name}'s website (${r.status}${r.note ? `: ${r.note}` : ""})` : `Research of ${name} failed: ${r.error}`,
+  });
+  return r;
+}
+
+async function researchLeadInner({ user, workspace }: { user: { id: string }; workspace: WorkspaceRef }, leadId: string): Promise<ResearchResult> {
   if (isViewer(workspace)) return { ok: false, error: VIEW_ONLY };
   {
     const why = await accessProblem(workspace.id);

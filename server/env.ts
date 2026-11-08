@@ -64,3 +64,8 @@ export function discoveryMonthlyLimit(raw: string | undefined = process.env.DISC
   const n = Number(v);
   return Number.isInteger(n) && n > 0 && n <= 1_000_000 ? n : DEFAULT_DISCOVERY_MONTHLY_LIMIT;
 }
+
+/** SIGNUP_OPEN=true: anyone can create an account and start a free trial. Otherwise only BETA_ALLOWED_EMAILS and invited people. */
+export function signupOpen(): boolean {
+  return process.env.SIGNUP_OPEN?.trim().toLowerCase() === "true";
+}

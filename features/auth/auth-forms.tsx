@@ -205,8 +205,11 @@ export function SignInForm({ emailEnabled }: { emailEnabled: boolean }) {
   );
 }
 
-export function SignUpForm({ emailEnabled }: { emailEnabled: boolean }) {
+const PLAN_NAMES: Record<string, string> = { starter: "Starter", growth: "Growth", agency: "Agency" };
+
+export function SignUpForm({ emailEnabled, trialDays, open }: { emailEnabled: boolean; trialDays: number; open: boolean }) {
   const params = useSearchParams();
+  const plan = PLAN_NAMES[params.get("plan") ?? ""] ?? null;
   const [state, action, pending] = React.useActionState<FormState, FormData>(signUpWithPasswordAction, {});
   const srcRef = React.useRef<HTMLInputElement>(null);
   React.useEffect(() => {
@@ -216,8 +219,14 @@ export function SignUpForm({ emailEnabled }: { emailEnabled: boolean }) {
   return (
     <>
       <UrlError />
-      <GoogleButton next={safeNextPath(params.get("next"))} label="Sign up with Google" />
-      <Divider>Or create an account with email</Divider>
+      <div className="mb-5 rounded-xl border border-mint/25 bg-mint/[0.07] px-4 py-3 text-center">
+        <p className="text-[15px] font-semibold text-white">
+          {trialDays}-day free trial{plan ? ` of ${plan}` : ""}
+        </p>
+        <p className="mt-0.5 text-[13px] text-fog">No card needed to start.</p>
+      </div>
+      <GoogleButton next={safeNextPath(params.get("next"))} label="Start free trial with Google" />
+      <Divider>Or start with email</Divider>
       {emailEnabled ? (
         <form action={action} className="space-y-5" noValidate>
           <input ref={srcRef} type="hidden" name="src" defaultValue="" />
@@ -229,11 +238,11 @@ export function SignUpForm({ emailEnabled }: { emailEnabled: boolean }) {
             placeholder="you@company.com"
             defaultValue={state.values?.email}
             error={state.fieldErrors?.email}
-            hint="Use the address your invite was sent to."
+            hint={open ? undefined : "Use the address your invite was sent to."}
           />
           <DarkField name="password" label="Password" type="password" autoComplete="new-password" placeholder="At least 10 characters" error={state.fieldErrors?.password} />
           {state.error ? <Notice tone="danger">{state.error}</Notice> : null}
-          <Submit pending={pending}>Create account</Submit>
+          <Submit pending={pending}>Start free trial</Submit>
         </form>
       ) : (
         <Notice tone="warn">Email sign-up isn&apos;t available yet. Continue with Google above.</Notice>

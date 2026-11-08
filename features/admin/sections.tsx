@@ -485,9 +485,79 @@ export function AdminsTab({ d }: { d: Of<"admins"> }) {
   );
 }
 
-const ACTIVITY_LABELS: Record<string, string> = { all: "Everything", signups: "Sign-ups", signins: "Sign-ins", team: "Workspaces & team", prospecting: "Searches & leads", outreach: "Campaigns & replies", billing: "Plans & payments" };
+const ACTIVITY_LABELS: Record<string, string> = {
+  all: "Everything",
+  failed: "Failed only",
+  signups: "Sign-ups",
+  signins: "Sign-ins",
+  team: "Workspaces & team",
+  mailboxes: "Mailboxes",
+  prospecting: "Searches & leads",
+  research: "Research & AI",
+  campaigns: "Campaigns",
+  sending: "Sending",
+  replies: "Replies",
+  billing: "Plans & payments",
+};
+const OUTCOME: Record<string, { tone: "green" | "danger" | "warn" | "outline"; label: string }> = {
+  success: { tone: "green", label: "Success" },
+  failed: { tone: "danger", label: "Failed" },
+  warning: { tone: "warn", label: "Warning" },
+  info: { tone: "outline", label: "Info" },
+};
+/** "mailbox_needs_reconnect" → "Mailbox needs reconnect" for kinds without a short label. */
+const kindLabel = (k: string) => KIND_LABEL[k] ?? (k.charAt(0).toUpperCase() + k.slice(1)).replace(/_/g, " ");
 const KIND_TONE: Record<string, "green" | "info" | "warn" | "neutral" | "outline"> = { signup: "green", confirm: "green", signin: "outline", workspace: "info", invite: "info", joined: "info", token: "neutral", search: "neutral", leads: "neutral", campaign: "green", sent: "outline", reply: "info", admin: "warn", payment: "green" };
-const KIND_LABEL: Record<string, string> = { signup: "Sign-up", confirm: "Confirmed", signin: "Sign-in", workspace: "Workspace", invite: "Invite", joined: "Joined", token: "Agent token", search: "Search", leads: "Leads", campaign: "Campaign", sent: "Emails", reply: "Reply", admin: "Admin", payment: "Billing" };
+const KIND_LABEL: Record<string, string> = {
+  signup: "Sign-up",
+  confirm: "Confirmed",
+  signin: "Sign-in",
+  workspace: "Workspace",
+  invite: "Invite",
+  joined: "Joined",
+  token: "Agent token",
+  search: "Search",
+  leads: "Leads",
+  campaign: "Campaign",
+  sent: "Emails",
+  send_failed: "Not sent",
+  reply: "Reply",
+  admin: "Admin",
+  payment: "Billing",
+  signin_failed: "Sign-in",
+  signin_refused: "Sign-in",
+  signup_refused: "Sign-up",
+  signup_email_failed: "Sign-up",
+  signup_existing: "Sign-up",
+  mailbox_connected: "Mailbox",
+  mailbox_connect_failed: "Mailbox",
+  mailbox_test_ok: "Test email",
+  mailbox_test_failed: "Test email",
+  mailbox_needs_reconnect: "Mailbox",
+  mailbox_healed: "Mailbox",
+  mailbox_disconnected: "Mailbox",
+  mailbox_settings: "Mailbox",
+  campaign_created: "Campaign",
+  campaign_launched: "Campaign",
+  campaign_launch_failed: "Campaign",
+  campaign_pause: "Campaign",
+  campaign_resume: "Campaign",
+  campaign_cancel: "Campaign",
+  campaign_edited: "Campaign",
+  campaign_reopened: "Campaign",
+  campaign_deleted: "Campaign",
+  campaign_completed: "Campaign",
+  campaign_auto_paused: "Sending",
+  research_done: "Research",
+  research_failed: "Research",
+  ai_draft: "AI email",
+  ai_draft_failed: "AI email",
+  email_lookup: "Email lookup",
+  csv_import: "CSV import",
+  csv_import_failed: "CSV import",
+  csv_export: "CSV export",
+  monthly_limit: "Limit",
+};
 
 export function ActivityTab({ d, search }: { d: Of<"activity">; search: string }) {
   const c = d.counts;
@@ -499,6 +569,18 @@ export function ActivityTab({ d, search }: { d: Of<"activity">; search: string }
           { label: "Signed up with email", value: num(c.byEmail), hint: c.unconfirmed ? `${c.unconfirmed} haven't confirmed yet` : "all confirmed", tone: c.unconfirmed ? "warn" : undefined },
           { label: "Signed up with Google", value: num(c.byGoogle) },
           { label: "Shown below", value: num(d.rows.length), hint: d.rows.length === 200 ? "newest 200 events" : "events" },
+        ]}
+      />
+      <Tiles
+        items={[
+          {
+            label: "Went well, last 7 days",
+            value: num(d.outcomes.success),
+            hint: d.outcomes.success + d.outcomes.failed ? `${Math.round((d.outcomes.success / (d.outcomes.success + d.outcomes.failed)) * 100)}% of recorded actions succeeded` : d.outcomes.recording ? "recorded actions" : "recording starts after migration 0016",
+          },
+          { label: "Failed, last 7 days", value: num(d.outcomes.failed), hint: d.outcomes.warning ? `plus ${num(d.outcomes.warning)} warnings` : "recorded actions", tone: d.outcomes.failed ? "warn" : undefined },
+          { label: "Emails sent, last 7 days", value: num(d.outcomes.sent), hint: d.outcomes.sendFailed ? `${num(d.outcomes.sendFailed)} couldn't be sent` : "none failed", tone: d.outcomes.sendFailed ? "warn" : undefined },
+          { label: "Searches, last 7 days", value: num(d.outcomes.searches), hint: d.outcomes.searchesFailed ? `${num(d.outcomes.searchesFailed)} failed` : "none failed", tone: d.outcomes.searchesFailed ? "warn" : undefined },
         ]}
       />
       <Panel
@@ -527,15 +609,18 @@ export function ActivityTab({ d, search }: { d: Of<"activity">; search: string }
           ))}
         </nav>
         {d.rows.length ? (
-          <Table caption="Activity" minWidth={760} head={["When", "What", "Who", "Workspace", ""]}>
+          <Table caption="Activity" minWidth={860} head={["When", "Result", "What", "Who", "Workspace", ""]}>
             {d.rows.map((r, i) => (
-              <tr key={i}>
+              <tr key={i} className={r.outcome === "failed" ? "bg-danger-bg/30" : undefined}>
                 <td className="whitespace-nowrap text-xs text-slate">{formatDateTime(r.at)}</td>
+                <td>
+                  <Badge tone={OUTCOME[r.outcome]?.tone ?? "outline"}>{OUTCOME[r.outcome]?.label ?? r.outcome}</Badge>
+                </td>
                 <td className="max-w-[420px] text-sm text-ink">{r.summary}</td>
                 <td className="max-w-[220px] truncate text-xs">{r.email ?? <span className="text-slate">—</span>}</td>
                 <td className="max-w-[180px] truncate text-xs text-slate">{r.workspace ?? "—"}</td>
                 <td className="text-right">
-                  <Badge tone={KIND_TONE[r.kind] ?? "outline"}>{KIND_LABEL[r.kind] ?? r.kind}</Badge>
+                  <Badge tone={KIND_TONE[r.kind] ?? "neutral"}>{kindLabel(r.kind)}</Badge>
                 </td>
               </tr>
             ))}

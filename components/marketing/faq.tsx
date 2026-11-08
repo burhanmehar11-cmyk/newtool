@@ -78,7 +78,7 @@ export function FinalCta() {
         </p>
         <div data-reveal className="mt-8 flex flex-wrap gap-3">
           <Button asChild variant="mint" size="lg">
-            <Link href="/sign-up">Get started</Link>
+            <Link href="/sign-up">Start free trial</Link>
           </Button>
           <Button asChild variant="outline-dark" size="lg">
             <Link href="#how-it-works">See the workflow</Link>

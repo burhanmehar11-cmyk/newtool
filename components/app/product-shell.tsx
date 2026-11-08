@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, Bot, CreditCard, Inbox, LayoutDashboard, LogOut, Mail, Menu, Search, Send, Settings, Users, UsersRound } from "lucide-react";
+import { BarChart3, Bell, Bot, CreditCard, Inbox, LayoutDashboard, LogOut, Mail, Menu, Search, Send, Settings, Users, UsersRound } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogTrigger, SheetCloseButton, SheetContent } from "@/components/ui/sheet";
@@ -11,6 +11,8 @@ import { cn } from "@/lib/utils";
 import { signOutAction } from "@/server/actions/auth";
 import { ThemeToggle, useAppTheme } from "@/components/app/theme-toggle";
 import { AutoSender } from "@/components/app/auto-sender";
+import { useUnreadNotifications } from "@/features/product/notifications";
+import { ProductTour, TakeTourButton } from "@/features/product/tour";
 
 /**
  * Shell for the live product. Only shipped areas appear in the navigation;
@@ -22,6 +24,7 @@ const nav = [
   { href: "/app/leads", label: "Leads", icon: Users },
   { href: "/app/campaigns", label: "Campaigns", icon: Send },
   { href: "/app/inbox", label: "Inbox", icon: Inbox },
+  { href: "/app/notifications", label: "Notifications", icon: Bell },
   { href: "/app/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/app/mailboxes", label: "Mailboxes", icon: Mail },
   { href: "/app/agent", label: "Agent", icon: Bot },
@@ -39,6 +42,10 @@ export function ProductShell({ workspaceSlot, children }: { workspaceSlot: React
       </aside>
       <MobileBar workspaceSlot={workspaceSlot} />
       <AutoSender />
+      {/* Reads the URL, which is request-time data on dynamic routes. */}
+      <React.Suspense fallback={null}>
+        <ProductTour />
+      </React.Suspense>
       <main id="main" className="mx-auto w-full max-w-[1280px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
         {children}
       </main>
@@ -60,6 +67,7 @@ function Sidebar({ workspaceSlot, onNavigate }: { workspaceSlot: React.ReactNode
         <ActiveNav onNavigate={onNavigate} />
       </React.Suspense>
       <div className="space-y-3 border-t border-line p-4">
+        <TakeTourButton variant="ghost" className="w-full justify-start text-slate" />
         <div className="flex items-center justify-between gap-2">
           <span className="text-xs text-slate">Appearance</span>
           <ThemeToggle />
@@ -79,6 +87,7 @@ function ActiveNav({ onNavigate }: { onNavigate?: () => void }) {
 }
 
 function NavLinks({ pathname, onNavigate }: { pathname: string | null; onNavigate?: () => void }) {
+  const unread = useUnreadNotifications(pathname);
   return (
     <nav className="flex-1 space-y-0.5 px-3" aria-label="Product">
       {nav.map(({ href, label, icon: Icon }) => {
@@ -88,6 +97,7 @@ function NavLinks({ pathname, onNavigate }: { pathname: string | null; onNavigat
             key={href}
             href={href}
             onClick={onNavigate}
+            data-tour={href}
             aria-current={active ? "page" : undefined}
             className={cn(
               "flex items-center gap-3 rounded-[10px] px-3 py-2 text-sm font-medium transition-colors duration-200",
@@ -96,6 +106,12 @@ function NavLinks({ pathname, onNavigate }: { pathname: string | null; onNavigat
           >
             <Icon aria-hidden className="size-[18px]" />
             {label}
+            {href === "/app/notifications" && unread ? (
+              <span className={cn("ml-auto rounded-full px-1.5 py-0.5 text-[11px] font-semibold tabular-nums", active ? "bg-white/15 text-white" : "bg-green text-white")}>
+                {unread > 99 ? "99+" : unread}
+                <span className="sr-only"> unread</span>
+              </span>
+            ) : null}
           </Link>
         );
       })}

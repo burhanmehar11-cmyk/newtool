@@ -3,9 +3,11 @@ import { Check } from "lucide-react";
 import { plans } from "@/config/plans";
 import { PRICING_LIVE } from "@/config/milestone";
 import { Button } from "@/components/ui/button";
+import { trialDays } from "@/lib/admin";
 import { cn } from "@/lib/utils";
 
 export function Pricing() {
+  const days = trialDays();
   return (
     <section id="pricing" className="bg-canvas py-20 sm:py-28">
       <div className="container-page">
@@ -33,7 +35,10 @@ export function Pricing() {
                 {PRICING_LIVE && p.monthlyPriceUsd !== null ? (
                   <p className="font-display text-3xl font-bold">${p.monthlyPriceUsd}/mo</p>
                 ) : (
-                  <p className={cn("text-sm font-medium", p.highlight ? "text-white" : "text-ink")}>Price to be announced</p>
+                  <>
+                    <p className={cn("font-display text-xl font-bold", p.highlight ? "text-white" : "text-ink")}>{days}-day free trial</p>
+                    <p className={cn("mt-0.5 text-xs", p.highlight ? "text-fog" : "text-slate")}>No card needed · pricing coming soon</p>
+                  </>
                 )}
               </div>
               <div className="mt-6 flex-1 space-y-5">
@@ -52,13 +57,13 @@ export function Pricing() {
                 ))}
               </div>
               <Button asChild variant={p.highlight ? "mint" : "secondary"} className="mt-8 w-full">
-                <Link href="/sign-up">Get started</Link>
+                <Link href={`/sign-up?plan=${p.id}`}>Start free trial</Link>
               </Button>
             </div>
           ))}
         </div>
         <p className="mx-auto mt-6 max-w-2xl text-center text-xs leading-5 text-slate">
-          Prices are being finalised and will be shown here. Nothing on this page is an offer.
+          Every plan starts with a {days}-day free trial, no card needed. Prices are being finalised and will be shown here before any payment is asked for.
         </p>
       </div>
     </section>

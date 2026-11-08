@@ -1,4 +1,5 @@
 import "server-only";
+import { track } from "@/server/events";
 import { accessProblem, billingConfig } from "@/server/services/billing";
 import { emitLeadsCreated } from "@/server/services/webhooks";
 import { z } from "zod";
@@ -125,6 +126,7 @@ async function reserveError(e: unknown, workspaceId: string): Promise<{ log: str
   const msg = String((e as Error)?.message);
   if (msg.includes("monthly_limit")) {
     const limit = (await monthlyLimitFor(workspaceId)) ?? 0;
+    await track({ workspaceId, kind: "monthly_limit", area: "prospecting", outcome: "warning", summary: `Search refused: this month's ${limit} businesses are used up`, notify: { title: "This month's searches are used up", body: `Your workspace has found its ${limit} businesses for this month. Searching opens again on the 1st.`, href: "/app/discover", level: "warning", dedupeKey: `limit:${new Date().toISOString().slice(0, 7)}` } });
     const on = monthlyResetDate().toLocaleDateString("en-US", { month: "long", day: "numeric", timeZone: "UTC" });
     return { log: "Monthly limit reached.", error: `You've used this month's ${limit} businesses. Google Maps search opens again on ${on}.` };
   }

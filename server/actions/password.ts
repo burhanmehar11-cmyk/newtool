@@ -1,5 +1,6 @@
 "use server";
 
+import { track } from "@/server/events";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { mayUseLocenti } from "@/server/access";
@@ -42,10 +43,17 @@ export async function signInWithPasswordAction(_: FormState, form: FormData): Pr
   const values = { email: String(form.get("email") ?? "").slice(0, 254) };
   const parsed = z.object({ email, password: z.string().min(1, "Enter your password.").max(128) }).safeParse({ email: form.get("email"), password: form.get("password") });
   if (!parsed.success) return { values, fieldErrors: Object.fromEntries(parsed.error.issues.map((i) => [String(i.path[0]), i.message])) };
-  if (!(await mayUseLocenti(parsed.data.email))) return { values, error: NOT_INVITED };
+  if (!(await mayUseLocenti(parsed.data.email))) {
+    await track({ email: parsed.data.email, kind: "signin_refused", area: "account", outcome: "failed", summary: "Sign-in refused: email doesn't have access" });
+    return { values, error: NOT_INVITED };
+  }
 
   const ip = await clientIp();
   const r = await svc((q) => passwordSignIn(q, parsed.data.email, parsed.data.password, ip));
+  if (r.kind !== "ok") {
+    const why = { throttled: "too many attempts (locked for 15 minutes)", invalid: "wrong email or password", unverified: "email not confirmed yet" }[r.kind];
+    await track({ email: parsed.data.email, kind: "signin_failed", area: "account", outcome: r.kind === "unverified" ? "warning" : "failed", summary: `Sign-in failed: ${why}` });
+  }
   if (r.kind === "throttled") return { values, error: "Too many attempts. Wait 15 minutes, or reset your password." };
   if (r.kind === "invalid") return { values, error: "That email and password don't match an account." };
   if (r.kind === "unverified") return { values, error: "Confirm your email first. Check your inbox for the link.", unverifiedEmail: parsed.data.email };
@@ -65,7 +73,10 @@ export async function signUpWithPasswordAction(_: FormState, form: FormData): Pr
   const pwProblem = passwordProblem(pw);
   if (pwProblem) fieldErrors.password = pwProblem;
   if (!parsed.success || pwProblem) return { values, fieldErrors };
-  if (!(await mayUseLocenti(parsed.data.email))) return { values, error: NOT_INVITED };
+  if (!(await mayUseLocenti(parsed.data.email))) {
+    await track({ email: parsed.data.email, kind: "signup_refused", area: "account", outcome: "failed", summary: "Sign-up refused: email doesn't have access" });
+    return { values, error: NOT_INVITED };
+  }
 
   const origin = await appOrigin();
   const r = await svc((q) => passwordSignUp(q, parsed.data.email, pw, parsed.data.email.split("@")[0].slice(0, 120)));
@@ -79,8 +90,10 @@ export async function signUpWithPasswordAction(_: FormState, form: FormData): Pr
     }
   } catch (e) {
     console.error("[sign-up] confirmation email failed:", (e as Error).message);
+    await track({ email: parsed.data.email, kind: "signup_email_failed", area: "account", outcome: "failed", summary: "Sign-up: the confirmation email couldn't be sent", details: { error: String((e as Error).message).slice(0, 200) } });
     return { values, error: "We couldn't send the confirmation email just now. Try again in a minute, or continue with Google." };
   }
+  if (r.kind !== "verify") await track({ email: parsed.data.email, kind: "signup_existing", area: "account", outcome: "info", summary: "Tried to sign up with an email that already has an account (sent a sign-in reminder)" });
   // Same message either way, so the form doesn't reveal which emails have accounts.
   return { message: `Check ${parsed.data.email} for a confirmation link. It expires in 24 hours.` };
 }

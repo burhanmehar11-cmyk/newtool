@@ -55,7 +55,7 @@ export function SiteHeader() {
                 Sign in
               </Link>
               <Button asChild variant="mint" size="sm" className="hidden h-9 px-4 sm:inline-flex">
-                <Link href="/sign-up">Get started</Link>
+                <Link href="/sign-up">Start free trial</Link>
               </Button>
             </>
           )}
@@ -85,7 +85,7 @@ export function SiteHeader() {
               <div className="mt-auto border-t border-white/[0.08] p-5">
                 <Button asChild variant="mint" size="lg" className="w-full">
                   <Link href={signedIn ? "/app" : "/sign-up"} onClick={() => setOpen(false)}>
-                    {signedIn ? "Open dashboard" : "Get started"}
+                    {signedIn ? "Open dashboard" : "Start free trial"}
                   </Link>
                 </Button>
               </div>

@@ -40,7 +40,7 @@ export async function getAdminTab(tab: AdminTab, days: number, search: string, f
         return { tab, overview: await store.overview(q, trial), daily: await store.daily(q, days), sources: (await store.sources(q, days)).slice(0, 6), trial };
       case "activity": {
         const f = (store.ACTIVITY_FILTERS as readonly string[]).includes(filter) ? (filter as store.ActivityFilter) : "all";
-        return { tab, filter: f, rows: await store.activity(q, f, search), counts: await store.signupCounts(q) };
+        return { tab, filter: f, rows: await store.activity(q, f, search), counts: await store.signupCounts(q), outcomes: await store.outcomeCounts(q) };
       }
       case "funnel":
         return { tab, funnel: await store.signupFunnel(q, days), sources: await store.sources(q, days), campaigns: await store.campaignsBySignups(q, days) };

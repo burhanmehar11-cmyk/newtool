@@ -1,4 +1,5 @@
 import "server-only";
+import { track } from "@/server/events";
 import { z } from "zod";
 import { buildMessage, toGmailRaw } from "@/lib/gmail/mime";
 import { requireWorkspace } from "@/server/auth";
@@ -47,7 +48,39 @@ export async function healMailbox(accountId: string): Promise<boolean> {
   const t = await accessTokenFor(accountId);
   if (!t.ok) return false;
   await svc((q) => markMailbox(q, accountId, { status: "connected", lastError: null }));
+  const info = await mailboxInfo(accountId);
+  await track({ workspaceId: info?.workspace_id, kind: "mailbox_healed", area: "mailbox", outcome: "success", summary: `Mailbox ${info?.email ?? ""} works again (rechecked with Google, no reconnect needed)` });
   return true;
+}
+
+async function mailboxInfo(accountId: string) {
+  return (await svc((q) => q.query<{ workspace_id: string; email: string }>("select workspace_id, email from public.sending_accounts where id = $1", [accountId]))).rows[0] ?? null;
+}
+
+/**
+ * Marks a mailbox as needing a reconnect, records why, and tells the
+ * workspace's owners and admins (once a day per mailbox).
+ */
+export async function flagReconnect(accountId: string, reason: string) {
+  await svc((q) => markMailbox(q, accountId, { status: "needs_reconnect", lastError: reason }));
+  accessCache.delete(accountId);
+  const info = await mailboxInfo(accountId);
+  if (!info) return;
+  await track({
+    workspaceId: info.workspace_id,
+    kind: "mailbox_needs_reconnect",
+    area: "mailbox",
+    outcome: "failed",
+    summary: `Mailbox ${info.email} lost access: ${reason}`,
+    notify: {
+      title: `Reconnect ${info.email}`,
+      body: "Google stopped Locenti's access to this mailbox, so campaigns using it are paused. Reconnect it on the Mailboxes page.",
+      href: "/app/mailboxes",
+      level: "failed",
+      to: "managers",
+      dedupeKey: `reconnect:${accountId}:${new Date().toISOString().slice(0, 10)}`,
+    },
+  });
 }
 
 // Short-lived access tokens, kept in memory only (they last about an hour).
@@ -61,12 +94,12 @@ export async function accessTokenFor(accountId: string): Promise<{ ok: true; tok
   const blob = await svc((q) => loadSecret(q, accountId));
   const stored = blob && key ? decryptJson<StoredTokens>(blob, key) : null;
   if (!stored?.refreshToken) {
-    await svc((q) => markMailbox(q, accountId, { status: "needs_reconnect", lastError: "Stored access couldn't be read. Reconnect the mailbox." }));
+    await flagReconnect(accountId, "Stored access couldn't be read. Reconnect the mailbox.");
     return { ok: false, message: "This mailbox needs to be reconnected.", reconnect: true };
   }
   const r = await refreshAccessToken(stored.refreshToken);
   if (!r.ok) {
-    if (r.revoked) await svc((q) => markMailbox(q, accountId, { status: "needs_reconnect", lastError: r.message }));
+    if (r.revoked) await flagReconnect(accountId, r.message);
     return { ok: false, message: r.message, reconnect: r.revoked };
   }
   accessCache.set(accountId, { token: r.accessToken, expiresAt: r.expiresAt });
@@ -84,7 +117,10 @@ export async function sendTestEmail(accountId: string): Promise<{ ok: true; to: 
   if (!box || box.status === "disconnected") return { ok: false, error: "Mailbox not found." };
 
   const token = await accessTokenFor(box.id);
-  if (!token.ok) return { ok: false, error: token.message };
+  if (!token.ok) {
+    await track({ workspaceId: workspace.id, userId: user.id, kind: "mailbox_test_failed", area: "mailbox", outcome: "failed", summary: `Test email from ${box.email} failed: ${token.message}` });
+    return { ok: false, error: token.message };
+  }
   const raw = toGmailRaw(
     buildMessage({
       from: { email: box.email, name: box.sender_name },
@@ -95,11 +131,13 @@ export async function sendTestEmail(accountId: string): Promise<{ ok: true; to: 
   );
   const sent = await sendRaw(token.token, raw);
   if (!sent.ok) {
-    if (sent.code === "auth") accessCache.delete(box.id);
-    await asQ(user.id, (q) => markMailbox(q, box.id, { status: sent.code === "auth" || sent.code === "permission" ? "needs_reconnect" : undefined, lastError: sent.message }));
+    if (sent.code === "auth" || sent.code === "permission") await flagReconnect(box.id, sent.message);
+    else await asQ(user.id, (q) => markMailbox(q, box.id, { lastError: sent.message }));
+    await track({ workspaceId: workspace.id, userId: user.id, kind: "mailbox_test_failed", area: "mailbox", outcome: "failed", summary: `Test email from ${box.email} failed: ${sent.message}` });
     return { ok: false, error: sent.message };
   }
   await asQ(user.id, (q) => markMailbox(q, box.id, { status: "connected", lastError: null, tested: true }));
+  await track({ workspaceId: workspace.id, userId: user.id, kind: "mailbox_test_ok", area: "mailbox", outcome: "success", summary: `Test email from ${box.email} sent` });
   return { ok: true, to: box.email };
 }
 
@@ -114,6 +152,7 @@ export async function saveMailboxSettings(accountId: string, input: unknown): Pr
   const parsed = settingsSchema.safeParse(input);
   if (!uuid.safeParse(accountId).success || !parsed.success) return { ok: false, error: parsed.success ? "Mailbox not found." : parsed.error.issues[0].message };
   const ok = await asQ(user.id, (q) => updateMailboxSettings(q, accountId, parsed.data));
+  if (ok) await track({ workspaceId: workspace.id, userId: user.id, kind: "mailbox_settings", area: "mailbox", outcome: "info", summary: `Mailbox settings changed (daily limit ${parsed.data.dailyCap})` });
   return ok ? { ok: true } : { ok: false, error: "Mailbox not found." };
 }
 
@@ -131,5 +170,6 @@ export async function disconnectMailbox(accountId: string): Promise<{ ok: true }
   await svc((q) => deleteSecret(q, box.id));
   await asQ(user.id, (q) => markMailbox(q, box.id, { status: "disconnected", lastError: null }));
   accessCache.delete(box.id);
+  await track({ workspaceId: workspace.id, userId: user.id, kind: "mailbox_disconnected", area: "mailbox", outcome: "info", summary: `Disconnected mailbox ${box.email}` });
   return { ok: true };
 }

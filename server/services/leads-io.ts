@@ -1,4 +1,5 @@
 import "server-only";
+import { track } from "@/server/events";
 import { z } from "zod";
 import { toCsv, parseLeadsCsv } from "@/lib/csv";
 import { googleMapsLink } from "@/lib/discovery/google-places";
@@ -61,6 +62,7 @@ export async function exportLeadsCsv(input: { leadIds?: string[] } = {}): Promis
     ]),
   );
   const date = new Date().toISOString().slice(0, 10);
+  await track({ workspaceId: workspace.id, userId: user.id, kind: "csv_export", area: "prospecting", outcome: "success", summary: `Downloaded ${rows.rows.length} lead${rows.rows.length === 1 ? "" : "s"} as CSV` });
   return { ok: true, csv, filename: `locenti-leads-${date}.csv`, count: rows.rows.length };
 }
 
@@ -100,7 +102,10 @@ export async function importLeadsCsv(text: string): Promise<{ ok: true; added: n
   if (typeof text !== "string" || !text.trim()) return { ok: false, error: "Choose a CSV file." };
   if (text.length > 2_000_000) return { ok: false, error: "The file is too large (2 MB at most)." };
   const parsed = parseLeadsCsv(text);
-  if (!parsed.rows.length) return { ok: false, error: parsed.errors[0] ?? "No rows to import." };
+  if (!parsed.rows.length) {
+    await track({ workspaceId: workspace.id, userId: user.id, kind: "csv_import_failed", area: "prospecting", outcome: "failed", summary: `CSV import failed: ${parsed.errors[0] ?? "no rows to import"}` });
+    return { ok: false, error: parsed.errors[0] ?? "No rows to import." };
+  }
   // Addresses whose domain can't receive email are dropped (the business is still imported if it has a website).
   const okEmails = new Set((await deliverableEmails(parsed.rows.filter((r) => r.email).map((r) => ({ email: r.email! })))).map((x) => x.email));
   for (const r of parsed.rows) if (r.email && !okEmails.has(r.email)) r.email = null;
@@ -144,5 +149,13 @@ export async function importLeadsCsv(text: string): Promise<{ ok: true; added: n
     return { added, skipped };
   });
   if (added) await emitLeadsCreated(workspace.id, since);
+  await track({
+    workspaceId: workspace.id,
+    userId: user.id,
+    kind: "csv_import",
+    area: "prospecting",
+    outcome: added ? (parsed.errors.length ? "warning" : "success") : "warning",
+    summary: `Imported a CSV: ${added} added, ${skipped} already there${parsed.errors.length ? `, ${parsed.errors.length} row${parsed.errors.length === 1 ? "" : "s"} with problems` : ""}`,
+  });
   return { ok: true, added, skipped, errors: parsed.errors.slice(0, 20) };
 }

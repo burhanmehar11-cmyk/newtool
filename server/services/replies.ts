@@ -1,4 +1,5 @@
 import "server-only";
+import { notifyWorkspace } from "@/server/events";
 import { brand } from "@/config/brand";
 import { configuredSiteUrl } from "@/server/env";
 import { emitWebhook } from "@/server/services/webhooks";
@@ -62,6 +63,16 @@ async function syncMailbox(box: MailboxForSync, summary: SyncSummary) {
       );
       if (!added) continue;
       summary.newReplies++;
+      if (c.kind !== "out_of_office") {
+        const who = m.from.replace(/<.*>/, "").trim() || m.fromEmail;
+        await notifyWorkspace(t.workspace_id, "reply", {
+          title: c.kind === "bounce" ? "An email bounced" : c.kind === "interested" ? `Interested reply from ${who}` : `New reply from ${who}`,
+          body: c.kind === "bounce" ? "The address rejected the email, so it's on your do-not-contact list now." : m.text.replace(/\s+/g, " ").slice(0, 160),
+          href: `/app/inbox/${t.id}`,
+          level: c.kind === "bounce" ? "warning" : c.kind === "interested" ? "success" : "info",
+          dedupeKey: `reply:${m.id}`,
+        });
+      }
       await emitWebhook(t.workspace_id, "reply.received", m.id, {
         thread_id: t.id,
         campaign_id: t.campaign_id,
