@@ -2,13 +2,18 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { LogoMark } from "@/components/brand/logo";
 import { brand } from "@/config/brand";
+import { Suspense } from "react";
 import { AttributionCapture } from "@/components/attribution-capture";
+import { ScrollToTop } from "@/components/scroll-to-top";
 
 /** Full-screen layout for sign-in, sign-up and password pages. */
 export default function AuthLayout({ children }: LayoutProps<"/">) {
   return (
     <div className="on-dark relative flex min-h-dvh flex-col overflow-hidden bg-midnight text-white">
       <AttributionCapture />
+      <Suspense fallback={null}>
+        <ScrollToTop />
+      </Suspense>
       <div aria-hidden className="pointer-events-none absolute inset-0">
         <div className="absolute -top-48 left-1/2 h-[560px] w-[960px] -translate-x-1/2 rounded-full bg-mint/[0.09] blur-3xl" />
         <div className="absolute -bottom-40 -left-40 h-[420px] w-[520px] rounded-full bg-green/30 blur-3xl" />

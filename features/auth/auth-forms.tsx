@@ -219,14 +219,8 @@ export function SignUpForm({ emailEnabled, trialDays, open }: { emailEnabled: bo
   return (
     <>
       <UrlError />
-      <div className="mb-5 rounded-xl border border-mint/25 bg-mint/[0.07] px-4 py-3 text-center">
-        <p className="text-[15px] font-semibold text-white">
-          {trialDays}-day free trial{plan ? ` of ${plan}` : ""}
-        </p>
-        <p className="mt-0.5 text-[13px] text-fog">No card needed to start.</p>
-      </div>
-      <GoogleButton next={safeNextPath(params.get("next"))} label="Start free trial with Google" />
-      <Divider>Or start with email</Divider>
+      <GoogleButton next={safeNextPath(params.get("next"))} label="Sign up with Google" />
+      <Divider>Or create an account with email</Divider>
       {emailEnabled ? (
         <form action={action} className="space-y-5" noValidate>
           <input ref={srcRef} type="hidden" name="src" defaultValue="" />
@@ -242,7 +236,7 @@ export function SignUpForm({ emailEnabled, trialDays, open }: { emailEnabled: bo
           />
           <DarkField name="password" label="Password" type="password" autoComplete="new-password" placeholder="At least 10 characters" error={state.fieldErrors?.password} />
           {state.error ? <Notice tone="danger">{state.error}</Notice> : null}
-          <Submit pending={pending}>Start free trial</Submit>
+          <Submit pending={pending}>{`Start ${trialDays}-day free trial${plan ? ` of ${plan}` : ""}`}</Submit>
         </form>
       ) : (
         <Notice tone="warn">Email sign-up isn&apos;t available yet. Continue with Google above.</Notice>
