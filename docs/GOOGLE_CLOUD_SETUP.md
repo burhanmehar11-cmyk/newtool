@@ -313,6 +313,17 @@ Do these in order. Nothing breaks in between: the old `*.vercel.app` address kee
 - Google Maps key: if you restricted it by website (HTTP referrers), add `locenti.com`. Server-side keys restricted by IP or API need no change.
 - Paddle, when you set up billing: add `locenti.com` as your approved domain and use `https://locenti.com/api/billing/paddle` for the webhook (Part K).
 
+## Part M: Showing up in Google and AI search
+
+Locenti already gives search engines what they need: page titles and descriptions, a canonical address, `sitemap.xml`, `robots.txt`, structured data (company, logo, product with free trial, FAQ) and `/llms.txt`, a plain summary for AI tools. What's left needs your accounts:
+
+1. **Google Search Console** (the `locenti.com` Domain property from Part L) → **Sitemaps** → submit `https://locenti.com/sitemap.xml`. Then **URL inspection** → `https://locenti.com/` → **Request indexing**.
+2. **Bing Webmaster Tools** (bing.com/webmasters): sign in → **Import from Google Search Console** (quickest; no tag needed). Bing's index also feeds ChatGPT search and Microsoft Copilot. If you add the site by hand instead, choose the **HTML meta tag** method, put its `content` value in Vercel as `BING_SITE_VERIFICATION`, redeploy, then verify.
+3. **Profiles that point back to locenti.com** help Google and AI tools recognise "Locenti" as your company: a LinkedIn company page, an X/Twitter account, and later Product Hunt or Crunchbase. Use the same name, logo (`public/brand/locentio-logo-512.png`) and one-line description everywhere. Send me the links and I'll add them to the site's structured data.
+4. **Check it**: Google's Rich Results Test (search.google.com/test/rich-results) on `https://locenti.com/` should list Organization, Software App and FAQ.
+
+Expect your homepage to appear for "Locenti" within days to a few weeks after indexing; nobody can guarantee the exact position or what an AI answer says, but these steps are what search engines and AI tools use.
+
 ## Part F: First sign-in (owner)
 
 1. Open `https://YOUR-URL/sign-in` → **Continue with Google** → pick a Gmail account that is both a **test user** (Part B) and on `BETA_ALLOWED_EMAILS` (Part E).

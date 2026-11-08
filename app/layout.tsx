@@ -28,13 +28,19 @@ export const metadata: Metadata = {
   applicationName: brand.name,
   openGraph: {
     type: "website",
+    url: "/",
+    locale: "en_US",
     siteName: brand.name,
     title: `${brand.name} · Find local prospects. Give them a reason to reply.`,
     description: brand.description,
   },
   twitter: { card: "summary_large_image" },
-  // Google Search Console ownership check (URL-prefix property, "HTML tag" method). Set GOOGLE_SITE_VERIFICATION.
-  ...(process.env.GOOGLE_SITE_VERIFICATION?.trim() ? { verification: { google: process.env.GOOGLE_SITE_VERIFICATION.trim() } } : {}),
+  // Search engine ownership checks ("HTML tag" method): Google Search Console (GOOGLE_SITE_VERIFICATION)
+  // and Bing Webmaster Tools, which also feeds ChatGPT search and Copilot (BING_SITE_VERIFICATION).
+  verification: {
+    ...(process.env.GOOGLE_SITE_VERIFICATION?.trim() ? { google: process.env.GOOGLE_SITE_VERIFICATION.trim() } : {}),
+    ...(process.env.BING_SITE_VERIFICATION?.trim() ? { other: { "msvalidate.01": process.env.BING_SITE_VERIFICATION.trim() } } : {}),
+  },
 };
 
 export const viewport: Viewport = {

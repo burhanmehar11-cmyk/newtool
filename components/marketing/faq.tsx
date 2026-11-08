@@ -2,41 +2,8 @@ import Link from "next/link";
 import { ChevronDown } from "lucide-react";
 import { LogoMark } from "@/components/brand/logo";
 import { Button } from "@/components/ui/button";
+import { faqs } from "@/lib/faq";
 
-const faqs: { q: string; a: React.ReactNode }[] = [
-  {
-    q: "Does AI write the emails?",
-    a: "Yes, two ways. The built-in AI writer drafts each first email from the lead's research and your pitch. Or connect your own AI agent (Claude, Cursor or any MCP client) and it can search, research and write inside your workspace using your own AI account. Either way, every email is based on facts with sources, and nothing is sent until you approve it.",
-  },
-  {
-    q: "Where does lead data come from?",
-    a: "Business listings come from Google Maps, through Google's official Places API (never scraping), or from OpenStreetMap's free open map data. Google results are shown live and not stored, as Google's terms require. Locenti then reads each business's public website (respecting robots.txt) for contact details and research. Every fact shows its source and the date it was collected.",
-  },
-  {
-    q: "What does email verification mean?",
-    a: "A verification provider checks whether an address is likely to accept mail. Results are valid, invalid, catch-all or unknown, each with the provider and time of the check. Verification reduces uncertainty. It does not guarantee delivery or that a person reads the email.",
-  },
-  {
-    q: "Are messages reviewed before they're sent?",
-    a: "Yes. You approve the exact campaign version: recipients, sequence and every draft. Editing approved content removes the approval until you review it again. Suggested replies stay drafts until you send them.",
-  },
-  {
-    q: "Do I connect my own mailbox?",
-    a: "Yes. Locenti works with Gmail, connected separately from your sign-in with send-only access: Locenti can send from your address but can't read your inbox. Each mailbox has its own daily limit.",
-  },
-  {
-    q: "How is usage charged?",
-    a: "Usage is counted in units: one per business returned by a search, one per address verified, one per brief or draft generated. You see the estimate before work starts and the actual use afterwards. Failed work is not charged, and retries never charge twice. Prices have not been set yet.",
-  },
-  {
-    q: "How does an agency organise its work?",
-    a: "Everyone works in one shared workspace: invite teammates as admins or members, and clients as read-only viewers. Admins connect mailboxes and approve campaigns; members find leads, research and write; viewers can look but not change anything. Saved lists, tags, notes and a do-not-contact list keep the work organised.",
-  },
-  {
-    q: "Is this compliant with email law where I work?",
-    a: "Outreach rules differ by country and by recipient type. The product will give you controls such as sender identity, a business address, visible opt-out and suppression. It can't make a campaign compliant on your behalf, so check the rules for your market.",
-  },
-];
 
 export function Faq() {
   return (
