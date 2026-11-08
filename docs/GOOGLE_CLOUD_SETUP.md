@@ -277,6 +277,42 @@ While the consent screen's publishing status is **Testing**, Google gives connec
 
 Locenti also rechecks a mailbox marked for reconnecting before asking (on the Mailboxes page, when launching or resuming a campaign, and before each sending pass), so a passing Google error or a Gmail API that was off for a while no longer leaves it stuck.
 
+## Part L: Your own domain (locenti.com)
+
+Do these in order. Nothing breaks in between: the old `*.vercel.app` address keeps working until step 3, and afterwards it forwards to locenti.com.
+
+**1. Add the domain in Vercel**
+- Vercel → your project → **Settings → Domains** → **Add** → `locenti.com`. When asked, also add `www.locenti.com` and choose to redirect it to `locenti.com`.
+- Vercel then shows the DNS records to create (usually an **A** record for `locenti.com` and a **CNAME** for `www`). Copy the exact values Vercel shows; they can differ per project.
+
+**2. Point the domain at Vercel** (at the company you bought the domain from)
+- Open its **DNS** settings for locenti.com and create the records from step 1. Delete any other A record on `@` (often a "parking page" record), but keep MX and TXT records.
+- Wait until Vercel shows both domains as **Valid Configuration** (minutes, sometimes a few hours). Vercel issues the HTTPS certificate itself.
+
+**3. Tell Locenti its address**
+- Vercel → **Settings → Environment Variables** → `NEXT_PUBLIC_SITE_URL` = `https://locenti.com` (Production) → **Redeploy**.
+- From this deploy on, visits to the old `newtool-rho.vercel.app` address (except `/api/...`) forward to `https://locenti.com` with the same path. Everyone signs in once more on the new domain (sign-in is stored per address).
+
+**4. Google sign-in and Gmail connection** (Google Cloud → APIs & Services → **Credentials** → your OAuth client; and the Gmail client too if you made a separate one)
+- **Authorised JavaScript origins**: add `https://locenti.com`.
+- **Authorised redirect URIs**: add `https://locenti.com/api/auth/google/callback` and `https://locenti.com/api/gmail/callback`.
+- Keep the old vercel.app entries for a week, then remove them.
+- Already-connected Gmail mailboxes keep working; nothing needs reconnecting because of the domain.
+
+**5. Branding page and verification** (Google Cloud → Google Auth Platform → **Branding**)
+- Home page `https://locenti.com`, privacy policy `https://locenti.com/legal/privacy`, terms `https://locenti.com/legal/terms`.
+- **Authorised domains**: add `locenti.com`.
+- Prove you own it in **Search Console** (search.google.com/search-console), signed in with the account that owns the Google Cloud project: **Add property → Domain** → `locenti.com` → copy the **TXT** record → add it in your domain's DNS → **Verify**. This replaces the HTML-tag method and fixes "The website of your home page URL is not registered to you".
+- Wait 24 hours, then submit the app for verification again (scopes as in Part J).
+
+**6. The contact mailbox** (`hello@locenti.com`, shown on the legal pages and in the Google consent screen)
+- It must receive email. Free options: your registrar's email forwarding, or Cloudflare Email Routing if your DNS is on Cloudflare; forward it to your Gmail. A paid Google Workspace mailbox also works.
+- Account emails (confirm your email, password reset) still go out from your connected Gmail or SMTP, as before.
+
+**7. Optional**
+- Google Maps key: if you restricted it by website (HTTP referrers), add `locenti.com`. Server-side keys restricted by IP or API need no change.
+- Paddle, when you set up billing: add `locenti.com` as your approved domain and use `https://locenti.com/api/billing/paddle` for the webhook (Part K).
+
 ## Part F: First sign-in (owner)
 
 1. Open `https://YOUR-URL/sign-in` → **Continue with Google** → pick a Gmail account that is both a **test user** (Part B) and on `BETA_ALLOWED_EMAILS` (Part E).
