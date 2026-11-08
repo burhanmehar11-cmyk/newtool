@@ -23,7 +23,7 @@ const STEPS: Step[] = [
   { target: "/app/leads", title: "Leads", body: "Businesses you saved. Open one to see what its website shows, research it, add notes, or import and export leads as a CSV file." },
   { target: "/app/campaigns", title: "Campaigns", body: "Pick leads, and Locenti writes a personal first email for each. You review every message and approve; nothing is sent before that. Pause, resume or edit any time." },
   { target: "/app/inbox", title: "Inbox", body: "Replies to your campaigns, sorted into interested, not interested and out of office. Answer them from your Gmail." },
-  { target: "/app/notifications", title: "Notifications", body: "Everything that needs your attention: new replies, campaigns starting and finishing, a mailbox that needs reconnecting, teammates joining." },
+  { target: "/app/notifications", title: "Notifications", body: "The bell on your workspace card. A number means something new: replies, campaigns starting and finishing, a mailbox that needs reconnecting, teammates joining." },
   { target: "/app/analytics", title: "Analytics", body: "How your campaigns are doing: emails sent, reply rate and which campaigns get interested replies." },
   { target: "/app/agent", title: "Agent", body: "Optional: connect your own AI app (Claude, Cursor and others) to search, research and draft campaigns for you. It can't send; you still approve." },
   { target: "/app/team", title: "Team", body: "Invite teammates to your workspace as admins, members or view-only clients." },

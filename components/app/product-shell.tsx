@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, Bell, Bot, CreditCard, Inbox, LayoutDashboard, LogOut, Mail, Menu, Search, Send, Settings, Users, UsersRound } from "lucide-react";
+import { BarChart3, Bot, CreditCard, Inbox, LayoutDashboard, LogOut, Mail, Menu, Search, Send, Settings, Users, UsersRound } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogTrigger, SheetCloseButton, SheetContent } from "@/components/ui/sheet";
@@ -11,7 +11,6 @@ import { cn } from "@/lib/utils";
 import { signOutAction } from "@/server/actions/auth";
 import { ThemeToggle, useAppTheme } from "@/components/app/theme-toggle";
 import { AutoSender } from "@/components/app/auto-sender";
-import { useUnreadNotifications } from "@/features/product/notifications";
 import { ProductTour, TakeTourButton } from "@/features/product/tour";
 
 /**
@@ -24,7 +23,6 @@ const nav = [
   { href: "/app/leads", label: "Leads", icon: Users },
   { href: "/app/campaigns", label: "Campaigns", icon: Send },
   { href: "/app/inbox", label: "Inbox", icon: Inbox },
-  { href: "/app/notifications", label: "Notifications", icon: Bell },
   { href: "/app/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/app/mailboxes", label: "Mailboxes", icon: Mail },
   { href: "/app/agent", label: "Agent", icon: Bot },
@@ -87,7 +85,6 @@ function ActiveNav({ onNavigate }: { onNavigate?: () => void }) {
 }
 
 function NavLinks({ pathname, onNavigate }: { pathname: string | null; onNavigate?: () => void }) {
-  const unread = useUnreadNotifications(pathname);
   return (
     <nav className="flex-1 space-y-0.5 px-3" aria-label="Product">
       {nav.map(({ href, label, icon: Icon }) => {
@@ -106,12 +103,6 @@ function NavLinks({ pathname, onNavigate }: { pathname: string | null; onNavigat
           >
             <Icon aria-hidden className="size-[18px]" />
             {label}
-            {href === "/app/notifications" && unread ? (
-              <span className={cn("ml-auto rounded-full px-1.5 py-0.5 text-[11px] font-semibold tabular-nums", active ? "bg-white/15 text-white" : "bg-green text-white")}>
-                {unread > 99 ? "99+" : unread}
-                <span className="sr-only"> unread</span>
-              </span>
-            ) : null}
           </Link>
         );
       })}

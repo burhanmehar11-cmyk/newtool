@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import { AlertTriangle, Bell, CheckCheck, CircleCheck, CircleX, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { markAllNotificationsReadAction, markNotificationReadAction, unreadNotificationsAction } from "@/server/actions/notifications";
@@ -78,7 +79,30 @@ export function MarkAllRead() {
   );
 }
 
-/** Unread count for the sidebar: checked on load, every minute, when the tab comes back, and after reading. */
+/** Bell on the workspace card: opens Notifications and shows how many are unread. */
+export function NotificationBell({ className }: { className?: string }) {
+  const pathname = usePathname();
+  const unread = useUnreadNotifications(pathname);
+  const active = pathname?.startsWith("/app/notifications");
+  return (
+    <Link
+      href="/app/notifications"
+      aria-label={unread ? `Notifications, ${unread} unread` : "Notifications"}
+      aria-current={active ? "page" : undefined}
+      data-tour="/app/notifications"
+      className={cn("relative inline-flex size-8 shrink-0 items-center justify-center rounded-lg text-slate transition-colors hover:bg-ink/[0.06] hover:text-ink", active && "bg-ink/[0.06] text-ink", className)}
+    >
+      <Bell aria-hidden className="size-[18px]" />
+      {unread ? (
+        <span aria-hidden className="absolute -right-1 -top-1 min-w-[18px] rounded-full bg-green px-1 text-center text-[10.5px] font-semibold leading-[18px] text-white ring-2 ring-surface">
+          {unread > 99 ? "99+" : unread}
+        </span>
+      ) : null}
+    </Link>
+  );
+}
+
+/** Unread count for the bell: checked on load, every minute, when the tab comes back, and after reading. */
 export function useUnreadNotifications(pathname: string | null) {
   const [count, setCount] = React.useState(0);
   React.useEffect(() => {
