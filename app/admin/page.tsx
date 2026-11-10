@@ -6,6 +6,7 @@ import { LogoMark } from "@/components/brand/logo";
 import { Skeleton } from "@/components/ui/misc";
 import { ActivityTab, AdminsTab, ApisTab, EmailsTab, FunnelTab, OverviewTab, RevenueTab, UsageTab, UsersTab, WorkspacesTab } from "@/features/admin/sections";
 import { ADMIN_TABS, getAdminTab, type AdminTab } from "@/server/services/admin";
+import { AnnouncementsTab } from "@/features/admin/announcements";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Admin · Locenti", robots: { index: false, follow: false } };
@@ -18,6 +19,7 @@ const LABELS: Record<AdminTab, string> = {
   workspaces: "Workspaces & plans",
   usage: "Product usage",
   emails: "Emails",
+  announcements: "Announcements",
   apis: "Shared APIs",
   revenue: "Revenue",
   admins: "Admins",
@@ -112,6 +114,7 @@ async function Admin({ searchParams }: { searchParams: PageProps<"/admin">["sear
         {d.tab === "apis" ? <ApisTab d={d} days={days} /> : null}
         {d.tab === "revenue" ? <RevenueTab d={d} days={days} /> : null}
         {d.tab === "admins" ? <AdminsTab d={d} /> : null}
+        {d.tab === "announcements" ? <AnnouncementsTab /> : null}
       </main>
     </>
   );

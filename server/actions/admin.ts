@@ -8,3 +8,27 @@ export async function setPlanAction(input: { workspaceId: string; plan: string; 
   if (r.ok) revalidatePath("/admin");
   return r;
 }
+
+export async function sendAnnouncementTestAction(input: { template: string | null; subject: string; body: string }) {
+  const { sendAnnouncementTest } = await import("@/server/services/announcements");
+  return sendAnnouncementTest(input);
+}
+
+export async function startAnnouncementAction(input: { template: string | null; subject: string; body: string; confirm: boolean }) {
+  const { startAnnouncement } = await import("@/server/services/announcements");
+  return startAnnouncement(input);
+}
+
+export async function continueAnnouncementAction(id: string) {
+  const { continueAnnouncement } = await import("@/server/services/announcements");
+  const r = await continueAnnouncement(id);
+  if (r.ok && r.done) revalidatePath("/admin");
+  return r;
+}
+
+export async function stopAnnouncementAction(id: string) {
+  const { stopAnnouncement } = await import("@/server/services/announcements");
+  const r = await stopAnnouncement(id);
+  revalidatePath("/admin");
+  return r;
+}

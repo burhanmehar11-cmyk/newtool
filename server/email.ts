@@ -70,12 +70,19 @@ export async function emailChannel(): Promise<{ kind: "smtp" } | { kind: "gmail"
 
 let transport: Transporter | null = null;
 
-export async function sendEmail(to: string, subject: string, text: string) {
+/**
+ * `from` asks for a different sender address (e.g. hello@locenti.com). Over
+ * SMTP it's used as is; through Gmail it only shows if that address is set up
+ * in Gmail as "Send mail as", otherwise Gmail shows the mailbox's own address.
+ */
+export type SendOptions = { replyTo?: string; headers?: Record<string, string>; from?: string };
+
+export async function sendEmail(to: string, subject: string, text: string, opts: SendOptions = {}) {
   const url = process.env.SMTP_URL?.trim();
   if (url) {
     transport ??= nodemailer.createTransport(url);
-    const from = process.env.EMAIL_FROM?.trim() || decodeURIComponent(new URL(url).username) || undefined;
-    await transport.sendMail({ from: from ? `${brand.name} <${from}>` : undefined, to, subject, text });
+    const from = opts.from || process.env.EMAIL_FROM?.trim() || decodeURIComponent(new URL(url).username) || undefined;
+    await transport.sendMail({ from: from ? `${brand.name} <${from}>` : undefined, to, subject, text, replyTo: opts.replyTo, headers: opts.headers });
     return;
   }
   const box = await systemMailbox();
@@ -86,7 +93,7 @@ export async function sendEmail(to: string, subject: string, text: string) {
     mailboxCache = null;
     throw new Error(token.message);
   }
-  const sent = await sendRaw(token.token, toGmailRaw(buildMessage({ from: { email: box.email, name: brand.name }, to, subject, text })));
+  const sent = await sendRaw(token.token, toGmailRaw(buildMessage({ from: { email: opts.from || box.email, name: brand.name }, to, subject, text, replyTo: opts.replyTo ?? null, headers: opts.headers })));
   if (!sent.ok) throw new Error(sent.message);
 }
 

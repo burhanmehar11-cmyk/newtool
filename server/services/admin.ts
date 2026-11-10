@@ -27,7 +27,7 @@ export async function isAdmin() {
   return isAdminEmail(user?.email);
 }
 
-export const ADMIN_TABS = ["overview", "activity", "funnel", "users", "workspaces", "usage", "emails", "apis", "revenue", "admins"] as const;
+export const ADMIN_TABS = ["overview", "activity", "funnel", "users", "workspaces", "usage", "emails", "announcements", "apis", "revenue", "admins"] as const;
 export type AdminTab = (typeof ADMIN_TABS)[number];
 
 export async function getAdminTab(tab: AdminTab, days: number, search: string, filter = "all") {
@@ -59,6 +59,9 @@ export async function getAdminTab(tab: AdminTab, days: number, search: string, f
         const cfg = billingConfig();
         return { tab, overview: await store.overview(q, trial), paying: (await store.workspaces(q, trial, "")).filter((w) => w.plan === "paid" || w.plan === "comp"), billing, configured: { checkout: cfg.checkoutReady, webhook: cfg.webhookReady, environment: cfg.environment, enforce: cfg.enforce } };
       }
+      case "announcements":
+        // Loaded by its own section (it sends email, so it has its own service).
+        return { tab };
       case "admins": {
         const emails = adminEmails();
         const accounts = await store.accountsFor(q, emails);
