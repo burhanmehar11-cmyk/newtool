@@ -98,4 +98,39 @@ describe("generateJson", () => {
     expect(r).toMatchObject({ ok: false, message: expect.stringMatching(/gemini-old-flash/) });
     expect(r).not.toHaveProperty("status");
   });
+
+  it("retries a busy model, then answers with the next best model", async () => {
+    vi.resetModules();
+    const g = await import("@/server/ai/gemini");
+    vi.stubEnv("GEMINI_API_KEY", "k");
+    const calls: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      if (url.includes("/models?")) return new Response(JSON.stringify({ models: [
+        { name: `models/${g.DEFAULT_GEMINI_MODEL}`, supportedGenerationMethods: ["generateContent"] },
+        { name: "models/gemini-3-flash", supportedGenerationMethods: ["generateContent"] },
+        { name: "models/gemini-3.8-flash-lite", supportedGenerationMethods: ["generateContent"] },
+      ] }), { status: 200 });
+      const model = /models\/([^:]+):/.exec(url)![1];
+      calls.push(model);
+      if (model === "gemini-3-flash") return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: '{"answer":"ok"}' }] }, finishReason: "STOP" }] }), { status: 200 });
+      return new Response(JSON.stringify({ error: { status: "UNAVAILABLE", message: "This model is currently experiencing high demand." } }), { status: 503 });
+    }));
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    expect(await g.generateJson("s", "u", {})).toEqual({ ok: true, text: '{"answer":"ok"}' });
+    expect(calls).toEqual([g.DEFAULT_GEMINI_MODEL, g.DEFAULT_GEMINI_MODEL, "gemini-3-flash"]);
+  });
+
+  it("says the AI is busy when every model is", async () => {
+    vi.resetModules();
+    const g = await import("@/server/ai/gemini");
+    vi.stubEnv("GEMINI_API_KEY", "k");
+    vi.stubGlobal("fetch", vi.fn(async (url: string) =>
+      url.includes("/models?")
+        ? new Response(JSON.stringify({ models: [{ name: "models/gemini-3-flash", supportedGenerationMethods: ["generateContent"] }] }), { status: 200 })
+        : new Response(JSON.stringify({ error: { status: "UNAVAILABLE", message: "high demand" } }), { status: 503 }),
+    ));
+    const r = await g.generateJson("s", "u", {});
+    expect(r).toMatchObject({ ok: false, code: "busy", message: expect.stringMatching(/busy/) });
+    expect(r).not.toHaveProperty("retryable");
+  });
 });

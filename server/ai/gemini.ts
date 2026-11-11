@@ -29,15 +29,27 @@ export function flashVersion(name: string) {
   return m ? Number(m[1]) : null;
 }
 
-/** Asks Google which models this key can use and picks the newest plain Flash model. */
-async function discoverModel(key: string): Promise<string | null> {
-  const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000", { headers: { "x-goog-api-key": key }, signal: AbortSignal.timeout(10_000), cache: "no-store" }).catch(() => null);
-  if (!res?.ok) return null;
+/** Version of a "gemini-<n>-flash-lite" model, or null. Used only as a backup when Flash models are busy. */
+function liteVersion(name: string) {
+  const m = /^(?:models\/)?gemini-(\d+(?:\.\d+)?)-flash-lite$/.exec(name);
+  return m ? Number(m[1]) : null;
+}
+
+/**
+ * The models this key can use, best first: plain Flash models newest first,
+ * then Flash-Lite. Asked of Google at most every 10 minutes.
+ */
+let modelList: { at: number; models: string[] } | null = null;
+export async function availableModels(key: string): Promise<string[]> {
+  if (modelList && Date.now() - modelList.at < 10 * 60_000) return modelList.models;
+  const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000", { headers: { "x-goog-api-key": key }, signal: AbortSignal.timeout(8_000), cache: "no-store" }).catch(() => null);
+  if (!res?.ok) return [];
   const json = (await res.json().catch(() => ({}))) as { models?: { name?: string; supportedGenerationMethods?: string[] }[] };
-  const best = (json.models ?? [])
-    .filter((m) => m.name && (m.supportedGenerationMethods ?? []).includes("generateContent") && flashVersion(m.name) !== null)
-    .sort((a, b) => flashVersion(b.name!)! - flashVersion(a.name!)!)[0];
-  return best?.name?.replace(/^models\//, "") ?? null;
+  const usable = (json.models ?? []).filter((m) => m.name && (m.supportedGenerationMethods ?? []).includes("generateContent")).map((m) => m.name!.replace(/^models\//, ""));
+  const flash = usable.filter((n) => flashVersion(n) !== null).sort((a, b) => flashVersion(b)! - flashVersion(a)!);
+  const lite = usable.filter((n) => liteVersion(n) !== null).sort((a, b) => liteVersion(b)! - liteVersion(a)!);
+  modelList = { at: Date.now(), models: [...flash, ...lite] };
+  return modelList.models;
 }
 
 /** Thinking can be fully switched off only on 2.x Flash models; newer ones get more room instead. */
@@ -47,36 +59,65 @@ function thinkingOff(model: string) {
 
 export type GeminiResult =
   | { ok: true; text: string }
-  | { ok: false; code: "not_configured" | "auth" | "quota" | "blocked" | "error"; message: string; /** Google's own words, for logs and admins (never contains the key). */ detail?: string };
+  | { ok: false; code: "not_configured" | "auth" | "quota" | "busy" | "blocked" | "error"; message: string; /** Google's own words, for logs and admins (never contains the key). */ detail?: string };
+
+type Opts = { thinking?: boolean; maxOutputTokens?: number; /** Total time allowed across retries (default 45s). */ budgetMs?: number };
+type Attempt = GeminiResult & { status?: number; retryable?: boolean };
 
 /**
- * `thinking: false` turns off "thinking" on Flash models: much faster for
- * short answers, and thinking can't use up the output allowance and leave
- * the reply empty. (Pro models can't turn it off, so it's left alone there.)
+ * `thinking: false` turns off "thinking" where the model allows it (2.x
+ * Flash): much faster for short answers. When Google says the model is
+ * busy (503) or it times out, it retries once and then tries the next best
+ * model this key can use, within `budgetMs`. A retired model (404) is
+ * replaced by the newest Flash model, unless GEMINI_MODEL picks one.
  */
-export async function generateJson(system: string, user: string, schema: object, opts: { thinking?: boolean; maxOutputTokens?: number } = {}): Promise<GeminiResult> {
+export async function generateJson(system: string, user: string, schema: object, opts: Opts = {}): Promise<GeminiResult> {
   const key = geminiKey();
   if (!key) return { ok: false, code: "not_configured", message: "The AI writer isn't set up on this server (GEMINI_API_KEY is missing)." };
-  const first = await callModel(key, geminiModel(), system, user, schema, opts);
-  // The model was retired (or never existed for this key): find the newest one this key can use, once, and retry.
-  if (!first.ok && first.status === 404 && !configuredModel()) {
-    const next = await discoverModel(key);
-    if (next && next !== geminiModel()) {
+  const deadline = Date.now() + (opts.budgetMs ?? 45_000);
+  const left = () => deadline - Date.now();
+  const primary = geminiModel();
+  let r: Attempt = await callModel(key, primary, system, user, schema, opts, left());
+  if (r.ok) return r;
+
+  if (r.status === 404 && !configuredModel()) {
+    const next = (await availableModels(key)).find((m) => flashVersion(m) !== null && m !== primary);
+    if (next) {
       discovered = next;
-      console.warn(`[gemini] model unavailable; switched to ${next}`);
-      return strip(await callModel(key, next, system, user, schema, opts));
+      console.warn(`[gemini] ${primary} unavailable; switched to ${next}`);
+      r = await callModel(key, next, system, user, schema, opts, left());
+      if (r.ok) return r;
     }
   }
-  return strip(first);
+
+  if (r.retryable) {
+    const current = geminiModel();
+    if (left() > 6_000) {
+      await new Promise((ok) => setTimeout(ok, 800));
+      r = await callModel(key, current, system, user, schema, opts, left());
+      if (r.ok) return r;
+    }
+    for (const backup of (await availableModels(key)).filter((m) => m !== current).slice(0, 3)) {
+      if (!r.retryable || left() < 4_000) break;
+      r = await callModel(key, backup, system, user, schema, opts, left());
+      if (r.ok) {
+        console.warn(`[gemini] ${current} busy; answered with ${backup}`);
+        return r;
+      }
+    }
+  }
+  return strip(r);
 }
 
-function strip(r: GeminiResult & { status?: number }): GeminiResult {
-  const { status: _status, ...rest } = r;
+function strip(r: Attempt): GeminiResult {
+  const { status: _status, retryable: _retryable, ...rest } = r;
   void _status;
+  void _retryable;
   return rest as GeminiResult;
 }
 
-async function callModel(key: string, model: string, system: string, user: string, schema: object, opts: { thinking?: boolean; maxOutputTokens?: number }): Promise<GeminiResult & { status?: number }> {
+async function callModel(key: string, model: string, system: string, user: string, schema: object, opts: Opts, timeoutMs: number): Promise<Attempt> {
+  if (timeoutMs < 1_000) return { ok: false, code: "busy", message: "The AI took too long. Try again.", retryable: false };
   const noThinking = opts.thinking === false && thinkingOff(model);
   // Where thinking can't be switched off it shares the output allowance, so leave room for the answer.
   const maxOutputTokens = opts.thinking === false && !noThinking ? Math.max(opts.maxOutputTokens ?? 2048, 4096) : (opts.maxOutputTokens ?? 2048);
@@ -94,10 +135,10 @@ async function callModel(key: string, model: string, system: string, user: strin
         ...(noThinking ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
       },
     }),
-    signal: AbortSignal.timeout(45_000),
+    signal: AbortSignal.timeout(timeoutMs),
     cache: "no-store",
   }).catch((e: Error) => (e.name === "TimeoutError" ? "timeout" : null));
-  if (res === "timeout") return { ok: false, code: "error", message: "The AI took too long. Try again." };
+  if (res === "timeout") return { ok: false, code: "busy", message: "The AI took too long. Try again.", detail: `${model}: timed out`, retryable: true };
   if (!res) return { ok: false, code: "error", message: "Couldn't reach the AI service." };
   const json = (await res.json().catch(() => ({}))) as {
     candidates?: { content?: { parts?: { text?: string }[] }; finishReason?: string }[];
@@ -112,6 +153,7 @@ async function callModel(key: string, model: string, system: string, user: strin
   if (res.status === 400 && /API key/i.test(json.error?.message ?? "")) return { ok: false, code: "auth", message: "Google rejected the Gemini API key.", detail };
   if (res.status === 401 || res.status === 403) return { ok: false, code: "auth", message: "Google rejected the Gemini API key.", detail };
   if (res.status === 404) return { ok: false, code: "error", message: `The AI model "${model}" isn't available. Check GEMINI_MODEL.`, detail, status: 404 };
+  if (res.status === 500 || res.status === 503 || res.status === 504) return { ok: false, code: "busy", message: "The AI is very busy right now. Try again in a moment.", detail: `${model}: ${detail ?? `HTTP ${res.status}`}`, retryable: true };
   if (!res.ok) return { ok: false, code: "error", message: `The AI service returned an error (HTTP ${res.status}).`, detail };
   if (json.promptFeedback?.blockReason) return { ok: false, code: "blocked", message: "The AI declined to write this email." };
   const c = json.candidates?.[0];
