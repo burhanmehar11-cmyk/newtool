@@ -39,3 +39,8 @@ export async function adminStartSupportAction(input: { userId: string; subject: 
   if (r.ok) revalidatePath("/admin");
   return r;
 }
+
+export async function askHelpAction(messages: { role: "user" | "assistant"; text: string }[]) {
+  const { askHelpAssistant } = await import("@/server/services/help-assistant");
+  return askHelpAssistant({ messages });
+}

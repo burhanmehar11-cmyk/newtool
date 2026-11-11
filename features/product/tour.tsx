@@ -29,6 +29,7 @@ const STEPS: Step[] = [
   { target: "/app/team", title: "Team", body: "Invite teammates to your workspace as admins, members or view-only clients." },
   { target: "/app/billing", title: "Billing", body: "Your plan and your free trial." },
   { target: "/app/settings", title: "Settings", body: "Your offer (what you sell, your tone and signature), which Locenti uses to write every email. Keep it up to date for better emails." },
+  { target: "/app/support", title: "Help & Support", body: "Stuck? Quick picks answer the common questions in seconds, the assistant explains how anything works, and the team replies to requests, usually within a day." },
   { title: "You're ready", body: "Best first steps: connect your mailbox, check your offer in Settings, then run your first search in Discover. You can replay this tour from the sidebar any time." },
 ];
 

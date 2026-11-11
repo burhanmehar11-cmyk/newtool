@@ -8,6 +8,7 @@ import { ActivityTab, AdminsTab, ApisTab, EmailsTab, FunnelTab, OverviewTab, Rev
 import { ADMIN_TABS, getAdminTab, type AdminTab } from "@/server/services/admin";
 import { AnnouncementsTab } from "@/features/admin/announcements";
 import { SupportTab } from "@/features/admin/support";
+import { supportBadge } from "@/server/services/support";
 
 const str = (v: string | string[] | undefined) => (typeof v === "string" ? v : undefined);
 import { cn } from "@/lib/utils";
@@ -57,7 +58,7 @@ async function Admin({ searchParams }: { searchParams: PageProps<"/admin">["sear
   const days = PERIODS.includes(Number(sp.days)) ? Number(sp.days) : 30;
   const search = typeof sp.q === "string" ? sp.q.trim().slice(0, 100) : "";
   const filter = typeof sp.f === "string" ? sp.f : "all";
-  const d = await getAdminTab(tab, days, search, filter);
+  const [d, badge] = [await getAdminTab(tab, days, search, filter), await supportBadge()];
   const href = (t: AdminTab, dd = days) => `/admin?tab=${t}${WITH_PERIOD.includes(t) ? `&days=${dd}` : ""}`;
 
   return (
@@ -82,9 +83,18 @@ async function Admin({ searchParams }: { searchParams: PageProps<"/admin">["sear
                 <Link
                   href={href(t)}
                   aria-current={t === tab ? "page" : undefined}
-                  className={cn("block border-b-2 px-3 py-2.5 text-sm font-medium transition-colors", t === tab ? "border-mint text-white" : "border-transparent text-white/60 hover:text-white")}
+                  className={cn("flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-sm font-medium transition-colors", t === tab ? "border-mint text-white" : "border-transparent text-white/60 hover:text-white")}
                 >
                   {LABELS[t]}
+                  {t === "support" && badge.needsReply ? (
+                    <span
+                      className="min-w-[20px] rounded-full bg-red-500 px-1.5 text-center text-[11px] font-bold leading-5 text-white"
+                      title={`${badge.needsReply} waiting on a reply${badge.urgent ? `, ${badge.urgent} urgent` : ""}${badge.overdue ? `, ${badge.overdue} past the reply target` : ""}`}
+                    >
+                      {badge.needsReply > 99 ? "99+" : badge.needsReply}
+                      <span className="sr-only"> waiting on a reply</span>
+                    </span>
+                  ) : null}
                 </Link>
               </li>
             ))}

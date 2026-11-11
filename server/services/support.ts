@@ -11,6 +11,11 @@ import { configuredSiteUrl } from "@/server/env";
 import { notifyWorkspace, track } from "@/server/events";
 import * as store from "@/server/support-store";
 import { requireAdmin } from "@/server/services/admin";
+import { firstNameOf } from "@/lib/announcements";
+
+/** Who is acting in the admin functions: the signed-in admin, or the owner through the admin API. */
+export type SupportActor = { email: string | null };
+const adminOr = async (actor?: SupportActor) => actor ?? (await requireAdmin());
 
 /**
  * Support: people open requests in the app and follow the conversation; the
@@ -62,7 +67,7 @@ const openSchema = z.object({
   body,
 });
 
-export async function openSupportRequest(input: unknown): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+export async function openSupportRequest(input: unknown): Promise<{ ok: true; id: string; ref: string } | { ok: false; error: string }> {
   const user = await requireUser("/app/support");
   const p = openSchema.safeParse(input);
   if (!p.success) return { ok: false, error: p.error.issues[0].message };
@@ -74,12 +79,32 @@ export async function openSupportRequest(input: unknown): Promise<{ ok: true; id
   } catch {
     return { ok: false, error: "Support isn't available just yet. Email us at " + brand.supportEmail + " instead." };
   }
-  await track({ userId: user.id, workspaceId: ws?.id, kind: "support_opened", area: "account", outcome: "info", summary: `Opened a support request: "${p.data.subject}"${p.data.urgent ? " (urgent)" : ""}` });
+  const created = await asQ(user.id, (q) => store.getMyTicket(q, id)).catch(() => null);
+  const ref = created ? store.ticketRef(created.ticket) : store.ticketRef({ id, number: null });
+  await track({ userId: user.id, workspaceId: ws?.id, kind: "support_opened", area: "account", outcome: "info", summary: `Opened support request ${ref}: "${p.data.subject}"${p.data.urgent ? " (urgent)" : ""}` });
+  // Confirmation to the person, with their ticket number.
+  await sendEmail(
+    user.email,
+    `We've received your request [${ref}]`,
+    `Hi ${firstNameOf(null, user.email)},
+
+Thanks for reaching out. We've received your request and someone from our team will get back to you soon, usually within a day.
+
+Ticket: ${ref}
+Subject: ${p.data.subject}
+
+Want to add details or a screenshot? Reply to this email or open your request here:
+${site()}/app/support/${id}
+
+Happy Sending,
+The Locenti Team`,
+    { from: from(), replyTo: brand.supportEmail },
+  ).catch(() => undefined);
   await alertAdmins(
-    `[Support${p.data.urgent ? ", urgent" : ""}] ${p.data.subject}`,
-    `${user.email} opened a support request (${TOPIC_LABEL[p.data.topic]}${p.data.urgent ? ", urgent" : ""}):\n\n${p.data.body}\n\nReply: ${site()}/admin?tab=support&t=${id}`,
+    `[${ref}${p.data.urgent ? ", urgent" : ""}] ${p.data.subject}`,
+    `${user.email} opened ${ref} (${TOPIC_LABEL[p.data.topic]}${p.data.urgent ? ", urgent" : ""}):\n\n${p.data.body}\n\nReply: ${site()}/admin?tab=support&t=${id}`,
   );
-  return { ok: true, id };
+  return { ok: true, id, ref };
 }
 
 export async function replyToMyTicket(id: string, text: unknown): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -89,7 +114,8 @@ export async function replyToMyTicket(id: string, text: unknown): Promise<{ ok: 
   const ok = await asQ(user.id, (q) => store.customerReply(q, id, user.email ?? "", b.data)).catch(() => false);
   if (!ok) return { ok: false, error: "Request not found." };
   const t = await asQ(user.id, (q) => store.getMyTicket(q, id)).catch(() => null);
-  await alertAdmins(`[Support] Re: ${t?.ticket.subject ?? "a request"}`, `${user.email} replied:\n\n${b.data}\n\nReply: ${site()}/admin?tab=support&t=${id}`);
+  const ref = t ? store.ticketRef(t.ticket) : "a request";
+  await alertAdmins(`[${ref}] Re: ${t?.ticket.subject ?? "a request"}`, `${user.email} replied on ${ref}:\n\n${b.data}\n\nReply: ${site()}/admin?tab=support&t=${id}`);
   return { ok: true };
 }
 
@@ -104,8 +130,8 @@ export async function resolveMyTicket(id: string): Promise<{ ok: boolean }> {
 const TABS = ["needs_reply", "waiting", "resolved", "all", "mine"] as const;
 export type SupportTab = (typeof TABS)[number];
 
-export async function getSupportInbox(params: { tab?: string; search?: string; topic?: string; priority?: string; channel?: string; ticket?: string }) {
-  const admin = await requireAdmin();
+export async function getSupportInbox(params: { tab?: string; search?: string; topic?: string; priority?: string; channel?: string; ticket?: string }, actor?: SupportActor) {
+  const admin = await adminOr(actor);
   const sla = supportSlaHours();
   const tab: SupportTab = (TABS as readonly string[]).includes(params.tab ?? "") ? (params.tab as SupportTab) : "needs_reply";
   const pick = <T extends string>(v: string | undefined, allowed: readonly T[]) => ((allowed as readonly string[]).includes(v ?? "") ? (v as T) : null);
@@ -132,8 +158,8 @@ export async function getSupportInbox(params: { tab?: string; search?: string; t
 }
 
 /** Your answer (emailed to them and shown in their app), or an internal note (only admins see it). */
-export async function adminReplyToTicket(id: string, text: unknown, internal: boolean): Promise<{ ok: true } | { ok: false; error: string }> {
-  const admin = await requireAdmin();
+export async function adminReplyToTicket(id: string, text: unknown, internal: boolean, actor?: SupportActor): Promise<{ ok: true } | { ok: false; error: string }> {
+  const admin = await adminOr(actor);
   const b = body.safeParse(text);
   if (!uuid.safeParse(id).success || !b.success) return { ok: false, error: b.success ? "Request not found." : b.error.issues[0].message };
   const t = await svc((q) => store.adminTicket(q, id, supportSlaHours()));
@@ -145,13 +171,14 @@ export async function adminReplyToTicket(id: string, text: unknown, internal: bo
 
 async function tellCustomer(t: store.TicketRow, reply: string) {
   const link = `${site()}/app/support/${t.id}`;
+  const ref = store.ticketRef(t);
   if (t.workspace_id)
-    await notifyWorkspace(t.workspace_id, "support_reply", { title: "Support replied", body: reply.replace(/\s+/g, " ").slice(0, 160), href: `/app/support/${t.id}`, level: "info", to: { userId: t.user_id }, dedupeKey: `support:${t.id}:${Date.now()}` });
-  await sendEmail(t.email, `Re: ${t.subject}`, `${reply}\n\nSee the whole conversation or reply: ${link}\n\nHappy Sending,\nThe Locenti Team`, { from: from(), replyTo: brand.supportEmail }).catch(() => undefined);
+    await notifyWorkspace(t.workspace_id, "support_reply", { title: `We replied to ${ref}`, body: reply.replace(/\s+/g, " ").slice(0, 160), href: `/app/support/${t.id}`, level: "info", to: { userId: t.user_id }, dedupeKey: `support:${t.id}:${Date.now()}` });
+  await sendEmail(t.email, `Re: [${ref}] ${t.subject}`, `${reply}\n\nSee the whole conversation or reply: ${link}\n\nHappy Sending,\nThe Locenti Team`, { from: from(), replyTo: brand.supportEmail }).catch(() => undefined);
 }
 
-export async function adminUpdateTicket(id: string, patch: { status?: string; priority?: string; assignToMe?: boolean; unassign?: boolean; topic?: string }): Promise<{ ok: boolean }> {
-  const admin = await requireAdmin();
+export async function adminUpdateTicket(id: string, patch: { status?: string; priority?: string; assignToMe?: boolean; unassign?: boolean; topic?: string }, actor?: SupportActor): Promise<{ ok: boolean }> {
+  const admin = await adminOr(actor);
   if (!uuid.safeParse(id).success) return { ok: false };
   const p = z
     .object({ status: z.enum(["needs_reply", "waiting", "resolved"]).optional(), priority: z.enum(["normal", "urgent"]).optional(), topic: z.enum(store.SUPPORT_TOPICS).optional() })
@@ -159,6 +186,18 @@ export async function adminUpdateTicket(id: string, patch: { status?: string; pr
   if (!p.success) return { ok: false };
   const assignedTo = patch.assignToMe ? (admin.email ?? null) : patch.unassign ? null : undefined;
   return { ok: await svc((q) => store.adminUpdate(q, id, { ...p.data, assignedTo })) };
+}
+
+/** For the admin header: how many requests are waiting on us (0 if support isn't set up yet). */
+export async function supportBadge(): Promise<{ needsReply: number; urgent: number; overdue: number }> {
+  await requireAdmin();
+  return svc((q) => store.counts(q, supportSlaHours())).catch(() => ({ needsReply: 0, urgent: 0, overdue: 0 }));
+}
+
+/** A request's id from its number ("LOC-1042" or "1042"), for the admin API. */
+export async function supportTicketIdByRef(ref: string, actor?: SupportActor): Promise<string | null> {
+  await adminOr(actor);
+  return svc((q) => store.ticketIdByNumber(q, ref)).catch(() => null);
 }
 
 export async function findSupportUsers(search: string) {

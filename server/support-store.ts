@@ -5,8 +5,14 @@ export type SupportTopic = (typeof SUPPORT_TOPICS)[number];
 export type SupportStatus = "needs_reply" | "waiting" | "resolved";
 export type SupportPriority = "normal" | "urgent";
 
+/** "LOC-1042"; just the id's start before migration 0021 adds numbers. */
+export function ticketRef(t: { number: number | null; id: string }) {
+  return t.number ? `LOC-${t.number}` : `LOC-${t.id.slice(0, 6).toUpperCase()}`;
+}
+
 export type TicketRow = {
   id: string;
+  number: number | null;
   user_id: string;
   workspace_id: string | null;
   email: string;
@@ -26,7 +32,7 @@ export type TicketRow = {
 };
 export type MessageRow = { id: string; author: "customer" | "admin" | "system"; author_email: string | null; body: string; internal: boolean; created_at: string };
 
-const COLS = `t.id, t.user_id, t.workspace_id, t.email, t.subject, t.topic, t.priority, t.channel, t.status, t.assigned_to, t.created_at, t.updated_at, t.last_customer_at, t.last_admin_at,
+const COLS = `t.id, (to_jsonb(t)->>'number')::bigint as number, t.user_id, t.workspace_id, t.email, t.subject, t.topic, t.priority, t.channel, t.status, t.assigned_to, t.created_at, t.updated_at, t.last_customer_at, t.last_admin_at,
   (select left(m.body, 160) from public.support_messages m where m.ticket_id = t.id and not m.internal order by m.created_at desc limit 1) as preview,
   (select count(*)::int from public.support_messages m where m.ticket_id = t.id and not m.internal) as messages`;
 /** Waiting on us longer than the reply target ($slaHours). */
@@ -77,7 +83,8 @@ export async function queue(q: Q, f: QueueFilter): Promise<TicketRow[]> {
     await q.query<TicketRow>(
       `select ${COLS}, ${OVERDUE("$7")} as overdue from public.support_tickets t
        where ($1 = 'all' or ($1 = 'mine' and t.assigned_to = $2) or t.status = $1)
-         and ($3 = '' or t.subject ilike '%' || $3 || '%' or t.email ilike '%' || $3 || '%')
+         and ($3 = '' or t.subject ilike '%' || $3 || '%' or t.email ilike '%' || $3 || '%'
+              or ($3 ~ '[0-9]' and (to_jsonb(t)->>'number') = regexp_replace($3, '[^0-9]', '', 'g')))
          and ($4::text is null or t.topic = $4) and ($5::text is null or t.priority = $5) and ($6::text is null or t.channel = $6)
        order by (t.status = 'needs_reply' and t.priority = 'urgent') desc, ${OVERDUE("$7")} desc, t.updated_at desc
        limit 200`,
@@ -104,6 +111,13 @@ export async function adminTicket(q: Q, id: string, slaHours: number): Promise<{
   if (!ticket) return null;
   const messages = (await q.query<MessageRow>("select id, author, author_email, body, internal, created_at from public.support_messages where ticket_id = $1 order by created_at", [id])).rows;
   return { ticket, messages };
+}
+
+/** A request by its number (LOC-1042 or 1042). */
+export async function ticketIdByNumber(q: Q, ref: string): Promise<string | null> {
+  const n = ref.replace(/\D/g, "");
+  if (!n || n.length > 12) return null;
+  return (await q.query<{ id: string }>("select t.id from public.support_tickets t where (to_jsonb(t)->>'number') = $1 limit 1", [n])).rows[0]?.id ?? null;
 }
 
 /** A reply (status → waiting on them) or an internal note (status unchanged). */

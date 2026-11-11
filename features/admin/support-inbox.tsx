@@ -24,6 +24,8 @@ const TABS = [
   ["all", "All"],
   ["mine", "Mine"],
 ] as const;
+/** "LOC-1042" (same format as the server's ticketRef). */
+const ref = (t: { number: number | null; id: string }) => (t.number ? `LOC-${t.number}` : `LOC-${t.id.slice(0, 6).toUpperCase()}`);
 const STATUS_LABEL = { needs_reply: "Needs reply", waiting: "Waiting on them", resolved: "Resolved" } as const;
 
 /** Times in the admin's time zone (ADMIN_TIMEZONE), the same on the server and in the browser. */
@@ -113,7 +115,7 @@ export function SupportInbox({ data }: { data: Data }) {
             >
               <div className="relative flex-1">
                 <Search aria-hidden className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-slate" />
-                <Input name="q" defaultValue={f.search} placeholder="Search subject, email" className="h-9 pl-8 text-sm" aria-label="Search requests" />
+                <Input name="q" defaultValue={f.search} placeholder="Subject, email or LOC-1042" className="h-9 pl-8 text-sm" aria-label="Search requests" />
               </div>
               <Button type="button" size="icon-sm" variant="ghost" aria-label="Refresh" onClick={() => router.refresh()}>
                 <RefreshCw aria-hidden />
@@ -207,7 +209,9 @@ function QueueRow({ t, active, href, topic }: { t: Ticket; active: boolean; href
           {t.priority === "urgent" ? <Flame aria-label="Urgent" className="size-3.5 shrink-0 text-warn-fg" /> : null}
           {t.overdue ? <AlertTriangle aria-label="Past the reply target" className="size-3.5 shrink-0 text-danger-fg" /> : null}
         </span>
-        <span className="mt-0.5 block truncate text-xs text-slate">{t.email}</span>
+        <span className="mt-0.5 block truncate text-xs text-slate">
+          <span className="font-mono font-semibold text-ink/70">{ref(t)}</span> · {t.email}
+        </span>
         <span className="mt-1 flex items-center gap-2 text-[11px] text-slate">
           <span className="rounded bg-canvas px-1.5 py-0.5">{topic}</span>
           <span>{when(t.updated_at)}</span>
@@ -251,7 +255,10 @@ function Conversation({ d, topic, me, replyRef }: { d: NonNullable<Data["selecte
     <>
       <header className="space-y-2 border-b border-line bg-surface px-5 py-4">
         <div className="flex flex-wrap items-start gap-2">
-          <h2 className="min-w-0 flex-1 font-display text-lg font-semibold text-ink">{t.subject}</h2>
+          <h2 className="min-w-0 flex-1 font-display text-lg font-semibold text-ink">
+            <span className="mr-2 rounded-md bg-canvas px-2 py-0.5 align-middle font-mono text-sm text-slate">{ref(t)}</span>
+            {t.subject}
+          </h2>
           {pending ? <Loader2 aria-hidden className="size-4 animate-spin text-slate" /> : null}
         </div>
         <div className="flex flex-wrap items-center gap-1.5 text-xs">

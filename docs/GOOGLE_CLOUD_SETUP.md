@@ -92,7 +92,7 @@ Google calls this **Google Auth Platform** (older screens say **OAuth consent sc
 3. When asked which environments to connect, keep **Production** and **Preview** (and **Development** if offered). Vercel adds `DATABASE_URL` and related settings automatically.
 4. Open the database's **Open in Neon** (or **Neon Console**) link → **SQL Editor**.
 5. In another tab, open GitHub → **burhanmehar11-cmyk/newtool** → branch `claude/compassionate-knuth-hewpfn` → `database/migrations/0000_auth.sql` → **Copy raw file** (two-squares icon). Paste into the SQL Editor → **Run**.
-6. Clear the editor. Do the same, one file at a time, with `database/migrations/0001_foundation.sql` → **Run**, then `0002_password_and_discovery.sql` → **Run**, then `0003_research.sql` → **Run**, then `0004_google_places.sql` → **Run**, then `0005_mailboxes.sql` → **Run**, then `0006_campaigns.sql` → **Run**, then `0007_agents.sql` → **Run**, then `0008_replies.sql` → **Run**, then `0009_team.sql` → **Run**, then `0010_followups.sql` → **Run**, then `0011_admin.sql` → **Run**, then `0012_webhooks.sql` → **Run**, then `0013_viewer.sql` → **Run**, then `0014_billing.sql` → **Run**, then `0015_campaign_delete.sql` → **Run**, then `0016_activity_notifications.sql` → **Run**, then `0017_announcements.sql` → **Run**, then `0018_welcome.sql` → **Run**, then `0019_support.sql` → **Run**, then `0020_admin_users.sql` → **Run**.
+6. Clear the editor. Do the same, one file at a time, with `database/migrations/0001_foundation.sql` → **Run**, then `0002_password_and_discovery.sql` → **Run**, then `0003_research.sql` → **Run**, then `0004_google_places.sql` → **Run**, then `0005_mailboxes.sql` → **Run**, then `0006_campaigns.sql` → **Run**, then `0007_agents.sql` → **Run**, then `0008_replies.sql` → **Run**, then `0009_team.sql` → **Run**, then `0010_followups.sql` → **Run**, then `0011_admin.sql` → **Run**, then `0012_webhooks.sql` → **Run**, then `0013_viewer.sql` → **Run**, then `0014_billing.sql` → **Run**, then `0015_campaign_delete.sql` → **Run**, then `0016_activity_notifications.sql` → **Run**, then `0017_announcements.sql` → **Run**, then `0018_welcome.sql` → **Run**, then `0019_support.sql` → **Run**, then `0020_admin_users.sql` → **Run**, then `0021_support_numbers.sql` → **Run**.
    - Already ran some of them earlier? Run only the ones after the last you ran (for example just **0003**). Later files only add things and are safe to run on top.
 7. Check by running:
 
@@ -337,7 +337,10 @@ People open requests from **Support** in the app (topic, subject, message, urgen
 
 - A new request or reply emails everyone in `ADMIN_EMAILS`; your reply emails the person (from `hello@locenti.com`) and notifies them in the app.
 - Requests waiting on you longer than `SUPPORT_SLA_HOURS` (default 24) are flagged.
-- Needs migration `0019_support.sql`.
+- Needs migrations `0019_support.sql` and `0021_support_numbers.sql` (ticket numbers like LOC-1042).
+- **Help & Support** (what users see): Quick picks with instant answers, an AI assistant that answers how-to questions from Locenti's help content (uses `GEMINI_API_KEY`; hidden if it isn't set), the request form, and their requests with ticket numbers. Opening a request emails them a confirmation with the number.
+- The admin header's **Support** tab shows a red count of requests waiting on you.
+- **Handling a ticket through your assistant:** the same `ADMIN_API_TOKEN` also works on `https://locenti.com/api/admin/support` (list the queue, open `?ref=LOC-1042`, reply, add a note, change status or priority).
 
 ## Part P: Admin access
 

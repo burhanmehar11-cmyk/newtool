@@ -29,7 +29,7 @@ const nav = [
   { href: "/app/team", label: "Team", icon: UsersRound },
   { href: "/app/billing", label: "Billing", icon: CreditCard },
   { href: "/app/settings", label: "Settings", icon: Settings },
-  { href: "/app/support", label: "Support", icon: LifeBuoy },
+  { href: "/app/support", label: "Help & Support", icon: LifeBuoy },
 ] as const;
 
 export function ProductShell({ workspaceSlot, children }: { workspaceSlot: React.ReactNode; children: React.ReactNode }) {

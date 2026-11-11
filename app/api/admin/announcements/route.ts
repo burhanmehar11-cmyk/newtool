@@ -1,7 +1,6 @@
-import { createHash, timingSafeEqual } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
-import { adminEmails } from "@/lib/admin";
+import { adminApiActor } from "@/server/admin-api-auth";
 import { findTemplate } from "@/lib/announcements";
 import { continueAnnouncement, getAnnouncementsData, sendAnnouncementTest, sendWelcomeTest, startAnnouncement, stopAnnouncement, type Actor } from "@/server/services/announcements";
 
@@ -22,15 +21,7 @@ import { continueAnnouncement, getAnnouncementsData, sendAnnouncementTest, sendW
 
 export const maxDuration = 60;
 
-function authorized(request: NextRequest): Actor | null {
-  const expected = process.env.ADMIN_API_TOKEN?.trim() ?? "";
-  const owner = adminEmails()[0];
-  if (expected.length < 32 || !owner) return null;
-  const given = request.headers.get("authorization")?.match(/^Bearer\s+(.+)$/)?.[1]?.trim() ?? "";
-  const a = createHash("sha256").update(given).digest();
-  const b = createHash("sha256").update(expected).digest();
-  return timingSafeEqual(a, b) ? { email: owner } : null;
-}
+const authorized = (request: NextRequest): Actor | null => adminApiActor(request);
 
 const denied = () => NextResponse.json({ ok: false, error: "Not authorized." }, { status: 401 });
 

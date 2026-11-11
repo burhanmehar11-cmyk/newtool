@@ -50,9 +50,18 @@ describe("support", () => {
     const r = await support.openSupportRequest({ subject: "Mailbox needs reconnecting", topic: "mailbox", urgent: true, body: "It keeps asking me to reconnect." });
     if (!r.ok) throw new Error(r.error);
     ticket = r.id;
-    const [to, subject, text] = h.send.mock.calls[0];
+    expect(r.ref).toBe("LOC-1001");
+    // First the person's confirmation, with the ticket number…
+    const [toUser, subjectUser, textUser] = h.send.mock.calls[0];
+    expect(toUser).toBe("ann@agency.example");
+    expect(subjectUser).toBe("We've received your request [LOC-1001]");
+    expect(textUser).toContain("Ticket: LOC-1001");
+    expect(textUser).toContain(`https://locenti.com/app/support/${ticket}`);
+    expect(textUser).toContain("Happy Sending,\nThe Locenti Team");
+    // …then the alert to the owner.
+    const [to, subject, text] = h.send.mock.calls[1];
     expect(to).toBe("owner@locenti.example");
-    expect(subject).toBe("[Support, urgent] Mailbox needs reconnecting");
+    expect(subject).toBe("[LOC-1001, urgent] Mailbox needs reconnecting");
     expect(text).toContain(`https://locenti.com/admin?tab=support&t=${ticket}`);
     expect((await support.getMySupport()).tickets.map((t) => t.subject)).toEqual(["Mailbox needs reconnecting"]);
   });
@@ -66,6 +75,9 @@ describe("support", () => {
     // Filters
     expect((await support.getSupportInbox({ topic: "billing" })).list).toEqual([]);
     expect((await support.getSupportInbox({ search: "ann@" })).list).toHaveLength(1);
+    expect((await support.getSupportInbox({ search: "LOC-1001" })).list.map((t) => t.id)).toEqual([ticket]);
+    expect((await support.getSupportInbox({ search: "1001" })).list).toHaveLength(1);
+    expect(await support.supportBadge()).toEqual({ needsReply: 1, urgent: 1, overdue: 0 });
   });
 
   it("keeps internal notes from the person; a reply notifies and emails them, and waits on them", async () => {
@@ -75,13 +87,13 @@ describe("support", () => {
     expect(await support.adminReplyToTicket(ticket, "Your Google app was in Testing mode; publish it and reconnect once.", false)).toEqual({ ok: true });
     const [to, subject, text] = h.send.mock.calls[0];
     expect(to).toBe("ann@agency.example");
-    expect(subject).toBe("Re: Mailbox needs reconnecting");
+    expect(subject).toBe("Re: [LOC-1001] Mailbox needs reconnecting");
     expect(text).toContain("Happy Sending,\nThe Locenti Team");
     const mine = await support.getMyTicketDetail(ticket);
     expect(mine?.ticket.status).toBe("waiting");
     expect(mine?.messages.map((m) => m.author)).toEqual(["customer", "admin"]); // the note isn't visible to them
     const n = await as(h.db, ANN, () => h.db.query<{ title: string; href: string }>("select title, href from public.notifications where user_id = $1", [ANN]));
-    expect(n.rows).toEqual([{ title: "Support replied", href: `/app/support/${ticket}` }]);
+    expect(n.rows).toEqual([{ title: "We replied to LOC-1001", href: `/app/support/${ticket}` }]);
     const d = await support.getSupportInbox({ tab: "mine" });
     expect(d.list.map((t) => t.assigned_to)).toEqual(["owner@locenti.example"]); // replying assigns it
   });
