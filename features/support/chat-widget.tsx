@@ -23,6 +23,8 @@ export function ChatWidget({ assistant }: { assistant: boolean }) {
   const [text, setText] = React.useState("");
   const listRef = React.useRef<HTMLDivElement>(null);
   const inputRef = React.useRef<HTMLInputElement>(null);
+  const aiView = assistant && view === "chat";
+  const answered = chat.msgs.some((m) => m.role === "assistant");
 
   React.useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
@@ -48,7 +50,7 @@ export function ChatWidget({ assistant }: { assistant: boolean }) {
             <div className="relative flex items-center justify-between">
               {view === "chat" ? (
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-mint/30 bg-mint/10 px-3 py-1 text-xs font-semibold text-mint">
-                  <MessageCircle aria-hidden className="size-3.5" /> Messages
+                  <Sparkles aria-hidden className="size-3.5" /> AI assistant
                 </span>
               ) : (
                 <button type="button" onClick={() => setView(assistant ? "chat" : "team")} className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium text-white/70 hover:text-white" disabled={!assistant}>
@@ -66,26 +68,33 @@ export function ChatWidget({ assistant }: { assistant: boolean }) {
               </button>
             </div>
             <div className="relative mt-4 flex flex-col items-center text-center">
-              <div className="flex -space-x-2">
-                <span className="flex size-11 items-center justify-center rounded-full border-2 border-midnight bg-mint text-midnight">
-                  <Sparkles aria-hidden className="size-5" />
-                </span>
-                <span className="flex size-11 items-center justify-center rounded-full border-2 border-midnight bg-midnight-2 text-mint ring-1 ring-mint/30">
-                  <LogoMark className="size-6" />
-                </span>
-              </div>
-              <p className="mt-3 font-display text-lg font-bold">Questions? Chat with us.</p>
-              <p className="mt-1 inline-flex items-center gap-1.5 text-xs text-white/70">
-                <Clock aria-hidden className="size-3.5 text-mint" />
-                {assistant ? "Instant answers · the team replies within a day" : "The team replies within a day"}
-              </p>
+              {aiView ? (
+                <>
+                  <span className="relative flex size-12 items-center justify-center rounded-full bg-mint text-midnight shadow-[0_0_0_6px_rgb(143_240_192/0.12)]">
+                    <Sparkles aria-hidden className="size-6" />
+                    <span aria-hidden className="absolute bottom-0 right-0 size-3 rounded-full border-2 border-midnight bg-green" />
+                  </span>
+                  <p className="mt-3 font-display text-lg font-bold">Locenti AI Assistant</p>
+                  <p className="mt-1 text-xs text-white/70">Instant answers about anything in Locenti, any time.</p>
+                </>
+              ) : (
+                <>
+                  <span className="flex size-12 items-center justify-center rounded-full bg-midnight-2 text-mint ring-1 ring-mint/30">
+                    <LogoMark className="size-6" />
+                  </span>
+                  <p className="mt-3 font-display text-lg font-bold">Talk to the team</p>
+                  <p className="mt-1 inline-flex items-center gap-1.5 text-xs text-white/70">
+                    <Clock aria-hidden className="size-3.5 text-mint" /> A real person replies, usually within a day
+                  </p>
+                </>
+              )}
             </div>
           </div>
 
           {view === "chat" ? (
             <>
               <div ref={listRef} className="min-h-[240px] flex-1 space-y-3 overflow-y-auto px-4 py-4" aria-live="polite">
-                <Bubble role="assistant">Hi! I&apos;m Locenti&apos;s assistant. Ask me how anything works, or talk to the team.</Bubble>
+                <Bubble role="assistant">Hi! I&apos;m Locenti&apos;s AI assistant. Ask me anything about finding businesses, writing emails, mailboxes or campaigns, and I&apos;ll answer right away.</Bubble>
                 {chat.msgs.length === 0 ? (
                   <div className="flex flex-wrap gap-2 pl-9">
                     {HELP_STARTERS.map((s) => (
@@ -98,11 +107,6 @@ export function ChatWidget({ assistant }: { assistant: boolean }) {
                 {chat.msgs.map((m, i) => (
                   <Bubble key={i} role={m.role}>
                     <p className="whitespace-pre-wrap">{m.text}</p>
-                    {m.suggest ? (
-                      <button type="button" onClick={() => setView("team")} className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-green hover:underline">
-                        Send this to the team <ArrowRight aria-hidden className="size-3" />
-                      </button>
-                    ) : null}
                   </Bubble>
                 ))}
                 {chat.pending ? (
@@ -116,6 +120,16 @@ export function ChatWidget({ assistant }: { assistant: boolean }) {
                   </div>
                 ) : null}
                 {chat.error ? <p className="rounded-xl bg-warn-bg px-3 py-2 text-xs text-warn-fg">{chat.error}</p> : null}
+                {/* The team is the last step: offered once the assistant has had a go. */}
+                {!chat.pending && (answered || chat.error) ? (
+                  <div className={cn("ml-9 rounded-2xl border p-3", chat.lastSuggest || chat.error ? "border-green/40 bg-mint-soft/40" : "border-line bg-surface")}>
+                    <p className="text-xs font-semibold text-ink">{chat.lastSuggest ? "This one needs a person" : "Still need help?"}</p>
+                    <p className="mt-0.5 text-xs text-slate">Our team replies, usually within a day. Your chat is included.</p>
+                    <Button type="button" size="sm" variant="secondary" className="mt-2" onClick={() => setView("team")}>
+                      <UserRound aria-hidden /> Talk to the team
+                    </Button>
+                  </div>
+                ) : null}
               </div>
               <div className="border-t border-line p-3">
                 <form
@@ -130,12 +144,7 @@ export function ChatWidget({ assistant }: { assistant: boolean }) {
                     {chat.pending ? <Loader2 aria-hidden className="animate-spin" /> : <Send aria-hidden />}
                   </Button>
                 </form>
-                <div className="mt-2 flex items-center justify-between gap-2 px-1 text-[11px] text-slate">
-                  <span>AI can make mistakes.</span>
-                  <button type="button" onClick={() => setView("team")} className="inline-flex items-center gap-1 font-semibold text-green hover:underline">
-                    <UserRound aria-hidden className="size-3.5" /> Talk to the team
-                  </button>
-                </div>
+                <p className="mt-2 px-1 text-center text-[11px] text-slate">AI can make mistakes. Check important details.</p>
               </div>
             </>
           ) : view === "team" ? (
