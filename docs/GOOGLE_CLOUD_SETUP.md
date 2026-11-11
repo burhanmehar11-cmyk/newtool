@@ -92,7 +92,7 @@ Google calls this **Google Auth Platform** (older screens say **OAuth consent sc
 3. When asked which environments to connect, keep **Production** and **Preview** (and **Development** if offered). Vercel adds `DATABASE_URL` and related settings automatically.
 4. Open the database's **Open in Neon** (or **Neon Console**) link → **SQL Editor**.
 5. In another tab, open GitHub → **burhanmehar11-cmyk/newtool** → branch `claude/compassionate-knuth-hewpfn` → `database/migrations/0000_auth.sql` → **Copy raw file** (two-squares icon). Paste into the SQL Editor → **Run**.
-6. Clear the editor. Do the same, one file at a time, with `database/migrations/0001_foundation.sql` → **Run**, then `0002_password_and_discovery.sql` → **Run**, then `0003_research.sql` → **Run**, then `0004_google_places.sql` → **Run**, then `0005_mailboxes.sql` → **Run**, then `0006_campaigns.sql` → **Run**, then `0007_agents.sql` → **Run**, then `0008_replies.sql` → **Run**, then `0009_team.sql` → **Run**, then `0010_followups.sql` → **Run**, then `0011_admin.sql` → **Run**, then `0012_webhooks.sql` → **Run**, then `0013_viewer.sql` → **Run**, then `0014_billing.sql` → **Run**, then `0015_campaign_delete.sql` → **Run**, then `0016_activity_notifications.sql` → **Run**, then `0017_announcements.sql` → **Run**, then `0018_welcome.sql` → **Run**.
+6. Clear the editor. Do the same, one file at a time, with `database/migrations/0001_foundation.sql` → **Run**, then `0002_password_and_discovery.sql` → **Run**, then `0003_research.sql` → **Run**, then `0004_google_places.sql` → **Run**, then `0005_mailboxes.sql` → **Run**, then `0006_campaigns.sql` → **Run**, then `0007_agents.sql` → **Run**, then `0008_replies.sql` → **Run**, then `0009_team.sql` → **Run**, then `0010_followups.sql` → **Run**, then `0011_admin.sql` → **Run**, then `0012_webhooks.sql` → **Run**, then `0013_viewer.sql` → **Run**, then `0014_billing.sql` → **Run**, then `0015_campaign_delete.sql` → **Run**, then `0016_activity_notifications.sql` → **Run**, then `0017_announcements.sql` → **Run**, then `0018_welcome.sql` → **Run**, then `0019_support.sql` → **Run**.
    - Already ran some of them earlier? Run only the ones after the last you ran (for example just **0003**). Later files only add things and are safe to run on top.
 7. Check by running:
 
@@ -330,6 +330,14 @@ Admin panel → **Announcements**: pick or write an email, send yourself a test,
 
 - **Sender:** `hello@locenti.com` by default (`ANNOUNCE_FROM` changes it). Through your connected Gmail, that address only shows if Gmail has it under **Settings → Accounts → Send mail as**; otherwise Gmail shows your Gmail address. With `SMTP_URL` it's used directly.
 - **Sending on request without the panel:** set `ADMIN_API_TOKEN` in Vercel to 32+ random characters (e.g. from a password manager) and redeploy. Requests to `https://locenti.com/api/admin/announcements` with `Authorization: Bearer <token>` can then list templates, send a test to you and send an announcement. Keep the token private; change it in Vercel to revoke access.
+
+## Part O: Support
+
+People open requests from **Support** in the app (topic, subject, message, urgent or not) and follow the conversation there. You answer from **Admin → Support**: queue tabs (Needs reply, Waiting, Resolved, All, Mine), search, topic/priority/channel filters, the conversation with replies and private internal notes, and the customer's plan, workspace, mailboxes, usage and recent activity. **Message** starts a conversation with any user. Shortcuts: `j`/`k` move, `r` reply, `Ctrl+Enter` send, `?` list.
+
+- A new request or reply emails everyone in `ADMIN_EMAILS`; your reply emails the person (from `hello@locenti.com`) and notifies them in the app.
+- Requests waiting on you longer than `SUPPORT_SLA_HOURS` (default 24) are flagged.
+- Needs migration `0019_support.sql`.
 
 ## Part F: First sign-in (owner)
 

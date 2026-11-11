@@ -7,6 +7,9 @@ import { Skeleton } from "@/components/ui/misc";
 import { ActivityTab, AdminsTab, ApisTab, EmailsTab, FunnelTab, OverviewTab, RevenueTab, UsageTab, UsersTab, WorkspacesTab } from "@/features/admin/sections";
 import { ADMIN_TABS, getAdminTab, type AdminTab } from "@/server/services/admin";
 import { AnnouncementsTab } from "@/features/admin/announcements";
+import { SupportTab } from "@/features/admin/support";
+
+const str = (v: string | string[] | undefined) => (typeof v === "string" ? v : undefined);
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Admin · Locenti", robots: { index: false, follow: false } };
@@ -14,6 +17,7 @@ export const metadata: Metadata = { title: "Admin · Locenti", robots: { index: 
 const LABELS: Record<AdminTab, string> = {
   overview: "Overview",
   activity: "Activity",
+  support: "Support",
   funnel: "Sign-ups & sources",
   users: "People",
   workspaces: "Workspaces & plans",
@@ -92,7 +96,7 @@ async function Admin({ searchParams }: { searchParams: PageProps<"/admin">["sear
         <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
           <div>
             <h1 className="font-display text-2xl font-bold tracking-tight text-ink">{LABELS[tab]}</h1>
-            <p className="mt-0.5 text-sm text-slate">{tab === "announcements" ? "Email everyone who signed up: news, tips and updates." : "Live numbers from the database, across every workspace."}</p>
+            <p className="mt-0.5 text-sm text-slate">{tab === "announcements" ? "Email everyone who signed up: news, tips and updates." : tab === "support" ? "Requests from people using Locenti. Reply here; they get it by email and in the app." : "Live numbers from the database, across every workspace."}</p>
           </div>
           {WITH_PERIOD.includes(tab) ? (
             <nav aria-label="Period" className="flex rounded-lg border border-line bg-surface p-0.5">
@@ -115,6 +119,7 @@ async function Admin({ searchParams }: { searchParams: PageProps<"/admin">["sear
         {d.tab === "revenue" ? <RevenueTab d={d} days={days} /> : null}
         {d.tab === "admins" ? <AdminsTab d={d} /> : null}
         {d.tab === "announcements" ? <AnnouncementsTab /> : null}
+        {d.tab === "support" ? <SupportTab params={{ tab: str(sp.st), search: str(sp.q), topic: str(sp.topic), priority: str(sp.pri), channel: str(sp.ch), ticket: str(sp.t) }} /> : null}
       </main>
     </>
   );
