@@ -19,12 +19,16 @@ describe("welcome email content", () => {
 });
 
 describe("sign-off", () => {
-  it("is from Team Locenti, never a named founder", async () => {
+  it("welcome email is signed by the founder; other emails by The Locenti Team", async () => {
     const { ANNOUNCEMENT_TEMPLATES } = await import("@/lib/announcements");
     const m = welcomeEmail({ firstName: "Sam", site: "https://locenti.com", trialDays: 14, replyTo: "hello@locenti.com" });
-    for (const t of [m.text, m.html, ...ANNOUNCEMENT_TEMPLATES.map((x) => x.body)]) {
-      expect(t).toContain("Team Locenti");
-      expect(t).not.toMatch(/Burhan|Founder|\bI read\b/);
+    expect(m.text).toContain("Warm Regards,\nBurhan Javed\nFounder, Locenti.com");
+    expect(m.html).toContain("Warm Regards,<br>");
+    expect(m.html).toContain("<strong>Burhan Javed</strong>");
+    expect(m.html).toContain("Founder, Locenti.com");
+    for (const t of ANNOUNCEMENT_TEMPLATES) {
+      expect(t.body.endsWith("Happy Sending,\nThe Locenti Team")).toBe(true);
+      expect(t.body).not.toMatch(/Burhan|Founder/);
     }
   });
 });

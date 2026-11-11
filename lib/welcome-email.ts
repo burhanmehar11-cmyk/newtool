@@ -47,7 +47,9 @@ Open your dashboard: ${v.site}/app
 
 Questions, or stuck on a step? Just reply to this email. We read every one.
 
-Team Locenti
+Warm Regards,
+Burhan Javed
+Founder, Locenti.com
 `;
 
   const step = (n: number, s: (typeof STEPS)[number]) => `
@@ -115,7 +117,9 @@ Team Locenti
                   <td style="padding-top:20px;font:400 15px/23px Arial,Helvetica,sans-serif;color:${C.ink};">
                     Questions, or stuck on a step? Just reply to this email. We read every one.
                     <br><br>
-                    <strong>Team Locenti</strong>
+                    Warm Regards,<br>
+                    <strong>Burhan Javed</strong><br>
+                    <span style="color:${C.slate};">Founder, Locenti.com</span>
                   </td>
                 </tr>
               </table>

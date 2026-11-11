@@ -35,7 +35,8 @@ Try a search now: {{site}}/app/discover
 
 Reply to this email if anything's missing. We read every reply.
 
-Team Locenti`,
+Happy Sending,
+The Locenti Team`,
   },
   {
     id: "first-campaign",
@@ -65,7 +66,8 @@ Start here: {{site}}/app
 
 Stuck on a step? Just reply; we'll help.
 
-Team Locenti`,
+Happy Sending,
+The Locenti Team`,
   },
   {
     id: "reply-tips",
@@ -93,7 +95,8 @@ Plenty of replies come after a short, polite follow-up. Add one to your campaign
 
 Put it into practice: {{site}}/app/campaigns
 
-Team Locenti`,
+Happy Sending,
+The Locenti Team`,
   },
   {
     id: "trial",
@@ -114,7 +117,8 @@ Your dashboard: {{site}}/app
 
 If something doesn't work the way you expected, reply and tell us. That's how Locenti gets better.
 
-Team Locenti`,
+Happy Sending,
+The Locenti Team`,
   },
 ];
 
