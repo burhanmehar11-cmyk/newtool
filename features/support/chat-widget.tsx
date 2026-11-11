@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, Bot, CheckCircle2, Clock, Loader2, MessageCircle, Send, Sparkles, UserRound, X } from "lucide-react";
-import { LogoMark } from "@/components/brand/logo";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/field";
 import { cn } from "@/lib/utils";
@@ -74,18 +74,21 @@ export function ChatWidget({ assistant, site = false }: { assistant: boolean; si
             <div className="relative mt-4 flex flex-col items-center text-center">
               {aiView ? (
                 <>
-                  <span className="relative flex size-12 items-center justify-center rounded-full bg-mint text-midnight shadow-[0_0_0_6px_rgb(143_240_192/0.12)]">
-                    <Sparkles aria-hidden className="size-6" />
-                    <span aria-hidden className="absolute bottom-0 right-0 size-3 rounded-full border-2 border-midnight bg-green" />
-                  </span>
+                  <div className="flex items-center -space-x-2.5">
+                    <span className="relative z-10 flex size-12 items-center justify-center rounded-full border-2 border-midnight bg-mint text-midnight">
+                      <Sparkles aria-hidden className="size-6" />
+                      <span aria-hidden className="absolute bottom-0 right-0 size-3 rounded-full border-2 border-midnight bg-green" />
+                    </span>
+                    <TeamFaces size={44} ring="border-midnight" />
+                  </div>
                   <p className="mt-3 font-display text-lg font-bold">Locenti AI Assistant</p>
-                  <p className="mt-1 text-xs text-white/70">{site ? "Instant answers about Locenti, any time." : "Instant answers about anything in Locenti, any time."}</p>
+                  <p className="mt-1 text-xs text-white/70">{site ? "Instant answers about Locenti, with our team close by." : "Instant answers about anything in Locenti, with our team close by."}</p>
                 </>
               ) : (
                 <>
-                  <span className="flex size-12 items-center justify-center rounded-full bg-midnight-2 text-mint ring-1 ring-mint/30">
-                    <LogoMark className="size-6" />
-                  </span>
+                  <div className="flex items-center -space-x-2.5">
+                    <TeamFaces size={48} ring="border-midnight" />
+                  </div>
                   <p className="mt-3 font-display text-lg font-bold">Talk to the team</p>
                   <p className="mt-1 inline-flex items-center gap-1.5 text-xs text-white/70">
                     <Clock aria-hidden className="size-3.5 text-mint" /> A real person replies, usually within a day
@@ -131,7 +134,12 @@ export function ChatWidget({ assistant, site = false }: { assistant: boolean; si
                 {/* The team is the last step: offered once the assistant has had a go. */}
                 {!chat.pending && (answered || chat.error) ? (
                   <div className={cn("ml-9 rounded-2xl border p-3", chat.lastSuggest || chat.error ? "border-green/40 bg-mint-soft/40" : "border-line bg-surface")}>
-                    <p className="text-xs font-semibold text-ink">{chat.lastSuggest ? "This one needs a person" : site ? "Still have questions?" : "Still need help?"}</p>
+                    <div className="flex items-center gap-2">
+                      <span className="flex -space-x-1.5">
+                        <TeamFaces size={22} ring="border-surface" />
+                      </span>
+                      <p className="text-xs font-semibold text-ink">{chat.lastSuggest ? "This one needs a person" : site ? "Still have questions?" : "Still need help?"}</p>
+                    </div>
                     <p className="mt-0.5 text-xs text-slate">{site ? "Try Locenti free, no card needed, or message our team. We reply within a day." : "Our team replies, usually within a day. Your chat is included."}</p>
                     <div className="mt-2 flex flex-wrap gap-2">
                       {site ? (
@@ -238,6 +246,18 @@ export function ChatWidget({ assistant, site = false }: { assistant: boolean; si
         {open ? <X aria-hidden className="size-6" /> : <MessageCircle aria-hidden className="size-6" />}
         {!open && assistant ? <span aria-hidden className={cn("absolute right-0.5 top-0.5 size-3 rounded-full border-2", site ? "border-mint bg-green" : "border-midnight bg-mint")} /> : null}
       </button>
+    </>
+  );
+}
+
+/** Friendly faces for "the team" (photos in /public/team). */
+const FACES = ["/team/face-1.webp", "/team/face-2.webp", "/team/face-3.webp"];
+function TeamFaces({ size, ring }: { size: number; ring: string }) {
+  return (
+    <>
+      {FACES.map((src) => (
+        <Image key={src} src={src} alt="" aria-hidden width={size} height={size} className={cn("shrink-0 rounded-full border-2 object-cover", ring)} style={{ width: size, height: size }} />
+      ))}
     </>
   );
 }
