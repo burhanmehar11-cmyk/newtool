@@ -9,13 +9,12 @@ import { Checkbox, Input, Label, Select, Textarea } from "@/components/ui/field"
 import { Callout } from "@/components/ui/misc";
 import { cn } from "@/lib/utils";
 import type { QuickPick } from "@/lib/help-content";
-import { askHelpAction, openSupportAction } from "@/server/actions/support";
+import { openSupportAction } from "@/server/actions/support";
+import { HELP_STARTERS, useHelpChat } from "@/features/support/use-help-chat";
 
 const ICONS = { mail: Mail, pause: PauseCircle, search: Search, pen: PenLine, users: Users, card: CreditCard, ban: Ban, bug: Bug } as const;
 type Draft = { subject: string; topic: string; body: string };
-type Msg = { role: "user" | "assistant"; text: string; suggest?: { subject: string; topic: string } };
 
-const STARTERS = ["How do I connect my Gmail?", "Why did my campaign pause?", "How many businesses can I find on the trial?", "How do I write better emails?"];
 
 export function HelpCenter({ picks, topics, assistant, ready }: { picks: QuickPick[]; topics: { id: string; label: string }[]; assistant: boolean; ready: boolean }) {
   const [draft, setDraft] = React.useState<Draft>({ subject: "", topic: "other", body: "" });
@@ -119,29 +118,15 @@ function QuickPicks({ picks, onAsk }: { picks: QuickPick[]; onAsk: (p: QuickPick
 /* --------------------------------------------------------------- Assistant */
 
 function Assistant({ onSend }: { onSend: (d: Draft) => void }) {
-  const [msgs, setMsgs] = React.useState<Msg[]>([]);
+  const { msgs, pending, error, ask: askChat, transcript } = useHelpChat();
   const [text, setText] = React.useState("");
-  const [pending, start] = React.useTransition();
-  const [error, setError] = React.useState<string | null>(null);
   const listRef = React.useRef<HTMLDivElement>(null);
   React.useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
   }, [msgs.length, pending]);
-
   const ask = (q: string) => {
-    const question = q.trim();
-    if (!question || pending) return;
-    const next: Msg[] = [...msgs, { role: "user", text: question }];
-    setMsgs(next);
-    setText("");
-    setError(null);
-    start(async () => {
-      const r = await askHelpAction(next.slice(-12).map((m) => ({ role: m.role, text: m.text })));
-      if (r.ok) setMsgs((m) => [...m, { role: "assistant", text: r.answer, suggest: r.suggestRequest ? { subject: r.subject, topic: r.topic } : undefined }]);
-      else setError(r.error);
-    });
+    if (askChat(q)) setText("");
   };
-  const transcript = () => msgs.map((m) => `${m.role === "user" ? "Me" : "Assistant"}: ${m.text}`).join("\n\n");
 
   return (
     <section aria-labelledby="ai-title" className="card flex min-h-[460px] flex-col overflow-hidden">
@@ -161,7 +146,7 @@ function Assistant({ onSend }: { onSend: (d: Draft) => void }) {
           <div className="space-y-3">
             <p className="text-sm text-slate">Hi! I can explain how anything in Locenti works. Try one of these:</p>
             <div className="flex flex-wrap gap-2">
-              {STARTERS.map((s) => (
+              {HELP_STARTERS.map((s) => (
                 <button key={s} type="button" onClick={() => ask(s)} className="rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-medium text-ink transition-colors hover:border-green/50 hover:bg-mint-soft/40">
                   {s}
                 </button>

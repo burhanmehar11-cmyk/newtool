@@ -338,7 +338,7 @@ People open requests from **Support** in the app (topic, subject, message, urgen
 - A new request or reply emails everyone in `ADMIN_EMAILS`; your reply emails the person (from `hello@locenti.com`) and notifies them in the app.
 - Requests waiting on you longer than `SUPPORT_SLA_HOURS` (default 24) are flagged.
 - Needs migrations `0019_support.sql` and `0021_support_numbers.sql` (ticket numbers like LOC-1042).
-- **Help & Support** (what users see): Quick picks with instant answers, an AI assistant that answers how-to questions from Locenti's help content (uses `GEMINI_API_KEY`; hidden if it isn't set), the request form, and their requests with ticket numbers. Opening a request emails them a confirmation with the number.
+- **Help & Support** (what users see): Quick picks with instant answers, an AI assistant that answers how-to questions from Locenti's help content (uses `GEMINI_API_KEY`; hidden if it isn't set), the request form, and their requests with ticket numbers. Opening a request emails them a confirmation with the number. The same assistant and request form are in the chat bubble at the bottom-right of every app page.
 - The admin header's **Support** tab shows a red count of requests waiting on you.
 - **Handling a ticket through your assistant:** the same `ADMIN_API_TOKEN` also works on `https://locenti.com/api/admin/support` (list the queue, open `?ref=LOC-1042`, reply, add a note, change status or priority).
 

@@ -6,6 +6,7 @@ import { WorkspaceSwitcher } from "@/features/product/workspace-switcher";
 import { getActiveWorkspace, listWorkspaces } from "@/server/auth";
 import { Skeleton } from "@/components/ui/misc";
 import { SchemaBanner } from "@/features/product/schema-banner";
+import { helpAssistantAvailable } from "@/server/services/help-assistant";
 
 export const metadata: Metadata = {
   title: { default: "Workspace", template: "%s · Locenti" },
@@ -29,6 +30,7 @@ async function WorkspaceSlot() {
 export default function ProductLayout({ children }: LayoutProps<"/app">) {
   return (
     <ProductShell
+      assistant={helpAssistantAvailable()}
       workspaceSlot={
         <Suspense fallback={<Skeleton className="h-[58px] w-full rounded-[10px]" />}>
           <WorkspaceSlot />
