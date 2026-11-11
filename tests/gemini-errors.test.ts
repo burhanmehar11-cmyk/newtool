@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 /** Gemini calls: thinking can be turned off on Flash, and Google's errors are explained (without the key). */
 
 vi.mock("server-only", () => ({}));
-const { generateJson } = await import("@/server/ai/gemini");
+const { generateJson, geminiModel, flashVersion, DEFAULT_GEMINI_MODEL } = await import("@/server/ai/gemini");
 
 function reply(status: number, body: unknown) {
   const f = vi.fn(async () => new Response(JSON.stringify(body), { status }));
@@ -17,14 +17,26 @@ afterEach(() => {
 });
 
 describe("generateJson", () => {
-  it("turns thinking off on Flash when asked", async () => {
+  it("turns thinking off on 2.x Flash when asked", async () => {
     vi.stubEnv("GEMINI_API_KEY", "k");
+    vi.stubEnv("GEMINI_MODEL", "gemini-2.5-flash");
     const f = reply(200, { candidates: [{ content: { parts: [{ text: '{"answer":"hi"}' }] }, finishReason: "STOP" }] });
     expect(await generateJson("s", "u", {}, { thinking: false, maxOutputTokens: 1024 })).toEqual({ ok: true, text: '{"answer":"hi"}' });
     const body = JSON.parse((f.mock.calls[0] as unknown as [string, { body: string }])[1].body);
     expect(body.generationConfig).toMatchObject({ maxOutputTokens: 1024, thinkingConfig: { thinkingBudget: 0 } });
     await generateJson("s", "u", {});
     expect(JSON.parse((f.mock.calls[1] as unknown as [string, { body: string }])[1].body).generationConfig.thinkingConfig).toBeUndefined();
+  });
+
+  it("uses the current default model, leaving room for thinking it can't turn off", async () => {
+    vi.stubEnv("GEMINI_API_KEY", "k");
+    const f = reply(200, { candidates: [{ content: { parts: [{ text: "{}" }] }, finishReason: "STOP" }] });
+    await generateJson("s", "u", {}, { thinking: false, maxOutputTokens: 1024 });
+    const [url, init] = f.mock.calls[0] as unknown as [string, { body: string }];
+    expect(url).toContain(`/models/${DEFAULT_GEMINI_MODEL}:generateContent`);
+    const cfg = JSON.parse(init.body).generationConfig;
+    expect(cfg.thinkingConfig).toBeUndefined();
+    expect(cfg.maxOutputTokens).toBe(4096);
   });
 
   it("leaves thinking alone on Pro models", async () => {
@@ -49,5 +61,41 @@ describe("generateJson", () => {
     vi.stubEnv("GEMINI_API_KEY", "k");
     reply(200, { candidates: [{ content: { parts: [{ text: '{"answer":"Loc' }] }, finishReason: "MAX_TOKENS" }] });
     expect(await generateJson("s", "u", {})).toMatchObject({ ok: false, detail: "finishReason MAX_TOKENS" });
+  });
+
+  it("picks only plain Flash models when looking for a replacement", () => {
+    expect(flashVersion("models/gemini-3.8-flash")).toBe(3.8);
+    expect(flashVersion("gemini-4-flash")).toBe(4);
+    expect(flashVersion("models/gemini-3.8-flash-lite")).toBeNull();
+    expect(flashVersion("models/gemini-3.8-flash-preview-09")).toBeNull();
+    expect(flashVersion("models/gemini-3-pro")).toBeNull();
+  });
+
+  // Last: the replacement it finds is remembered for the rest of the run.
+  it("switches to the newest Flash model this key can use when the model is retired", async () => {
+    vi.stubEnv("GEMINI_API_KEY", "k");
+    const f = vi.fn(async (url: string) => {
+      if (url.includes("/models?")) return new Response(JSON.stringify({ models: [
+        { name: "models/gemini-2.5-flash", supportedGenerationMethods: ["generateContent"] },
+        { name: "models/gemini-4.1-flash", supportedGenerationMethods: ["generateContent"] },
+        { name: "models/gemini-5-flash-lite", supportedGenerationMethods: ["generateContent"] },
+        { name: "models/gemini-5-flash", supportedGenerationMethods: ["embedContent"] },
+      ] }), { status: 200 });
+      if (url.includes("gemini-4.1-flash:generateContent")) return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: '{"answer":"ok"}' }] }, finishReason: "STOP" }] }), { status: 200 });
+      return new Response(JSON.stringify({ error: { status: "NOT_FOUND", message: "This model is no longer available to new users." } }), { status: 404 });
+    });
+    vi.stubGlobal("fetch", f);
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    expect(await generateJson("s", "u", {})).toEqual({ ok: true, text: '{"answer":"ok"}' });
+    expect(geminiModel()).toBe("gemini-4.1-flash");
+  });
+
+  it("keeps an explicitly chosen model and explains the error", async () => {
+    vi.stubEnv("GEMINI_API_KEY", "k");
+    vi.stubEnv("GEMINI_MODEL", "gemini-old-flash");
+    reply(404, { error: { status: "NOT_FOUND", message: "gone" } });
+    const r = await generateJson("s", "u", {});
+    expect(r).toMatchObject({ ok: false, message: expect.stringMatching(/gemini-old-flash/) });
+    expect(r).not.toHaveProperty("status");
   });
 });
