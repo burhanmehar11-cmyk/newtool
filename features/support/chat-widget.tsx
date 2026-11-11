@@ -50,7 +50,7 @@ export function ChatWidget({ assistant, site = false }: { assistant: boolean; si
           className="fixed inset-x-3 bottom-24 z-40 flex max-h-[min(640px,calc(100dvh-120px))] flex-col overflow-hidden rounded-3xl border border-line bg-surface shadow-[0_24px_70px_-20px_rgb(5_12_18/0.45)] sm:inset-x-auto sm:right-6 sm:w-[390px] origin-bottom-right animate-[chat-in_200ms_var(--ease-out-soft)] motion-reduce:animate-none"
         >
           {/* Header */}
-          <div className="relative overflow-hidden bg-midnight px-5 pb-5 pt-4 text-white">
+          <div className="relative shrink-0 overflow-hidden bg-midnight px-5 pb-4 pt-4 text-white sm:pb-5">
             <div aria-hidden className="pointer-events-none absolute inset-0 bg-[repeating-linear-gradient(135deg,rgb(143_240_192/0.07)_0_10px,transparent_10px_20px)]" />
             <div className="relative flex items-center justify-between">
               {view === "chat" ? (
@@ -75,15 +75,23 @@ export function ChatWidget({ assistant, site = false }: { assistant: boolean; si
             <div className="relative mt-4 flex flex-col items-center text-center">
               {aiView ? (
                 <>
-                  <div className="flex items-center -space-x-2.5">
-                    <span className="relative z-10 flex size-12 items-center justify-center rounded-full border-2 border-midnight bg-mint text-midnight">
-                      <LogoMark className="size-6" />
-                      <span aria-hidden className="absolute bottom-0 right-0 size-3 rounded-full border-2 border-midnight bg-green" />
-                    </span>
-                    <TeamFaces size={44} ring="border-midnight" />
-                  </div>
+                  <span className="relative flex size-12 items-center justify-center rounded-full border-2 border-midnight bg-mint text-midnight">
+                    <LogoMark className="size-6" />
+                    <span aria-hidden className="absolute bottom-0 right-0 size-3 rounded-full border-2 border-midnight bg-green" />
+                  </span>
                   <p className="mt-3 font-display text-lg font-bold">Locenti AI Assistant</p>
-                  <p className="mt-1 text-xs text-white/70">{site ? "Instant answers about Locenti, with our team close by." : "Instant answers about anything in Locenti, with our team close by."}</p>
+                  <p className="mt-1 text-xs text-white/70">{site ? "Instant answers about Locenti, any time." : "Instant answers about anything in Locenti, any time."}</p>
+                  {/* The people are the team, not the AI: shown apart, with their own way in. */}
+                  <button
+                    type="button"
+                    onClick={() => setView("team")}
+                    className="mt-3 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 py-1 pl-1 pr-3 text-xs font-semibold text-white transition-colors hover:border-mint/40 hover:bg-white/10"
+                  >
+                    <span className="flex -space-x-1.5">
+                      <TeamFaces size={24} ring="border-midnight" />
+                    </span>
+                    Prefer a person? Talk to the team <ArrowRight aria-hidden className="size-3.5 text-mint" />
+                  </button>
                 </>
               ) : (
                 <>
@@ -101,7 +109,7 @@ export function ChatWidget({ assistant, site = false }: { assistant: boolean; si
 
           {view === "chat" ? (
             <>
-              <div ref={listRef} className="min-h-[240px] flex-1 space-y-3 overflow-y-auto px-4 py-4" aria-live="polite">
+              <div ref={listRef} className="min-h-[140px] flex-1 space-y-3 overflow-y-auto px-4 py-4" aria-live="polite">
                 <Bubble role="assistant">
                   {site
                     ? "Hi! I'm Locenti's AI assistant. Ask me what Locenti does, how it finds businesses and emails, or how the free trial works."
