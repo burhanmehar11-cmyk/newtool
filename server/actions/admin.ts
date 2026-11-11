@@ -32,3 +32,8 @@ export async function stopAnnouncementAction(id: string) {
   revalidatePath("/admin");
   return r;
 }
+
+export async function sendWelcomeTestAction() {
+  const { sendWelcomeTest } = await import("@/server/services/announcements");
+  return sendWelcomeTest();
+}

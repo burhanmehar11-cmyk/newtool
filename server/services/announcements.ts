@@ -145,6 +145,19 @@ export async function continueAnnouncement(id: string, actor?: Actor): Promise<{
   return { ok: true, sent, failed, remaining, done, note };
 }
 
+/** Sends the welcome email (as new users get it) to the admin, to see how it looks. */
+export async function sendWelcomeTest(actor?: Actor): Promise<{ ok: true; to: string } | { ok: false; error: string }> {
+  const admin = await actorOr(actor);
+  if (!admin.email) return { ok: false, error: "Your account has no email address." };
+  try {
+    const { sendWelcomePreview } = await import("@/server/services/welcome");
+    await sendWelcomePreview(admin.email);
+    return { ok: true, to: admin.email };
+  } catch (e) {
+    return { ok: false, error: `Couldn't send it: ${(e as Error).message}` };
+  }
+}
+
 /** Stops a send that's under way (those already emailed stay emailed). */
 export async function stopAnnouncement(id: string, actor?: Actor): Promise<{ ok: boolean }> {
   await actorOr(actor);

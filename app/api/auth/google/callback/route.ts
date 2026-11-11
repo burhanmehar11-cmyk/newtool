@@ -1,4 +1,5 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse, type NextRequest, after } from "next/server";
+import { sendWelcomeEmail } from "@/server/services/welcome";
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import { GOOGLE_ISSUERS, GOOGLE_JWKS_URL, GOOGLE_TOKEN_URL, SESSION_COOKIE, SIGNED_IN_COOKIE, SIGNUP_SOURCE_COOKIE, STATE_COOKIE } from "@/lib/auth/constants";
 import { parseAttribution } from "@/lib/attribution";
@@ -67,6 +68,8 @@ export async function GET(request: NextRequest) {
     const src = parseAttribution(request.cookies.get(SIGNUP_SOURCE_COOKIE)?.value ?? null);
     if (src) await withService((q) => recordAttribution(q as unknown as Q, userId, src)).catch(() => undefined);
     token = await newSessionToken(userId, request.headers.get("user-agent"));
+    // A brand-new account gets the welcome email (once; skipped for everyone else), after the response.
+    after(() => sendWelcomeEmail(userId));
   } catch {
     return fail("server");
   }

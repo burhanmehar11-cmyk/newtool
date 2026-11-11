@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { adminEmails } from "@/lib/admin";
 import { findTemplate } from "@/lib/announcements";
-import { continueAnnouncement, getAnnouncementsData, sendAnnouncementTest, startAnnouncement, stopAnnouncement, type Actor } from "@/server/services/announcements";
+import { continueAnnouncement, getAnnouncementsData, sendAnnouncementTest, sendWelcomeTest, startAnnouncement, stopAnnouncement, type Actor } from "@/server/services/announcements";
 
 /**
  * Private admin API for announcements, so the owner (or their assistant) can
@@ -17,6 +17,7 @@ import { continueAnnouncement, getAnnouncementsData, sendAnnouncementTest, start
  *   POST {action:"send", template | subject+body, confirm:true} → starts and sends for ~45 s
  *   POST {action:"continue", id}          → sends the next batch
  *   POST {action:"stop", id}              → stops a send
+ *   POST {action:"welcome_test"}          → the new-user welcome email, to the owner
  */
 
 export const maxDuration = 60;
@@ -57,6 +58,7 @@ const bodySchema = z.discriminatedUnion("action", [
   draft.extend({ action: z.literal("send"), confirm: z.literal(true) }),
   z.object({ action: z.literal("continue"), id: z.string().uuid() }),
   z.object({ action: z.literal("stop"), id: z.string().uuid() }),
+  z.object({ action: z.literal("welcome_test") }),
 ]);
 
 /** A template by id, with subject or body overridden if given. */
@@ -73,6 +75,7 @@ export async function POST(request: NextRequest) {
   const b = parsed.data;
 
   if (b.action === "test") return NextResponse.json(await sendAnnouncementTest(resolveDraft(b), actor));
+  if (b.action === "welcome_test") return NextResponse.json(await sendWelcomeTest(actor));
   if (b.action === "stop") return NextResponse.json(await stopAnnouncement(b.id, actor));
   if (b.action === "continue") return NextResponse.json(await continueAnnouncement(b.id, actor));
 

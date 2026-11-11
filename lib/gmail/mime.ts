@@ -8,6 +8,8 @@ export type OutgoingEmail = {
   to: string;
   subject: string;
   text: string;
+  /** Optional HTML version; the text stays as the fallback (multipart/alternative). */
+  html?: string | null;
   replyTo?: string | null;
   /** Extra headers, e.g. List-Unsubscribe. */
   headers?: Record<string, string>;
@@ -49,9 +51,15 @@ export function buildMessage(m: OutgoingEmail): string {
     if (!/^[A-Za-z][A-Za-z0-9-]{0,60}$/.test(k)) throw new Error("Invalid header name");
     lines.push(`${k}: ${safe(v, k)}`);
   }
-  lines.push("MIME-Version: 1.0", "Content-Type: text/plain; charset=UTF-8", "Content-Transfer-Encoding: base64", "");
-  const body = Buffer.from(m.text.replace(/\r?\n/g, "\r\n"), "utf8").toString("base64").replace(/.{76}/g, "$&\r\n");
-  return `${lines.join("\r\n")}\r\n${body}`;
+  const b64 = (s: string) => Buffer.from(s.replace(/\r?\n/g, "\r\n"), "utf8").toString("base64").replace(/.{76}/g, "$&\r\n");
+  if (!m.html) {
+    lines.push("MIME-Version: 1.0", "Content-Type: text/plain; charset=UTF-8", "Content-Transfer-Encoding: base64", "");
+    return `${lines.join("\r\n")}\r\n${b64(m.text)}`;
+  }
+  const boundary = `locenti-${Buffer.from(m.subject + m.to).toString("hex").slice(0, 16)}-${Date.now().toString(36)}`;
+  lines.push("MIME-Version: 1.0", `Content-Type: multipart/alternative; boundary="${boundary}"`, "");
+  const part = (type: string, content: string) => [`--${boundary}`, `Content-Type: ${type}; charset=UTF-8`, "Content-Transfer-Encoding: base64", "", b64(content)].join("\r\n");
+  return `${lines.join("\r\n")}\r\n${part("text/plain", m.text)}\r\n${part("text/html", m.html)}\r\n--${boundary}--\r\n`;
 }
 
 export function toGmailRaw(message: string) {

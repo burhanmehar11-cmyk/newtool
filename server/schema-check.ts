@@ -25,6 +25,7 @@ const MARKERS: { file: string; sql: string }[] = [
   { file: "0015_campaign_delete.sql", sql: "select 1 from information_schema.columns where table_schema = 'public' and table_name = 'campaigns' and column_name = 'deleted_at'" },
   { file: "0016_activity_notifications.sql", sql: "select 1 from information_schema.tables where table_schema = 'public' and table_name = 'notifications'" },
   { file: "0017_announcements.sql", sql: "select 1 from information_schema.tables where table_schema = 'app' and table_name = 'announcements'" },
+  { file: "0018_welcome.sql", sql: "select 1 from information_schema.columns where table_schema = 'auth' and table_name = 'users' and column_name = 'welcomed_at'" },
 ];
 
 export const LATEST_MIGRATION = MARKERS.at(-1)!.file;

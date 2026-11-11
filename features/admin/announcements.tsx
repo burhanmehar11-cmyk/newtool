@@ -5,6 +5,7 @@ import { formatDateTime } from "@/lib/utils";
 import { adminTimeZone } from "@/lib/admin";
 import { getAnnouncementsData } from "@/server/services/announcements";
 import { AnnouncementComposer } from "@/features/admin/announcement-composer";
+import { WelcomePreview } from "@/features/admin/welcome-preview";
 
 /** Admin → Announcements: write or pick a product email, test it, send it to every registered user. */
 export async function AnnouncementsTab() {
@@ -35,6 +36,7 @@ export async function AnnouncementsTab() {
           </div>
         </div>
       )}
+      <WelcomePreview />
       <AnnouncementComposer
         templates={d.templates}
         recipients={d.recipients}

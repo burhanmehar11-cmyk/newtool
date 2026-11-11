@@ -105,3 +105,20 @@ describe("Gmail OAuth client choice", () => {
     expect(gmailOAuth()).toEqual({ clientId: "gmail-id", clientSecret: "gmail-secret" });
   });
 });
+
+describe("HTML emails", () => {
+  it("sends text and HTML together (multipart/alternative)", async () => {
+    const { buildMessage } = await import("@/lib/gmail/mime");
+    const raw = buildMessage({ from: { email: "hello@locenti.example", name: "Locenti" }, to: "sam@shop.example", subject: "Welcome", text: "Hi Sam", html: "<p>Hi <b>Sam</b></p>", replyTo: "hello@locenti.example" });
+    const boundary = /boundary="([^"]+)"/.exec(raw)![1];
+    expect(raw).toContain("Content-Type: multipart/alternative");
+    const parts = raw.split(`--${boundary}`);
+    expect(parts).toHaveLength(4); // preamble, text, html, closing
+    expect(parts[1]).toContain("Content-Type: text/plain");
+    expect(parts[2]).toContain("Content-Type: text/html");
+    const decode = (p: string) => Buffer.from(p.split("\r\n\r\n")[1].replace(/\r\n/g, ""), "base64").toString("utf8");
+    expect(decode(parts[1])).toBe("Hi Sam");
+    expect(decode(parts[2])).toBe("<p>Hi <b>Sam</b></p>");
+    expect(parts[3].trim()).toBe("--");
+  });
+});
