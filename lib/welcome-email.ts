@@ -45,10 +45,9 @@ Three steps to your first replies:
 Open your dashboard: ${v.site}/app
 (New here? Press "Take the tour" on your dashboard for a one-minute walkthrough.)
 
-Questions, or stuck on a step? Just reply to this email. I read every one.
+Questions, or stuck on a step? Just reply to this email. We read every one.
 
-Burhan
-Founder, Locenti
+Team Locenti
 `;
 
   const step = (n: number, s: (typeof STEPS)[number]) => `
@@ -114,10 +113,9 @@ Founder, Locenti
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid ${C.line};">
                 <tr>
                   <td style="padding-top:20px;font:400 15px/23px Arial,Helvetica,sans-serif;color:${C.ink};">
-                    Questions, or stuck on a step? Just reply to this email. I read every one.
+                    Questions, or stuck on a step? Just reply to this email. We read every one.
                     <br><br>
-                    <strong>Burhan</strong><br>
-                    <span style="color:${C.slate};">Founder, Locenti</span>
+                    <strong>Team Locenti</strong>
                   </td>
                 </tr>
               </table>

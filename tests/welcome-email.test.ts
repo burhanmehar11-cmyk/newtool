@@ -17,3 +17,14 @@ describe("welcome email content", () => {
     expect(welcomeEmail({ ...v, firstName: "<b>x</b>" }).html).not.toContain("<b>x</b>");
   });
 });
+
+describe("sign-off", () => {
+  it("is from Team Locenti, never a named founder", async () => {
+    const { ANNOUNCEMENT_TEMPLATES } = await import("@/lib/announcements");
+    const m = welcomeEmail({ firstName: "Sam", site: "https://locenti.com", trialDays: 14, replyTo: "hello@locenti.com" });
+    for (const t of [m.text, m.html, ...ANNOUNCEMENT_TEMPLATES.map((x) => x.body)]) {
+      expect(t).toContain("Team Locenti");
+      expect(t).not.toMatch(/Burhan|Founder|\bI read\b/);
+    }
+  });
+});

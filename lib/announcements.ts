@@ -33,10 +33,9 @@ New here, or showing a teammate around? Press "Take the tour" on your dashboard.
 
 Try a search now: {{site}}/app/discover
 
-Reply to this email if anything's missing. I read every reply.
+Reply to this email if anything's missing. We read every reply.
 
-Burhan
-Founder, Locenti`,
+Team Locenti`,
   },
   {
     id: "first-campaign",
@@ -64,10 +63,9 @@ Nothing is sent until you approve. Emails go out within your sending hours, and 
 
 Start here: {{site}}/app
 
-Stuck on a step? Just reply; I'll help.
+Stuck on a step? Just reply; we'll help.
 
-Burhan
-Founder, Locenti`,
+Team Locenti`,
   },
   {
     id: "reply-tips",
@@ -95,8 +93,7 @@ Plenty of replies come after a short, polite follow-up. Add one to your campaign
 
 Put it into practice: {{site}}/app/campaigns
 
-Burhan
-Founder, Locenti`,
+Team Locenti`,
   },
   {
     id: "trial",
@@ -115,10 +112,9 @@ Three things worth doing this week:
 
 Your dashboard: {{site}}/app
 
-If something doesn't work the way you expected, reply and tell me. That's how Locenti gets better.
+If something doesn't work the way you expected, reply and tell us. That's how Locenti gets better.
 
-Burhan
-Founder, Locenti`,
+Team Locenti`,
   },
 ];
 

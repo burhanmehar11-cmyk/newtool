@@ -19,7 +19,6 @@ export function homepageJsonLd() {
     logo: `${brand.siteUrl}/brand/locentio-logo-512.png`,
     email: brand.supportEmail,
     description: brand.description,
-    ...(brand.legalEntity ? { founder: { "@type": "Person", name: brand.legalEntity } } : {}),
     ...(sameAs.length ? { sameAs } : {}),
   };
   return {
