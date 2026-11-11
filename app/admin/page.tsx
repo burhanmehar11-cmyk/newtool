@@ -92,7 +92,7 @@ async function Admin({ searchParams }: { searchParams: PageProps<"/admin">["sear
         <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
           <div>
             <h1 className="font-display text-2xl font-bold tracking-tight text-ink">{LABELS[tab]}</h1>
-            <p className="mt-0.5 text-sm text-slate">Live numbers from the database, across every workspace.</p>
+            <p className="mt-0.5 text-sm text-slate">{tab === "announcements" ? "Email everyone who signed up: news, tips and updates." : "Live numbers from the database, across every workspace."}</p>
           </div>
           {WITH_PERIOD.includes(tab) ? (
             <nav aria-label="Period" className="flex rounded-lg border border-line bg-surface p-0.5">
