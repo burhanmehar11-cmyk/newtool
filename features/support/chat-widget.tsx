@@ -2,7 +2,8 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, Bot, CheckCircle2, Clock, Loader2, MessageCircle, Send, Sparkles, UserRound, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle2, Clock, Loader2, MessageCircle, Send, UserRound, X } from "lucide-react";
+import { LogoMark } from "@/components/brand/logo";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/field";
@@ -54,7 +55,7 @@ export function ChatWidget({ assistant, site = false }: { assistant: boolean; si
             <div className="relative flex items-center justify-between">
               {view === "chat" ? (
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-mint/30 bg-mint/10 px-3 py-1 text-xs font-semibold text-mint">
-                  <Sparkles aria-hidden className="size-3.5" /> AI assistant
+                  <LogoMark className="size-3.5" /> AI assistant
                 </span>
               ) : (
                 <button type="button" onClick={() => setView(assistant ? "chat" : "team")} className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium text-white/70 hover:text-white" disabled={!assistant}>
@@ -76,7 +77,7 @@ export function ChatWidget({ assistant, site = false }: { assistant: boolean; si
                 <>
                   <div className="flex items-center -space-x-2.5">
                     <span className="relative z-10 flex size-12 items-center justify-center rounded-full border-2 border-midnight bg-mint text-midnight">
-                      <Sparkles aria-hidden className="size-6" />
+                      <LogoMark className="size-6" />
                       <span aria-hidden className="absolute bottom-0 right-0 size-3 rounded-full border-2 border-midnight bg-green" />
                     </span>
                     <TeamFaces size={44} ring="border-midnight" />
@@ -265,7 +266,7 @@ function TeamFaces({ size, ring }: { size: number; ring: string }) {
 function Avatar() {
   return (
     <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-midnight text-mint">
-      <Bot aria-hidden className="size-4" />
+      <LogoMark className="size-4" />
     </span>
   );
 }
