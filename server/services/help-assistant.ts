@@ -2,7 +2,7 @@ import "server-only";
 import { z } from "zod";
 import { brand } from "@/config/brand";
 import { PRODUCT_FACTS, QUICK_PICKS } from "@/lib/help-content";
-import { generateJson, geminiKey } from "@/server/ai/gemini";
+import { generateJson, geminiKey, geminiModel } from "@/server/ai/gemini";
 import { requireUser } from "@/server/auth";
 import { clientIp } from "@/server/session";
 
@@ -105,7 +105,8 @@ export async function askVisitorAssistant(input: unknown): Promise<HelpAnswer> {
 async function answer(system: string, messages: { role: "user" | "assistant"; text: string }[]): Promise<HelpAnswer> {
   const p = { data: { messages } };
   const transcript = p.data.messages.map((m) => `${m.role === "user" ? "Person" : "Assistant"}: ${m.text}`).join("\n\n");
-  const r = await generateJson(system, `Conversation so far:\n\n${transcript}\n\nWrite the assistant's next reply.`, SCHEMA);
+  const r = await generateJson(system, `Conversation so far:\n\n${transcript}\n\nWrite the assistant's next reply.`, SCHEMA, { thinking: false, maxOutputTokens: 1024 });
+  if (!r.ok) console.error(`[help-assistant] ${r.code}: ${r.message}${r.detail ? ` (${r.detail})` : ""}`);
   if (!r.ok) return { ok: false, error: r.code === "quota" ? "The assistant is busy right now. Try again in a little while, or send us a request below." : "The assistant couldn't answer just now. Try again, or send us a request below." };
   try {
     const j = JSON.parse(r.text) as { answer?: unknown; suggestRequest?: unknown; topic?: unknown; subject?: unknown };
@@ -115,6 +116,23 @@ async function answer(system: string, messages: { role: "user" | "assistant"; te
     const subject = typeof j.subject === "string" ? j.subject.trim().slice(0, 200) : "";
     return { ok: true, answer, suggestRequest: j.suggestRequest === true, topic, subject };
   } catch {
+    console.error(`[help-assistant] unreadable reply: ${r.text.slice(0, 200)}`);
     return { ok: false, error: "The assistant couldn't answer just now. Try again, or send us a request below." };
+  }
+}
+
+/** For the private admin API: asks the assistant one test question and reports exactly what happened (never the key). */
+export async function diagnoseHelpAssistant() {
+  const base = { keySet: !!geminiKey(), model: geminiModel() };
+  if (!base.keySet) return { ...base, ok: false, code: "not_configured", message: "GEMINI_API_KEY isn't set on this deployment." };
+  const started = Date.now();
+  const r = await generateJson(VISITOR_SYSTEM, "Conversation so far:\n\nPerson: What does Locenti do?\n\nWrite the assistant's next reply.", SCHEMA, { thinking: false, maxOutputTokens: 1024 });
+  const ms = Date.now() - started;
+  if (!r.ok) return { ...base, ok: false, ms, code: r.code, message: r.message, detail: r.detail ?? null };
+  try {
+    const j = JSON.parse(r.text) as { answer?: string };
+    return { ...base, ok: !!j.answer, ms, sample: String(j.answer ?? "").slice(0, 300) };
+  } catch {
+    return { ...base, ok: false, ms, code: "unreadable", message: "The AI replied, but not in the expected format.", detail: r.text.slice(0, 300) };
   }
 }
