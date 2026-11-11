@@ -173,4 +173,26 @@ describe("generateJson", () => {
     expect(r).toMatchObject({ ok: false, code: "busy", message: expect.stringMatching(/busy/) });
     expect(r).not.toHaveProperty("retryable");
   });
+
+  it("uses another model when one's allowance is used up, past retired ones, and rests the used-up one", async () => {
+    vi.resetModules();
+    const g = await import("@/server/ai/gemini");
+    vi.stubEnv("GEMINI_API_KEY", "k");
+    const calls: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      if (url.includes("/models?")) return new Response(JSON.stringify({ models: ["gemini-3.8-flash", "gemini-2.5-flash", "gemini-3.5-flash-lite"].map((n) => ({ name: `models/${n}`, supportedGenerationMethods: ["generateContent"] })) }), { status: 200 });
+      const model = /models\/([^:]+):/.exec(url)![1];
+      calls.push(model);
+      if (model === "gemini-3.8-flash") return new Response(JSON.stringify({ error: { status: "RESOURCE_EXHAUSTED", message: "You exceeded your current quota. Quota exceeded for metric: free_tier_requests, limit: 20" } }), { status: 429 });
+      if (model === "gemini-2.5-flash") return new Response(JSON.stringify({ error: { status: "NOT_FOUND", message: "no longer available to new users" } }), { status: 404 });
+      return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: '{"answer":"lite"}' }] }, finishReason: "STOP" }] }), { status: 200 });
+    }));
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    expect(await g.generateJson("s", "u", {})).toEqual({ ok: true, text: '{"answer":"lite"}' });
+    expect(calls).toEqual(["gemini-3.8-flash", "gemini-2.5-flash", "gemini-3.5-flash-lite"]);
+    // Next question skips the used-up model and starts with the next one available.
+    calls.length = 0;
+    expect(await g.generateJson("s", "u", {})).toEqual({ ok: true, text: '{"answer":"lite"}' });
+    expect(calls).toEqual(["gemini-2.5-flash", "gemini-3.5-flash-lite"]);
+  });
 });
