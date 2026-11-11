@@ -43,7 +43,10 @@ describe("announcements", () => {
     expect(to).toBe("owner@locenti.com");
     expect(subject).toBe("[Test] Hi Owner");
     expect(text).toContain("Hello Owner, visit https://locenti.com for your 14-day trial.");
-    expect(text).toMatch(/Stop product emails: https:\/\/locenti\.com\/updates\/unsubscribe\/\S+/);
+    // One short line at the end, nothing else (owner's request).
+    // (This admin has no account row here, so the longer link is used; accounts get the short /u/ link, tested below.)
+    expect(text).toMatch(/\n\nUnsubscribe: https:\/\/locenti\.com\/(u|updates\/unsubscribe)\/\S+$/);
+    expect(text).not.toMatch(/You're getting this|--/);
     expect(opts).toMatchObject({ replyTo: "hello@locenti.com", headers: { "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" } });
   });
 
@@ -86,5 +89,20 @@ describe("announcements", () => {
     expect(await svc.unsubscribeFromUpdates(token)).toBe(true);
     expect(await svc.unsubscribeFromUpdates(token)).toBe(true); // twice is fine
     expect((await svc.getAnnouncementsData()).recipients).toBe(2);
+  });
+
+  it("puts a short link in the email that unsubscribes the right person, and refuses a tampered one", async () => {
+    h.send.mockReset().mockResolvedValue(undefined);
+    const started = await svc.startAnnouncement({ subject: "Short", body: "Hello {{first_name}}, a short note today.", confirm: true });
+    if (!started.ok) throw new Error(started.error);
+    await svc.continueAnnouncement(started.id);
+    const text: string = h.send.mock.calls.find((c) => c[0] === "carla@bakery.example")![2];
+    const token = /\/u\/([A-Za-z0-9_-]{33})$/.exec(text)![1];
+    expect(await svc.peekUpdatesUnsubscribe(token)).toBe("carla@bakery.example");
+    const tampered = token.slice(0, -1) + (token.endsWith("A") ? "B" : "A");
+    expect(await svc.peekUpdatesUnsubscribe(tampered)).toBeNull();
+    expect(await svc.unsubscribeFromUpdates(tampered)).toBe(false);
+    expect(await svc.unsubscribeFromUpdates(token)).toBe(true);
+    expect((await svc.getAnnouncementsData()).recipients).toBe(1);
   });
 });

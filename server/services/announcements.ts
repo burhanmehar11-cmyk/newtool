@@ -3,7 +3,7 @@ import { z } from "zod";
 import { brand } from "@/config/brand";
 import { ANNOUNCEMENT_TEMPLATES, findTemplate, firstNameOf, renderAnnouncement } from "@/lib/announcements";
 import { trialDays } from "@/lib/admin";
-import { signUpdatesUnsubscribe, verifyUpdatesUnsubscribe } from "@/lib/updates-unsubscribe";
+import { readShortUnsubscribeToken, shortUnsubscribeToken, signUpdatesUnsubscribe, verifyUpdatesUnsubscribe } from "@/lib/updates-unsubscribe";
 import type { Q } from "@/server/auth-store";
 import { withService } from "@/server/db";
 import { emailChannel, sendEmail } from "@/server/email";
@@ -46,21 +46,16 @@ export async function getAnnouncementsData(actor?: Actor) {
   }
 }
 
-async function composeFor(r: { email: string; name: string | null }, subject: string, body: string) {
+async function composeFor(r: { email: string; name: string | null; user_id?: string | null }, subject: string, body: string) {
   const secret = sessionSecret();
   if (!secret) throw new Error("SESSION_SECRET missing");
+  // The one-click header uses the full token (no lookup); the visible line uses the short link.
   const token = await signUpdatesUnsubscribe(r.email, secret);
+  const userId = r.user_id ?? (await svc((q) => q.query<{ id: string }>("select id from auth.users where lower(email) = $1 limit 1", [r.email.toLowerCase()]))).rows[0]?.id ?? null;
   const vars = { first_name: firstNameOf(r.name, r.email), site: site(), trial_days: trialDays() };
-  const unsubscribe = `${site()}/updates/unsubscribe/${token}`;
-  const footer = [
-    "",
-    "--",
-    `You're getting this because you have a ${brand.name} account (${r.email}).`,
-    `Stop product emails: ${unsubscribe}`,
-    brand.businessAddress ? `${brand.name}, ${brand.businessAddress}` : null,
-  ]
-    .filter((x) => x !== null)
-    .join("\n");
+  const unsubscribe = userId ? `${site()}/u/${shortUnsubscribeToken(userId, secret)}` : `${site()}/updates/unsubscribe/${token}`;
+  // Kept to one short line (owner's request). An opt-out in every marketing email is required by law (CAN-SPAM, PECR/GDPR) and by Gmail.
+  const footer = ["", `Unsubscribe: ${unsubscribe}`, brand.businessAddress ? `${brand.name}, ${brand.businessAddress}` : null].filter((x) => x !== null).join("\n");
   return {
     subject: renderAnnouncement(subject, vars),
     text: `${renderAnnouncement(body, vars)}\n${footer}`,
@@ -162,7 +157,10 @@ export async function stopAnnouncement(id: string, actor?: Actor): Promise<{ ok:
 
 export async function peekUpdatesUnsubscribe(token: string): Promise<string | null> {
   const secret = sessionSecret();
-  return secret ? verifyUpdatesUnsubscribe(token, secret) : null;
+  if (!secret) return null;
+  const userId = readShortUnsubscribeToken(token, secret);
+  if (userId) return (await svc((q) => q.query<{ email: string | null }>("select lower(email) as email from auth.users where id = $1", [userId])).catch(() => null))?.rows[0]?.email ?? null;
+  return verifyUpdatesUnsubscribe(token, secret);
 }
 
 export async function unsubscribeFromUpdates(token: string): Promise<boolean> {

@@ -8,7 +8,7 @@ import { brand } from "@/config/brand";
  */
 export default function robots(): MetadataRoute.Robots {
   return {
-    rules: [{ userAgent: "*", allow: "/", disallow: ["/demo", "/sign-in", "/sign-up", "/brand$", "/api/", "/app", "/admin", "/invite", "/unsubscribe", "/updates"] }],
+    rules: [{ userAgent: "*", allow: "/", disallow: ["/demo", "/sign-in", "/sign-up", "/brand$", "/api/", "/app", "/admin", "/invite", "/unsubscribe", "/updates", "/u/"] }],
     sitemap: `${brand.siteUrl}/sitemap.xml`,
   };
 }

@@ -144,14 +144,14 @@ export function AnnouncementComposer({ templates, recipients, optOuts, canSend, 
             <div className="rounded-xl border border-line bg-canvas p-4">
               <p className="text-sm font-semibold text-ink">{renderAnnouncement(subject, vars)}</p>
               <pre className="mt-3 whitespace-pre-wrap font-sans text-sm leading-6 text-ink">{renderAnnouncement(body, vars)}</pre>
-              <pre className="mt-3 whitespace-pre-wrap border-t border-line pt-3 font-sans text-xs leading-5 text-slate">{`You're getting this because you have a Locenti account (sam@example.com).\nStop product emails: ${site}/updates/unsubscribe/…`}</pre>
+              <pre className="mt-3 whitespace-pre-wrap border-t border-line pt-3 font-sans text-xs leading-5 text-slate">{`Unsubscribe: ${site}/u/…`}</pre>
             </div>
           ) : (
             <Textarea id="ann-body" value={body} onChange={(e) => (setBody(e.target.value), setTemplateId(null))} rows={16} className="font-mono text-[13px] leading-6" />
           )}
           <p className="text-xs text-slate">
             Plain text. <code className="font-mono">{"{{first_name}}"}</code> becomes each person&apos;s first name (or “there”), <code className="font-mono">{"{{site}}"}</code> the website and{" "}
-            <code className="font-mono">{"{{trial_days}}"}</code> the trial length. The unsubscribe line is added automatically.
+            <code className="font-mono">{"{{trial_days}}"}</code> the trial length. One short unsubscribe line is added at the end automatically (required in marketing emails).
           </p>
         </div>
       </div>
