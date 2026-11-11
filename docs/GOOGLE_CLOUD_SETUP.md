@@ -324,6 +324,13 @@ Locenti already gives search engines what they need: page titles and description
 
 Expect your homepage to appear for "Locenti" within days to a few weeks after indexing; nobody can guarantee the exact position or what an AI answer says, but these steps are what search engines and AI tools use.
 
+## Part N: Announcements to registered users
+
+Admin panel → **Announcements**: pick or write an email, send yourself a test, then send to everyone with a confirmed account who hasn't unsubscribed. Needs migration `0017_announcements.sql`.
+
+- **Sender:** `hello@locenti.com` by default (`ANNOUNCE_FROM` changes it). Through your connected Gmail, that address only shows if Gmail has it under **Settings → Accounts → Send mail as**; otherwise Gmail shows your Gmail address. With `SMTP_URL` it's used directly.
+- **Sending on request without the panel:** set `ADMIN_API_TOKEN` in Vercel to 32+ random characters (e.g. from a password manager) and redeploy. Requests to `https://locenti.com/api/admin/announcements` with `Authorization: Bearer <token>` can then list templates, send a test to you and send an announcement. Keep the token private; change it in Vercel to revoke access.
+
 ## Part F: First sign-in (owner)
 
 1. Open `https://YOUR-URL/sign-in` → **Continue with Google** → pick a Gmail account that is both a **test user** (Part B) and on `BETA_ALLOWED_EMAILS` (Part E).

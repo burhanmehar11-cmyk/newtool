@@ -22,8 +22,12 @@ import { requireAdmin } from "@/server/services/admin";
 
 const svc = <T,>(fn: (q: Q) => Promise<T>) => withService((q) => fn(q as unknown as Q));
 const site = () => configuredSiteUrl() ?? brand.siteUrl;
-/** Sender address to ask for, e.g. hello@locenti.com (see SendOptions.from). */
-const fromAddress = () => process.env.ANNOUNCE_FROM?.trim() || undefined;
+/** Sender address: ANNOUNCE_FROM, else the public contact address (hello@locenti.com). See SendOptions.from. */
+const fromAddress = () => process.env.ANNOUNCE_FROM?.trim() || brand.supportEmail;
+
+/** Who is acting: the signed-in admin (admin panel), or the owner through the admin API. */
+export type Actor = { email: string | null };
+const actorOr = async (actor?: Actor): Promise<Actor> => actor ?? (await requireAdmin());
 
 const draftSchema = z.object({
   template: z.string().max(40).nullable().optional(),
@@ -31,14 +35,14 @@ const draftSchema = z.object({
   body: z.string().trim().min(20, "Write the email.").max(20000),
 });
 
-export async function getAnnouncementsData() {
-  await requireAdmin();
+export async function getAnnouncementsData(actor?: Actor) {
+  await actorOr(actor);
   const channel = await emailChannel();
   try {
     const [recipients, history, optOuts] = await svc(async (q) => [await store.countRecipients(q), await store.listAnnouncements(q), await store.optOutCount(q)] as const);
-    return { ready: true as const, templates: ANNOUNCEMENT_TEMPLATES, recipients, history, optOuts, channel, from: fromAddress() ?? null, replyTo: brand.supportEmail, site: site(), trialDays: trialDays() };
+    return { ready: true as const, templates: ANNOUNCEMENT_TEMPLATES, recipients, history, optOuts, channel, from: fromAddress(), replyTo: brand.supportEmail, site: site(), trialDays: trialDays() };
   } catch {
-    return { ready: false as const, templates: ANNOUNCEMENT_TEMPLATES, recipients: 0, history: [], optOuts: 0, channel, from: fromAddress() ?? null, replyTo: brand.supportEmail, site: site(), trialDays: trialDays() };
+    return { ready: false as const, templates: ANNOUNCEMENT_TEMPLATES, recipients: 0, history: [], optOuts: 0, channel, from: fromAddress(), replyTo: brand.supportEmail, site: site(), trialDays: trialDays() };
   }
 }
 
@@ -69,8 +73,8 @@ async function composeFor(r: { email: string; name: string | null }, subject: st
 }
 
 /** Sends the draft to the admin themself, exactly as recipients will get it. */
-export async function sendAnnouncementTest(input: unknown): Promise<{ ok: true; to: string } | { ok: false; error: string }> {
-  const admin = await requireAdmin();
+export async function sendAnnouncementTest(input: unknown, actor?: Actor): Promise<{ ok: true; to: string } | { ok: false; error: string }> {
+  const admin = await actorOr(actor);
   const p = draftSchema.safeParse(input);
   if (!p.success) return { ok: false, error: p.error.issues[0].message };
   if (!admin.email) return { ok: false, error: "Your account has no email address." };
@@ -84,8 +88,8 @@ export async function sendAnnouncementTest(input: unknown): Promise<{ ok: true; 
 }
 
 /** Starts a send to everyone eligible. The browser then calls continueAnnouncement until it's done. */
-export async function startAnnouncement(input: unknown): Promise<{ ok: true; id: string; total: number } | { ok: false; error: string }> {
-  const admin = await requireAdmin();
+export async function startAnnouncement(input: unknown, actor?: Actor): Promise<{ ok: true; id: string; total: number } | { ok: false; error: string }> {
+  const admin = await actorOr(actor);
   const p = draftSchema.extend({ confirm: z.literal(true, { message: "Tick the box to confirm." }) }).safeParse(input);
   if (!p.success) return { ok: false, error: p.error.issues[0].message };
   if ((await emailChannel()).kind === "none") return { ok: false, error: "Email sending isn't set up: connect your Gmail in Mailboxes (or set SMTP_URL) first." };
@@ -105,8 +109,8 @@ export async function startAnnouncement(input: unknown): Promise<{ ok: true; id:
  * left. Stops early if the mailbox refuses (e.g. Gmail's daily limit), so it
  * can be resumed later without repeats.
  */
-export async function continueAnnouncement(id: string): Promise<{ ok: true; sent: number; failed: number; remaining: number; done: boolean; note: string | null } | { ok: false; error: string }> {
-  const admin = await requireAdmin();
+export async function continueAnnouncement(id: string, actor?: Actor): Promise<{ ok: true; sent: number; failed: number; remaining: number; done: boolean; note: string | null } | { ok: false; error: string }> {
+  const admin = await actorOr(actor);
   if (!z.string().uuid().safeParse(id).success) return { ok: false, error: "Not found." };
   const a = await svc((q) => store.getAnnouncement(q, id));
   if (!a) return { ok: false, error: "Not found." };
@@ -147,8 +151,8 @@ export async function continueAnnouncement(id: string): Promise<{ ok: true; sent
 }
 
 /** Stops a send that's under way (those already emailed stay emailed). */
-export async function stopAnnouncement(id: string): Promise<{ ok: boolean }> {
-  await requireAdmin();
+export async function stopAnnouncement(id: string, actor?: Actor): Promise<{ ok: boolean }> {
+  await actorOr(actor);
   if (!z.string().uuid().safeParse(id).success) return { ok: false };
   await svc((q) => store.finishAnnouncement(q, id, "stopped"));
   return { ok: true };
