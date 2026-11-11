@@ -35,9 +35,49 @@ describe("generateJson", () => {
     const [url, init] = f.mock.calls[0] as unknown as [string, { body: string }];
     expect(url).toContain(`/models/${DEFAULT_GEMINI_MODEL}:generateContent`);
     const cfg = JSON.parse(init.body).generationConfig;
-    expect(cfg.thinkingConfig).toBeUndefined();
+    expect(cfg.thinkingConfig).toEqual({ thinkingLevel: "low" });
     expect(cfg.maxOutputTokens).toBe(4096);
   });
+
+  it("asks again without a thinking level if a model rejects it", async () => {
+    vi.resetModules();
+    const g = await import("@/server/ai/gemini");
+    vi.stubEnv("GEMINI_API_KEY", "k");
+    const bodies: { thinkingConfig?: unknown }[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (_url: string, init: { body: string }) => {
+      const cfg = JSON.parse(init.body).generationConfig;
+      bodies.push(cfg);
+      return cfg.thinkingConfig
+        ? new Response(JSON.stringify({ error: { status: "INVALID_ARGUMENT", message: "Unknown name thinkingLevel in thinking_config" } }), { status: 400 })
+        : new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: "{}" }] }, finishReason: "STOP" }] }), { status: 200 });
+    }));
+    expect(await g.generateJson("s", "u", {}, { thinking: false })).toEqual({ ok: true, text: "{}" });
+    expect(await g.generateJson("s", "u", {}, { thinking: false })).toEqual({ ok: true, text: "{}" });
+    expect(bodies.map((b) => !!b.thinkingConfig)).toEqual([true, false, false]);
+  });
+
+  it("moves to another model when one is too slow, instead of waiting out the whole budget", async () => {
+    vi.resetModules();
+    const g = await import("@/server/ai/gemini");
+    vi.stubEnv("GEMINI_API_KEY", "k");
+    const calls: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init: { signal?: AbortSignal }) => {
+      if (url.includes("/models?")) return new Response(JSON.stringify({ models: [
+        { name: `models/${g.DEFAULT_GEMINI_MODEL}`, supportedGenerationMethods: ["generateContent"] },
+        { name: "models/gemini-3.7-flash", supportedGenerationMethods: ["generateContent"] },
+      ] }), { status: 200 });
+      const model = /models\/([^:]+):/.exec(url)![1];
+      calls.push(model);
+      if (model === "gemini-3.7-flash") return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: '{"answer":"fast"}' }] }, finishReason: "STOP" }] }), { status: 200 });
+      // The default model hangs until its time slot runs out.
+      return new Promise<Response>((_, fail) => init.signal?.addEventListener("abort", () => fail(Object.assign(new Error("t"), { name: "TimeoutError" }))));
+    }));
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const started = Date.now();
+    expect(await g.generateJson("s", "u", {}, { budgetMs: 16_000 })).toEqual({ ok: true, text: '{"answer":"fast"}' });
+    expect(calls).toEqual([g.DEFAULT_GEMINI_MODEL, "gemini-3.7-flash"]);
+    expect(Date.now() - started).toBeLessThan(12_000);
+  }, 20_000);
 
   it("leaves thinking alone on Pro models", async () => {
     vi.stubEnv("GEMINI_API_KEY", "k");

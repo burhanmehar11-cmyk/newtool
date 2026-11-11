@@ -56,13 +56,19 @@ export async function availableModels(key: string): Promise<string[]> {
 function thinkingOff(model: string) {
   return /^gemini-2(\.\d+)?-flash/.test(model);
 }
+/** Gemini 3 and later take a thinking level instead; "low" keeps short answers quick. */
+function thinkingLevelModel(model: string) {
+  return /^gemini-([3-9]|\d{2,})(\.\d+)?-flash/.test(model);
+}
+/** Models that rejected the thinking level (asked once, then remembered). */
+const noThinkingLevel = new Set<string>();
 
 export type GeminiResult =
   | { ok: true; text: string }
   | { ok: false; code: "not_configured" | "auth" | "quota" | "busy" | "blocked" | "error"; message: string; /** Google's own words, for logs and admins (never contains the key). */ detail?: string };
 
 type Opts = { thinking?: boolean; maxOutputTokens?: number; /** Total time allowed across retries (default 45s). */ budgetMs?: number };
-type Attempt = GeminiResult & { status?: number; retryable?: boolean };
+type Attempt = GeminiResult & { status?: number; retryable?: boolean; timedOut?: boolean };
 
 /**
  * `thinking: false` turns off "thinking" where the model allows it (2.x
@@ -76,8 +82,11 @@ export async function generateJson(system: string, user: string, schema: object,
   if (!key) return { ok: false, code: "not_configured", message: "The AI writer isn't set up on this server (GEMINI_API_KEY is missing)." };
   const deadline = Date.now() + (opts.budgetMs ?? 45_000);
   const left = () => deadline - Date.now();
+  // One slow model mustn't use up the whole budget: cap each try so there's time left for a backup.
+  const cap = Math.max(8_000, Math.round((opts.budgetMs ?? 45_000) * 0.5));
+  const slot = () => Math.min(left(), cap);
   const primary = geminiModel();
-  let r: Attempt = await callModel(key, primary, system, user, schema, opts, left());
+  let r: Attempt = await callModel(key, primary, system, user, schema, opts, slot());
   if (r.ok) return r;
 
   if (r.status === 404 && !configuredModel()) {
@@ -85,21 +94,22 @@ export async function generateJson(system: string, user: string, schema: object,
     if (next) {
       discovered = next;
       console.warn(`[gemini] ${primary} unavailable; switched to ${next}`);
-      r = await callModel(key, next, system, user, schema, opts, left());
+      r = await callModel(key, next, system, user, schema, opts, slot());
       if (r.ok) return r;
     }
   }
 
   if (r.retryable) {
     const current = geminiModel();
-    if (left() > 6_000) {
+    // "Busy" often clears in a second; a timeout means this model is slow right now, so move on.
+    if (!r.timedOut && left() > 6_000) {
       await new Promise((ok) => setTimeout(ok, 800));
-      r = await callModel(key, current, system, user, schema, opts, left());
+      r = await callModel(key, current, system, user, schema, opts, slot());
       if (r.ok) return r;
     }
     for (const backup of (await availableModels(key)).filter((m) => m !== current).slice(0, 3)) {
       if (!r.retryable || left() < 4_000) break;
-      r = await callModel(key, backup, system, user, schema, opts, left());
+      r = await callModel(key, backup, system, user, schema, opts, slot());
       if (r.ok) {
         console.warn(`[gemini] ${current} busy; answered with ${backup}`);
         return r;
@@ -110,15 +120,25 @@ export async function generateJson(system: string, user: string, schema: object,
 }
 
 function strip(r: Attempt): GeminiResult {
-  const { status: _status, retryable: _retryable, ...rest } = r;
-  void _status;
-  void _retryable;
+  const { status: _s, retryable: _r, timedOut: _t, thinkingLevelUsed: _l, ...rest } = r as Attempt & { thinkingLevelUsed?: boolean };
+  void [_s, _r, _t, _l];
   return rest as GeminiResult;
 }
 
 async function callModel(key: string, model: string, system: string, user: string, schema: object, opts: Opts, timeoutMs: number): Promise<Attempt> {
+  const r = await callOnce(key, model, system, user, schema, opts, timeoutMs);
+  // A model that doesn't take a thinking level: remember, and ask again without it.
+  if (!r.ok && r.status === 400 && r.thinkingLevelUsed && /thinking/i.test(r.detail ?? "")) {
+    noThinkingLevel.add(model);
+    return callOnce(key, model, system, user, schema, opts, timeoutMs);
+  }
+  return r;
+}
+
+async function callOnce(key: string, model: string, system: string, user: string, schema: object, opts: Opts, timeoutMs: number): Promise<Attempt & { thinkingLevelUsed?: boolean }> {
   if (timeoutMs < 1_000) return { ok: false, code: "busy", message: "The AI took too long. Try again.", retryable: false };
   const noThinking = opts.thinking === false && thinkingOff(model);
+  const lowThinking = opts.thinking === false && !noThinking && thinkingLevelModel(model) && !noThinkingLevel.has(model);
   // Where thinking can't be switched off it shares the output allowance, so leave room for the answer.
   const maxOutputTokens = opts.thinking === false && !noThinking ? Math.max(opts.maxOutputTokens ?? 2048, 4096) : (opts.maxOutputTokens ?? 2048);
   const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
@@ -132,13 +152,13 @@ async function callModel(key: string, model: string, system: string, user: strin
         maxOutputTokens,
         responseMimeType: "application/json",
         responseSchema: schema,
-        ...(noThinking ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
+        ...(noThinking ? { thinkingConfig: { thinkingBudget: 0 } } : lowThinking ? { thinkingConfig: { thinkingLevel: "low" } } : {}),
       },
     }),
     signal: AbortSignal.timeout(timeoutMs),
     cache: "no-store",
   }).catch((e: Error) => (e.name === "TimeoutError" ? "timeout" : null));
-  if (res === "timeout") return { ok: false, code: "busy", message: "The AI took too long. Try again.", detail: `${model}: timed out`, retryable: true };
+  if (res === "timeout") return { ok: false, code: "busy", message: "The AI took too long. Try again.", detail: `${model}: timed out`, retryable: true, timedOut: true };
   if (!res) return { ok: false, code: "error", message: "Couldn't reach the AI service." };
   const json = (await res.json().catch(() => ({}))) as {
     candidates?: { content?: { parts?: { text?: string }[] }; finishReason?: string }[];
@@ -151,6 +171,7 @@ async function callModel(key: string, model: string, system: string, user: strin
   if (reasons.includes("SERVICE_DISABLED")) return { ok: false, code: "auth", message: "The Gemini API isn't turned on for this key's Google Cloud project.", detail };
   if (reasons.includes("API_KEY_SERVICE_BLOCKED")) return { ok: false, code: "auth", message: "This API key isn't allowed to use the Gemini API (check the key's API restrictions).", detail };
   if (res.status === 400 && /API key/i.test(json.error?.message ?? "")) return { ok: false, code: "auth", message: "Google rejected the Gemini API key.", detail };
+  if (res.status === 400 && lowThinking) return { ok: false, code: "error", message: `The AI service returned an error (HTTP 400).`, detail, status: 400, thinkingLevelUsed: true };
   if (res.status === 401 || res.status === 403) return { ok: false, code: "auth", message: "Google rejected the Gemini API key.", detail };
   if (res.status === 404) return { ok: false, code: "error", message: `The AI model "${model}" isn't available. Check GEMINI_MODEL.`, detail, status: 404 };
   if (res.status === 500 || res.status === 503 || res.status === 504) return { ok: false, code: "busy", message: "The AI is very busy right now. Try again in a moment.", detail: `${model}: ${detail ?? `HTTP ${res.status}`}`, retryable: true };
