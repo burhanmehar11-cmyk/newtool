@@ -237,3 +237,45 @@ export async function hasSupportReply(): Promise<boolean> {
   const { user } = await requireWorkspace("/app");
   return asQ(user.id, async (q) => (await q.query("select 1 from public.support_tickets where user_id = auth.uid() and status = 'waiting' limit 1")).rows.length > 0).catch(() => false);
 }
+
+/* ----------------------------------------------------------- site visitors */
+
+const visitorSchema = z.object({
+  name: z.string().trim().max(100).optional().default(""),
+  email: z.string().trim().toLowerCase().email().max(254),
+  message: z.string().trim().min(2).max(5000),
+  /** Spam trap: a hidden field people never fill in. */
+  website: z.string().max(200).optional().default(""),
+});
+const visitorSends = new Map<string, number[]>();
+function visitorAllowed(key: string, perHour: number) {
+  const now = Date.now();
+  const list = (visitorSends.get(key) ?? []).filter((t) => now - t < 60 * 60_000);
+  if (list.length >= perHour) return false;
+  list.push(now);
+  visitorSends.set(key, list);
+  if (visitorSends.size > 5000) for (const [k, v] of visitorSends) if (!v.some((t) => now - t < 60 * 60_000)) visitorSends.delete(k);
+  return true;
+}
+
+/**
+ * A signed-out visitor messaging the team from the website chat. It emails the
+ * team (reply goes straight to the visitor); nothing is sent to the address the
+ * visitor typed, so the form can't be used to email strangers.
+ */
+export async function contactTeamFromSite(input: unknown, ip: string | null): Promise<{ ok: true } | { ok: false; error: string }> {
+  const p = visitorSchema.safeParse(input);
+  if (!p.success) return { ok: false, error: p.error.issues.some((i) => i.path[0] === "email") ? "Enter a valid email address so we can reply." : "Write a short message first." };
+  if (p.data.website) return { ok: true }; // a bot: pretend it worked
+  if (!visitorAllowed(`ip:${ip ?? "unknown"}`, 3) || !visitorAllowed("all", 40)) return { ok: false, error: "We've had a lot of messages just now. Please email us at " + brand.supportEmail + "." };
+  const { name, email, message } = p.data;
+  const who = name ? `${name} <${email}>` : email;
+  const subject = `[Website chat] ${message.split("\n")[0].replace(/^Me:\s*/, "").slice(0, 80)}`;
+  const text = `A visitor on the website asked to talk to the team.\n\nFrom: ${who}\n\n${message}\n\nReply to this email to answer them directly.`;
+  let sent = 0;
+  for (const to of await allAdminEmails()) {
+    const r = await sendEmail(to, subject, text, { from: from(), replyTo: email }).then(() => true, () => false);
+    if (r) sent++;
+  }
+  return sent ? { ok: true } : { ok: false, error: `We couldn't send that just now. Please email us at ${brand.supportEmail}.` };
+}

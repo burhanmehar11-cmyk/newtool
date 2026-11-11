@@ -4,6 +4,7 @@ import { brand } from "@/config/brand";
 import { PRODUCT_FACTS, QUICK_PICKS } from "@/lib/help-content";
 import { generateJson, geminiKey } from "@/server/ai/gemini";
 import { requireUser } from "@/server/auth";
+import { clientIp } from "@/server/session";
 
 /**
  * The AI help assistant on Help & Support: answers questions about using
@@ -26,14 +27,23 @@ const inputSchema = z.object({
 
 // A few questions a minute per person, so one tab can't use up the AI allowance.
 const recent = new Map<string, number[]>();
-function allowed(userId: string) {
+function allowed(key: string, perMinute = 6, perHour = 40) {
   const now = Date.now();
-  const list = (recent.get(userId) ?? []).filter((t) => now - t < 60 * 60_000);
-  if (list.length >= 40 || list.filter((t) => now - t < 60_000).length >= 6) return false;
+  const list = (recent.get(key) ?? []).filter((t) => now - t < 60 * 60_000);
+  if (list.length >= perHour || list.filter((t) => now - t < 60_000).length >= perMinute) return false;
   list.push(now);
-  recent.set(userId, list);
+  recent.set(key, list);
+  if (recent.size > 5000) for (const [k, v] of recent) if (!v.some((t) => now - t < 60 * 60_000)) recent.delete(k);
   return true;
 }
+
+const KNOWLEDGE = `FACTS:
+${PRODUCT_FACTS}
+
+HELP ARTICLES:
+${QUICK_PICKS.map((p) => `Q: ${p.title}\nA: ${p.answer.join(" ")}`).join("\n\n")}
+
+Contact: ${brand.supportEmail}`;
 
 const SYSTEM = `You are Locenti's help assistant inside the Locenti app (Help & Support page).
 Answer questions about using Locenti, using ONLY the facts and help articles below. Be friendly and brief: at most about 120 words, short numbered steps when there are steps, plain text (no markdown headings or tables).
@@ -45,13 +55,20 @@ Rules:
 - Reply in the language the person writes in.
 Set suggestRequest to true when the team should look at it, with a short subject and the best topic.
 
-FACTS:
-${PRODUCT_FACTS}
+${KNOWLEDGE}`;
 
-HELP ARTICLES:
-${QUICK_PICKS.map((p) => `Q: ${p.title}\nA: ${p.answer.join(" ")}`).join("\n\n")}
+const VISITOR_SYSTEM = `You are Locenti's AI assistant on the Locenti website (locenti.com), talking with a visitor who probably doesn't have an account yet.
+Help them understand what Locenti does, who it's for, how it works and how the free trial works, using ONLY the facts and help articles below. Be friendly, clear and brief: at most about 100 words, plain text (no markdown headings or tables).
+Rules:
+- Never invent features, prices, limits, dates or policies that aren't below. Paid plan prices aren't announced yet: say plans are coming soon and the free trial needs no card.
+- When it fits, invite them to start the free trial (the "Start free trial" button, or locenti.com/sign-up), without being pushy.
+- You can't see any account. If they already have an account and need help with it, tell them to sign in and use Help & Support.
+- Never ask for passwords, API keys or payment details.
+- Off-topic questions: politely say you can only help with Locenti.
+- Reply in the language the person writes in.
+Set suggestRequest to true when a person from the team should answer (partnerships, custom needs, press, anything you're unsure about), with a short subject and the best topic.
 
-Contact: ${brand.supportEmail}`;
+${KNOWLEDGE}`;
 
 const SCHEMA = {
   type: "object",
@@ -72,8 +89,23 @@ export async function askHelpAssistant(input: unknown): Promise<HelpAnswer> {
   if (!p.success) return { ok: false, error: "Ask a question first." };
   if (!helpAssistantAvailable()) return { ok: false, error: "The assistant isn't available right now. Pick a Quick pick or send us a request below." };
   if (!allowed(user.id)) return { ok: false, error: "That's a lot of questions in a short time. Wait a minute, or send us a request below." };
+  return answer(SYSTEM, p.data.messages);
+}
+
+/** The same assistant for signed-out visitors on the website, limited per IP address and overall. */
+export async function askVisitorAssistant(input: unknown): Promise<HelpAnswer> {
+  const p = inputSchema.safeParse(input);
+  if (!p.success) return { ok: false, error: "Ask a question first." };
+  if (!helpAssistantAvailable()) return { ok: false, error: "The assistant isn't available right now. Message the team below." };
+  const ip = (await clientIp()) ?? "unknown";
+  if (!allowed(`visitor:${ip}`, 5, 25) || !allowed("visitors:all", 60, 600)) return { ok: false, error: "That's a lot of questions in a short time. Wait a minute, or message the team below." };
+  return answer(VISITOR_SYSTEM, p.data.messages);
+}
+
+async function answer(system: string, messages: { role: "user" | "assistant"; text: string }[]): Promise<HelpAnswer> {
+  const p = { data: { messages } };
   const transcript = p.data.messages.map((m) => `${m.role === "user" ? "Person" : "Assistant"}: ${m.text}`).join("\n\n");
-  const r = await generateJson(SYSTEM, `Conversation so far:\n\n${transcript}\n\nWrite the assistant's next reply.`, SCHEMA);
+  const r = await generateJson(system, `Conversation so far:\n\n${transcript}\n\nWrite the assistant's next reply.`, SCHEMA);
   if (!r.ok) return { ok: false, error: r.code === "quota" ? "The assistant is busy right now. Try again in a little while, or send us a request below." : "The assistant couldn't answer just now. Try again, or send us a request below." };
   try {
     const j = JSON.parse(r.text) as { answer?: unknown; suggestRequest?: unknown; topic?: unknown; subject?: unknown };

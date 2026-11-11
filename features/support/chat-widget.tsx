@@ -7,19 +7,23 @@ import { LogoMark } from "@/components/brand/logo";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/field";
 import { cn } from "@/lib/utils";
-import { openSupportAction } from "@/server/actions/support";
+import { askVisitorHelpAction, contactTeamFromSiteAction, openSupportAction } from "@/server/actions/support";
 import { HELP_STARTERS, useHelpChat } from "@/features/support/use-help-chat";
 
+const SITE_STARTERS = ["What does Locenti do?", "How does the free trial work?", "Does it send from my own Gmail?", "Where do the emails come from?"];
+
 /**
- * The chat bubble in the corner of every app page: the AI help assistant, and
- * "Talk to the team", which turns the chat into a support request without
- * leaving the page. The conversation stays as people move between pages.
+ * The chat bubble in the corner of every app page (and, with `site`, the
+ * public website): the AI assistant first, and "Talk to the team" as the
+ * last step. In the app that becomes a support request with a ticket number;
+ * on the website it emails the team, who reply to the visitor's address.
+ * The conversation stays as people move between pages.
  */
-export function ChatWidget({ assistant }: { assistant: boolean }) {
+export function ChatWidget({ assistant, site = false }: { assistant: boolean; site?: boolean }) {
   const [open, setOpen] = React.useState(false);
   const [view, setView] = React.useState<"chat" | "team" | "sent">(assistant ? "chat" : "team");
-  const [sent, setSent] = React.useState<{ id: string; ref: string } | null>(null);
-  const chat = useHelpChat();
+  const [sent, setSent] = React.useState<{ id: string; ref: string } | { email: string } | null>(null);
+  const chat = useHelpChat(site ? askVisitorHelpAction : undefined);
   const [text, setText] = React.useState("");
   const listRef = React.useRef<HTMLDivElement>(null);
   const inputRef = React.useRef<HTMLInputElement>(null);
@@ -75,7 +79,7 @@ export function ChatWidget({ assistant }: { assistant: boolean }) {
                     <span aria-hidden className="absolute bottom-0 right-0 size-3 rounded-full border-2 border-midnight bg-green" />
                   </span>
                   <p className="mt-3 font-display text-lg font-bold">Locenti AI Assistant</p>
-                  <p className="mt-1 text-xs text-white/70">Instant answers about anything in Locenti, any time.</p>
+                  <p className="mt-1 text-xs text-white/70">{site ? "Instant answers about Locenti, any time." : "Instant answers about anything in Locenti, any time."}</p>
                 </>
               ) : (
                 <>
@@ -94,10 +98,14 @@ export function ChatWidget({ assistant }: { assistant: boolean }) {
           {view === "chat" ? (
             <>
               <div ref={listRef} className="min-h-[240px] flex-1 space-y-3 overflow-y-auto px-4 py-4" aria-live="polite">
-                <Bubble role="assistant">Hi! I&apos;m Locenti&apos;s AI assistant. Ask me anything about finding businesses, writing emails, mailboxes or campaigns, and I&apos;ll answer right away.</Bubble>
+                <Bubble role="assistant">
+                  {site
+                    ? "Hi! I'm Locenti's AI assistant. Ask me what Locenti does, how it finds businesses and emails, or how the free trial works."
+                    : "Hi! I'm Locenti's AI assistant. Ask me anything about finding businesses, writing emails, mailboxes or campaigns, and I'll answer right away."}
+                </Bubble>
                 {chat.msgs.length === 0 ? (
                   <div className="flex flex-wrap gap-2 pl-9">
-                    {HELP_STARTERS.map((s) => (
+                    {(site ? SITE_STARTERS : HELP_STARTERS).map((s) => (
                       <button key={s} type="button" onClick={() => chat.ask(s)} className="rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-medium text-ink transition-colors hover:border-green/50 hover:bg-mint-soft/40">
                         {s}
                       </button>
@@ -123,11 +131,20 @@ export function ChatWidget({ assistant }: { assistant: boolean }) {
                 {/* The team is the last step: offered once the assistant has had a go. */}
                 {!chat.pending && (answered || chat.error) ? (
                   <div className={cn("ml-9 rounded-2xl border p-3", chat.lastSuggest || chat.error ? "border-green/40 bg-mint-soft/40" : "border-line bg-surface")}>
-                    <p className="text-xs font-semibold text-ink">{chat.lastSuggest ? "This one needs a person" : "Still need help?"}</p>
-                    <p className="mt-0.5 text-xs text-slate">Our team replies, usually within a day. Your chat is included.</p>
-                    <Button type="button" size="sm" variant="secondary" className="mt-2" onClick={() => setView("team")}>
-                      <UserRound aria-hidden /> Talk to the team
-                    </Button>
+                    <p className="text-xs font-semibold text-ink">{chat.lastSuggest ? "This one needs a person" : site ? "Still have questions?" : "Still need help?"}</p>
+                    <p className="mt-0.5 text-xs text-slate">{site ? "Try Locenti free, no card needed, or message our team. We reply within a day." : "Our team replies, usually within a day. Your chat is included."}</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {site ? (
+                        <Button asChild size="sm">
+                          <Link href="/sign-up">
+                            Start free trial <ArrowRight aria-hidden />
+                          </Link>
+                        </Button>
+                      ) : null}
+                      <Button type="button" size="sm" variant="secondary" onClick={() => setView("team")}>
+                        <UserRound aria-hidden /> Talk to the team
+                      </Button>
+                    </div>
                   </div>
                 ) : null}
               </div>
@@ -147,6 +164,14 @@ export function ChatWidget({ assistant }: { assistant: boolean }) {
                 <p className="mt-2 px-1 text-center text-[11px] text-slate">AI can make mistakes. Check important details.</p>
               </div>
             </>
+          ) : view === "team" && site ? (
+            <SiteTeamForm
+              transcript={chat.transcript()}
+              onSent={(email) => {
+                setSent({ email });
+                setView("sent");
+              }}
+            />
           ) : view === "team" ? (
             <TeamForm
               initialSubject={chat.lastSuggest?.subject || chat.firstQuestion.slice(0, 120)}
@@ -160,9 +185,20 @@ export function ChatWidget({ assistant }: { assistant: boolean }) {
           ) : (
             <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-10 text-center">
               <CheckCircle2 aria-hidden className="size-10 text-green" />
-              <p className="font-display text-lg font-semibold text-ink">We&apos;ve got it{sent ? `: ${sent.ref}` : ""}</p>
-              <p className="text-sm leading-6 text-slate">We emailed you a confirmation. Someone from our team will get back to you soon, usually within a day, by email and in Help &amp; Support.</p>
-              {sent ? (
+              {sent && "email" in sent ? (
+                <>
+                  <p className="font-display text-lg font-semibold text-ink">Thanks, message sent</p>
+                  <p className="text-sm leading-6 text-slate">
+                    Someone from our team will reply to <span className="font-medium text-ink">{sent.email}</span>, usually within a day.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="font-display text-lg font-semibold text-ink">We&apos;ve got it{sent ? `: ${sent.ref}` : ""}</p>
+                  <p className="text-sm leading-6 text-slate">We emailed you a confirmation. Someone from our team will get back to you soon, usually within a day, by email and in Help &amp; Support.</p>
+                </>
+              )}
+              {sent && "id" in sent ? (
                 <Button asChild size="sm" variant="secondary" onClick={() => setOpen(false)}>
                   <Link href={`/app/support/${sent.id}`}>
                     Open {sent.ref} <ArrowRight aria-hidden />
@@ -193,10 +229,14 @@ export function ChatWidget({ assistant }: { assistant: boolean }) {
         }}
         aria-label={open ? "Close help chat" : "Open help chat"}
         aria-expanded={open}
-        className="fixed bottom-6 right-4 z-40 flex size-14 items-center justify-center rounded-full bg-midnight text-mint shadow-[0_12px_32px_-8px_rgb(5_12_18/0.55)] ring-4 ring-mint/25 transition-transform duration-200 hover:scale-105 focus-visible:outline-none focus-visible:ring-mint sm:right-6"
+        className={cn(
+          "fixed bottom-6 right-4 z-40 flex size-14 items-center justify-center rounded-full shadow-[0_12px_32px_-8px_rgb(5_12_18/0.55)] ring-4 transition-transform duration-200 hover:scale-105 focus-visible:outline-none focus-visible:ring-mint sm:right-6",
+          // Mint on the dark website so it stands out; dark in the light app.
+          site ? "bg-mint text-midnight ring-mint/25" : "bg-midnight text-mint ring-mint/25",
+        )}
       >
         {open ? <X aria-hidden className="size-6" /> : <MessageCircle aria-hidden className="size-6" />}
-        {!open && assistant ? <span aria-hidden className="absolute right-0.5 top-0.5 size-3 rounded-full border-2 border-midnight bg-mint" /> : null}
+        {!open && assistant ? <span aria-hidden className={cn("absolute right-0.5 top-0.5 size-3 rounded-full border-2", site ? "border-mint bg-green" : "border-midnight bg-mint")} /> : null}
       </button>
     </>
   );
@@ -243,6 +283,41 @@ function TeamForm({ initialSubject, initialTopic, transcript, onSent }: { initia
       {transcript ? <p className="text-[11px] text-slate">Your chat with the assistant is included so you don&apos;t have to repeat yourself.</p> : null}
       {error ? <p className="rounded-xl bg-danger-bg px-3 py-2 text-xs text-danger-fg">{error}</p> : null}
       <Button type="submit" disabled={pending || subject.trim().length < 3 || body.trim().length < 2}>
+        {pending ? <Loader2 aria-hidden className="animate-spin" /> : <Send aria-hidden />} Send to the team
+      </Button>
+    </form>
+  );
+}
+
+function SiteTeamForm({ transcript, onSent }: { transcript: string; onSent: (email: string) => void }) {
+  const [name, setName] = React.useState("");
+  const [email, setEmail] = React.useState("");
+  const [message, setMessage] = React.useState(transcript ? `${transcript}\n\n` : "");
+  const [website, setWebsite] = React.useState("");
+  const [error, setError] = React.useState<string | null>(null);
+  const [pending, start] = React.useTransition();
+  return (
+    <form
+      className="flex flex-1 flex-col gap-3 overflow-y-auto p-4"
+      onSubmit={(e) => {
+        e.preventDefault();
+        setError(null);
+        start(async () => {
+          const r = await contactTeamFromSiteAction({ name, email, message, website });
+          if (r.ok) onSent(email.trim());
+          else setError(r.error);
+        });
+      }}
+    >
+      <p className="text-sm text-slate">Leave your email and a short message. A real person replies, usually within a day.</p>
+      <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name (optional)" aria-label="Your name" maxLength={100} autoComplete="name" />
+      <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@company.com" aria-label="Your email" maxLength={254} autoComplete="email" required />
+      <Textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={6} placeholder="How can we help?" aria-label="Message" maxLength={5000} required />
+      {/* Spam trap, hidden from people. */}
+      <input type="text" name="website" value={website} onChange={(e) => setWebsite(e.target.value)} tabIndex={-1} autoComplete="off" aria-hidden className="absolute -left-[9999px] size-px opacity-0" />
+      {transcript ? <p className="text-[11px] text-slate">Your chat with the assistant is included.</p> : null}
+      {error ? <p className="rounded-xl bg-danger-bg px-3 py-2 text-xs text-danger-fg">{error}</p> : null}
+      <Button type="submit" disabled={pending || !email.trim() || message.trim().length < 2}>
         {pending ? <Loader2 aria-hidden className="animate-spin" /> : <Send aria-hidden />} Send to the team
       </Button>
     </form>

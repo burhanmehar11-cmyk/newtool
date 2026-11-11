@@ -44,3 +44,13 @@ export async function askHelpAction(messages: { role: "user" | "assistant"; text
   const { askHelpAssistant } = await import("@/server/services/help-assistant");
   return askHelpAssistant({ messages });
 }
+
+/* Website chat (signed-out visitors). */
+export async function askVisitorHelpAction(messages: { role: "user" | "assistant"; text: string }[]) {
+  const { askVisitorAssistant } = await import("@/server/services/help-assistant");
+  return askVisitorAssistant({ messages });
+}
+export async function contactTeamFromSiteAction(input: { name: string; email: string; message: string; website: string }) {
+  const { clientIp } = await import("@/server/session");
+  return s.contactTeamFromSite(input, await clientIp());
+}

@@ -2,6 +2,8 @@ import { SiteHeader } from "@/components/marketing/site-header";
 import { SiteFooter } from "@/components/marketing/site-footer";
 import { ScrollEffects } from "@/components/marketing/scroll-effects";
 import { AttributionCapture } from "@/components/attribution-capture";
+import { ChatWidget } from "@/features/support/chat-widget";
+import { helpAssistantAvailable } from "@/server/services/help-assistant";
 
 export default function MarketingLayout({ children }: LayoutProps<"/">) {
   return (
@@ -13,6 +15,7 @@ export default function MarketingLayout({ children }: LayoutProps<"/">) {
         {children}
       </main>
       <SiteFooter />
+      <ChatWidget assistant={helpAssistantAvailable()} site />
     </div>
   );
 }
