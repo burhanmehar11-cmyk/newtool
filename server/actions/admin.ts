@@ -37,3 +37,17 @@ export async function sendWelcomeTestAction() {
   const { sendWelcomeTest } = await import("@/server/services/announcements");
   return sendWelcomeTest();
 }
+
+export async function addAdminAction(email: string) {
+  const { addPlatformAdmin } = await import("@/server/services/admin");
+  const r = await addPlatformAdmin(email);
+  if (r.ok) revalidatePath("/admin");
+  return r;
+}
+
+export async function removeAdminAction(email: string) {
+  const { removePlatformAdmin } = await import("@/server/services/admin");
+  const r = await removePlatformAdmin(email);
+  if (r.ok) revalidatePath("/admin");
+  return r;
+}

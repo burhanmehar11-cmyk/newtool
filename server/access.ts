@@ -3,6 +3,7 @@ import { isAllowedBetaEmail } from "@/lib/beta-allowlist";
 import type { Q } from "@/server/auth-store";
 import { withService } from "@/server/db";
 import { signupOpen } from "@/server/env";
+import { isPlatformAdmin } from "@/server/admin-access";
 import { hasTeamAccess } from "@/server/team-store";
 
 /**
@@ -13,6 +14,8 @@ import { hasTeamAccess } from "@/server/team-store";
  */
 export async function mayUseLocenti(email: string): Promise<boolean> {
   if (signupOpen() || isAllowedBetaEmail(email)) return true;
+  // Owners and admins added in the admin panel can always sign in.
+  if (await isPlatformAdmin(email)) return true;
   try {
     return await withService((q) => hasTeamAccess(q as unknown as Q, email));
   } catch {

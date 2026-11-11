@@ -8,6 +8,7 @@ import { Panel, Table, Tiles, delta, num, pct } from "@/features/admin/parts";
 import { sourceLabel } from "@/lib/attribution";
 import { formatDate as fmtDate, formatDateTime as fmtDateTime } from "@/lib/utils";
 import { adminTimeZone, zoneAbbreviation, zoneName } from "@/lib/admin";
+import { AddAdminForm, RemoveAdminButton } from "@/features/admin/admin-manager";
 
 // Admin times are shown in the owner's time zone (Pakistan Standard Time by default, ADMIN_TIMEZONE to change).
 const formatDate = (iso: string) => fmtDate(iso, undefined, adminTimeZone());
@@ -448,20 +449,27 @@ export function RevenueTab({ d, days }: { d: Of<"revenue">; days: number }) {
 export function AdminsTab({ d }: { d: Of<"admins"> }) {
   return (
     <div className="grid gap-5 xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
-      <Panel title="Platform admins" description="People in ADMIN_EMAILS. Change the list in Vercel → Settings → Environment Variables, then redeploy." flush>
+      <Panel title="Who has admin access" description="Owners are set in ADMIN_EMAILS in Vercel and can't be removed here. Owners can add and remove admins below." flush>
         <ul className="divide-y divide-line">
           {d.admins.map((a) => (
             <li key={a.email} className="flex items-center justify-between gap-3 px-5 py-3">
               <span className="min-w-0">
                 <span className="block truncate text-sm font-medium text-ink">{a.email}</span>
-                <span className="text-xs text-slate">{a.hasAccount ? (a.lastSignIn ? `Last signed in ${formatDateTime(a.lastSignIn)}` : "Has an account") : "No account yet"}</span>
+                <span className="text-xs text-slate">
+                  {a.hasAccount ? (a.lastSignIn ? `Last signed in ${formatDateTime(a.lastSignIn)}` : "Has an account") : "No account yet"}
+                  {a.addedBy ? ` · added by ${a.addedBy}` : ""}
+                </span>
               </span>
-              <Badge tone="green">Admin</Badge>
+              <span className="flex shrink-0 items-center gap-2">
+                <Badge tone={a.owner ? "green" : "info"}>{a.owner ? "Owner" : "Admin"}</Badge>
+                {d.canManage && !a.owner ? <RemoveAdminButton email={a.email} /> : null}
+              </span>
             </li>
           ))}
         </ul>
+        {d.canManage ? <AddAdminForm /> : <p className="border-t border-line px-5 py-3 text-xs text-slate">Only owners can add or remove admins.</p>}
       </Panel>
-      <Panel title="Admin activity" description="Every plan change made from this panel" flush>
+      <Panel title="Admin activity" description="Plan changes and admin access changes made from this panel" flush>
         {d.audit.length ? (
           <Table caption="Admin activity" minWidth={560} head={["When", "Admin", "Action", "Details"]}>
             {d.audit.map((a) => (
@@ -469,10 +477,10 @@ export function AdminsTab({ d }: { d: Of<"admins"> }) {
                 <td className="whitespace-nowrap text-xs text-slate">{formatDateTime(a.created_at)}</td>
                 <td className="text-xs">{a.admin_email}</td>
                 <td className="text-xs">
-                  {a.action === "set_plan" ? "Changed plan" : a.action} · <span className="text-ink">{a.target}</span>
+                  {a.action === "set_plan" ? "Changed plan" : a.action === "grant_admin" ? "Gave admin access" : a.action === "revoke_admin" ? "Removed admin access" : a.action} · <span className="text-ink">{a.target}</span>
                 </td>
                 <td className="text-xs text-slate">
-                  {a.action === "set_plan" ? `${String(a.details.from)} → ${String(a.details.to)}${a.details.note ? ` (${String(a.details.note)})` : ""}` : JSON.stringify(a.details)}
+                  {a.action === "set_plan" ? `${String(a.details.from)} → ${String(a.details.to)}${a.details.note ? ` (${String(a.details.note)})` : ""}` : Object.keys(a.details).length ? JSON.stringify(a.details) : ""}
                 </td>
               </tr>
             ))}

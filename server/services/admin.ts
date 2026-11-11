@@ -1,11 +1,15 @@
 import "server-only";
+import { addedAdmins, grantAdmin, isOwnerEmail, isPlatformAdmin, revokeAdmin } from "@/server/admin-access";
+import { brand } from "@/config/brand";
+import { emailChannel, sendEmail } from "@/server/email";
+import { configuredSiteUrl } from "@/server/env";
+import { track } from "@/server/events";
 import { notFound } from "next/navigation";
 import { z } from "zod";
-import { adminEmails, isAdminEmail, trialDays } from "@/lib/admin";
+import { adminEmails, trialDays } from "@/lib/admin";
 import { getCurrentUser, requireUser } from "@/server/auth";
 import type { Q } from "@/server/auth-store";
 import { withService } from "@/server/db";
-import { emailChannel } from "@/server/email";
 import { dailyLimit, googlePlacesConfigured } from "@/server/providers/google-places";
 import { aiWriterStatus } from "@/server/services/ai-writer";
 import * as store from "@/server/admin-store";
@@ -14,17 +18,65 @@ import { billingConfig } from "@/server/services/billing";
 
 const svc = <T,>(fn: (q: Q) => Promise<T>) => withService((q) => fn(q as unknown as Q));
 
-/** For pages: signed in and listed in ADMIN_EMAILS, or a 404 (the panel's existence isn't revealed). */
+/** For pages: signed in as an owner (ADMIN_EMAILS) or an added admin, or a 404 (the panel's existence isn't revealed). */
 export async function requireAdmin() {
   const user = await requireUser("/admin");
-  if (!isAdminEmail(user.email)) notFound();
+  if (!(await isPlatformAdmin(user.email))) notFound();
+  return user;
+}
+
+/** Owners only (ADMIN_EMAILS): managing who else is an admin. */
+export async function requireOwner() {
+  const user = await requireAdmin();
+  if (!isOwnerEmail(user.email)) return null;
   return user;
 }
 
 /** For the app shell: show the Admin link? */
 export async function isAdmin() {
   const user = await getCurrentUser();
-  return isAdminEmail(user?.email);
+  return isPlatformAdmin(user?.email);
+}
+
+const emailSchema = z.string().trim().toLowerCase().email("Enter a valid email address.").max(254);
+
+/** Gives someone access to the admin panel (owners only). They sign in with that email. */
+export async function addPlatformAdmin(email: unknown): Promise<{ ok: true; emailed: boolean } | { ok: false; error: string }> {
+  const owner = await requireOwner();
+  if (!owner) return { ok: false, error: "Only owners can add admins." };
+  const e = emailSchema.safeParse(email);
+  if (!e.success) return { ok: false, error: e.error.issues[0].message };
+  if (isOwnerEmail(e.data)) return { ok: false, error: "That person is already an owner." };
+  let added: boolean;
+  try {
+    added = await svc((q) => grantAdmin(q, e.data, owner.email ?? "owner"));
+  } catch {
+    return { ok: false, error: "Run the database update 0020_admin_users.sql in Neon first." };
+  }
+  if (!added) return { ok: false, error: "That person is already an admin." };
+  const site = configuredSiteUrl() ?? brand.siteUrl;
+  const emailed = await sendEmail(
+    e.data,
+    "You now have admin access to Locenti",
+    `Hi,\n\n${owner.email} gave you admin access to Locenti: the admin panel with activity, support, people, announcements and more.\n\nOpen it here (sign in with this email address): ${site}/admin\n\nHappy Sending,\nThe Locenti Team`,
+    { from: process.env.ANNOUNCE_FROM?.trim() || brand.supportEmail, replyTo: brand.supportEmail },
+  )
+    .then(() => true)
+    .catch(() => false);
+  await track({ email: owner.email, kind: "admin_granted", area: "team", outcome: "success", summary: `Gave admin access to ${e.data}` });
+  return { ok: true, emailed };
+}
+
+/** Removes an added admin (owners only; owners themselves are set in ADMIN_EMAILS). */
+export async function removePlatformAdmin(email: unknown): Promise<{ ok: true } | { ok: false; error: string }> {
+  const owner = await requireOwner();
+  if (!owner) return { ok: false, error: "Only owners can remove admins." };
+  const e = emailSchema.safeParse(email);
+  if (!e.success) return { ok: false, error: "Not found." };
+  if (isOwnerEmail(e.data)) return { ok: false, error: "Owners are set in ADMIN_EMAILS in Vercel and can't be removed here." };
+  const ok = await svc((q) => revokeAdmin(q, e.data, owner.email ?? "owner")).catch(() => false);
+  if (ok) await track({ email: owner.email, kind: "admin_revoked", area: "team", outcome: "info", summary: `Removed admin access from ${e.data}` });
+  return ok ? { ok: true } : { ok: false, error: "That person isn't an admin." };
 }
 
 export const ADMIN_TABS = ["overview", "activity", "support", "funnel", "users", "workspaces", "usage", "emails", "announcements", "apis", "revenue", "admins"] as const;
@@ -64,9 +116,20 @@ export async function getAdminTab(tab: AdminTab, days: number, search: string, f
         // Loaded by its own section (it sends email, so it has its own service).
         return { tab };
       case "admins": {
-        const emails = adminEmails();
+        const owners = adminEmails();
+        const added = await addedAdmins();
+        const emails = [...owners, ...added.map((a) => a.email)];
         const accounts = await store.accountsFor(q, emails);
-        return { tab, admins: emails.map((e) => ({ email: e, lastSignIn: accounts.find((a) => a.email === e)?.last_sign_in_at ?? null, hasAccount: accounts.some((a) => a.email === e) })), audit: await store.auditLog(q) };
+        const me = (await requireAdmin()).email;
+        return {
+          tab,
+          canManage: isOwnerEmail(me),
+          admins: emails.map((e) => {
+            const a = added.find((x) => x.email === e);
+            return { email: e, owner: owners.includes(e), addedBy: a?.added_by ?? null, addedAt: a?.created_at ?? null, lastSignIn: accounts.find((x) => x.email === e)?.last_sign_in_at ?? null, hasAccount: accounts.some((x) => x.email === e) };
+          }),
+          audit: await store.auditLog(q),
+        };
       }
     }
   });

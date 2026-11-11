@@ -1,7 +1,8 @@
 import "server-only";
 import { z } from "zod";
 import { brand } from "@/config/brand";
-import { adminEmails, adminTimeZone, trialDays } from "@/lib/admin";
+import { adminTimeZone, trialDays } from "@/lib/admin";
+import { allAdminEmails } from "@/server/admin-access";
 import { requireUser, requireWorkspace, getActiveWorkspace } from "@/server/auth";
 import type { Q } from "@/server/auth-store";
 import { withService, withUser } from "@/server/db";
@@ -34,7 +35,7 @@ const body = z.string().trim().min(2, "Write a message.").max(10000, "That's too
 
 /** Tells the owner(s) by email; never blocks the person's action. */
 async function alertAdmins(subject: string, text: string) {
-  for (const to of adminEmails()) await sendEmail(to, subject, text, { from: from(), replyTo: brand.supportEmail }).catch(() => undefined);
+  for (const to of await allAdminEmails()) await sendEmail(to, subject, text, { from: from(), replyTo: brand.supportEmail }).catch(() => undefined);
 }
 
 /* ------------------------------------------------------------------- people */
