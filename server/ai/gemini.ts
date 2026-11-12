@@ -69,63 +69,127 @@ function resting(model: string) {
 const noThinkingLevel = new Set<string>();
 
 export type GeminiResult =
-  | { ok: true; text: string }
+  | { ok: true; text: string; /** The model that answered. */ model?: string }
   | { ok: false; code: "not_configured" | "auth" | "quota" | "busy" | "blocked" | "error"; message: string; /** Google's own words, for logs and admins (never contains the key). */ detail?: string };
 
-type Opts = { thinking?: boolean; maxOutputTokens?: number; /** Total time allowed across retries (default 45s). */ budgetMs?: number };
+type Opts = {
+  thinking?: boolean;
+  maxOutputTokens?: number;
+  /** Total time allowed across retries (default 45s). */
+  budgetMs?: number;
+  /** "lite": try the fastest models (Flash-Lite) first, for short answers. */
+  prefer?: "lite";
+  /** If the first model hasn't answered after this long, ask a second one at the same time and take whichever answers first. */
+  hedgeAfterMs?: number;
+};
 type Attempt = GeminiResult & { status?: number; retryable?: boolean; moveOn?: boolean };
+
+/** Models to try, best first, skipping any that are resting after running out of allowance (unless that leaves none). */
+function ordered(list: string[], prefer?: "lite") {
+  const flash = list.filter((m) => flashVersion(m) !== null);
+  const lite = list.filter((m) => flashVersion(m) === null);
+  const all = prefer === "lite" ? [...lite, ...flash] : [...flash, ...lite];
+  const awake = all.filter((m) => !resting(m));
+  return awake.length ? awake : all;
+}
 
 /**
  * `thinking: false` turns off "thinking" where the model allows it (2.x
- * Flash): much faster for short answers. When Google says the model is
- * busy (503) or it times out, it retries once and then tries the next best
- * model this key can use, within `budgetMs`. A retired model (404) is
- * replaced by the newest Flash model, unless GEMINI_MODEL picks one.
+ * Flash) or asks for a low level (3.x and later). When Google says a model
+ * is busy (503), out of allowance (429) or it's slow, the next best model
+ * this key can use is tried, within `budgetMs`; with `hedgeAfterMs` a second
+ * model races a slow first one. A retired model (404) is replaced by the
+ * newest Flash model, unless GEMINI_MODEL picks one.
  */
 export async function generateJson(system: string, user: string, schema: object, opts: Opts = {}): Promise<GeminiResult> {
   const key = geminiKey();
   if (!key) return { ok: false, code: "not_configured", message: "The AI writer isn't set up on this server (GEMINI_API_KEY is missing)." };
-  const deadline = Date.now() + (opts.budgetMs ?? 45_000);
+  const budget = opts.budgetMs ?? 45_000;
+  const deadline = Date.now() + budget;
   const left = () => deadline - Date.now();
   // One slow model mustn't use up the whole budget: cap each try so there's time left for a backup.
-  const cap = Math.max(8_000, Math.round((opts.budgetMs ?? 45_000) * 0.5));
+  const cap = Math.max(6_000, Math.round(budget * 0.5));
   const slot = () => Math.min(left(), cap);
-  // A model whose allowance just ran out is skipped for a while (unless GEMINI_MODEL insists on it).
-  const configured = geminiModel();
-  const primary = !configuredModel() && resting(configured) ? ((await availableModels(key)).find((m) => !resting(m)) ?? configured) : configured;
-  let r: Attempt = await callModel(key, primary, system, user, schema, opts, slot());
-  if (r.ok) return r;
+  const call = (m: string, signal?: AbortSignal) => callModel(key, m, system, user, schema, opts, slot(), signal);
 
-  if (r.status === 404 && !configuredModel() && primary === configured) {
-    const next = (await availableModels(key)).find((m) => flashVersion(m) !== null && m !== primary && !resting(m));
-    if (next) {
-      discovered = next;
-      console.warn(`[gemini] ${primary} unavailable; switched to ${next}`);
-      r = await callModel(key, next, system, user, schema, opts, slot());
-      if (r.ok) return r;
+  // The order to try models in. GEMINI_MODEL, when set, always goes first.
+  const queue: string[] = [];
+  const add = (ms: string[]) => ms.forEach((m) => !queue.includes(m) && queue.push(m));
+  const configured = configuredModel();
+  if (configured) add([configured]);
+  else if (opts.prefer === "lite") add(ordered(await availableModels(key), "lite"));
+  if (!queue.length) add([resting(geminiModel()) ? (ordered(await availableModels(key))[0] ?? geminiModel()) : geminiModel()]);
+  const tried = new Set<string>();
+  const next = () => {
+    const m = queue.find((x) => !tried.has(x));
+    if (m) tried.add(m);
+    return m;
+  };
+
+  const first = next()!;
+  let r: Attempt;
+  if (opts.hedgeAfterMs) {
+    if (queue.length < 2 && !configured) add(ordered(await availableModels(key), opts.prefer));
+    r = await hedged(call, first, next, opts.hedgeAfterMs);
+  } else {
+    r = await call(first);
+  }
+  if (r.ok) return strip(r);
+
+  // Retired model: remember the newest Flash model this key can use.
+  if (r.status === 404 && !configured && first === geminiModel()) {
+    const replacement = (await availableModels(key)).find((m) => flashVersion(m) !== null && m !== first && !resting(m));
+    if (replacement) {
+      discovered = replacement;
+      console.warn(`[gemini] ${first} unavailable; switched to ${replacement}`);
+      queue.unshift(replacement);
     }
   }
 
-  if (r.retryable || (r.status === 404 && !configuredModel())) {
-    const current = primary === configured ? geminiModel() : primary;
-    // "Busy" often clears in a second; a timeout means this model is slow right now, so move on.
-    if (r.retryable && !r.moveOn && left() > 6_000) {
-      await new Promise((ok) => setTimeout(ok, 800));
-      r = await callModel(key, current, system, user, schema, opts, slot());
-      if (r.ok) return r;
+  if (r.retryable || (r.status === 404 && !configured)) {
+    // "Busy" often clears in a second; slow or out-of-allowance means move on.
+    if (r.retryable && !r.moveOn && tried.size === 1 && left() > 6_000) {
+      await new Promise((ok) => setTimeout(ok, 600));
+      r = await call(first);
+      if (r.ok) return strip(r);
     }
-    for (const backup of (await availableModels(key)).filter((m) => m !== current && !resting(m)).slice(0, 4)) {
+    add(ordered(await availableModels(key), opts.prefer));
+    for (let m = next(), n = 0; m && n < 4; m = next(), n++) {
       // Keep going past models that are busy, slow, out of allowance or retired for this key.
-      if (!(r.retryable || r.status === 404) || left() < 4_000) break;
+      if (!(r.retryable || r.status === 404) || left() < 3_000) break;
       const why = r.ok ? "" : r.code;
-      r = await callModel(key, backup, system, user, schema, opts, slot());
+      r = await call(m);
       if (r.ok) {
-        console.warn(`[gemini] ${current} unavailable (${why}); answered with ${backup}`);
-        return r;
+        console.warn(`[gemini] ${first} unavailable (${why}); answered with ${m}`);
+        return strip(r);
       }
     }
   }
   return strip(r);
+}
+
+/** Starts `first`; if it hasn't answered after `ms`, starts the next model too and takes whichever answers first. */
+async function hedged(call: (m: string, signal?: AbortSignal) => Promise<Attempt>, first: string, next: () => string | undefined, ms: number): Promise<Attempt> {
+  const a1 = new AbortController();
+  const p1 = call(first, a1.signal);
+  const early = await Promise.race([p1, new Promise<null>((ok) => setTimeout(() => ok(null), ms))]);
+  if (early) return early;
+  const second = next();
+  if (!second) return p1;
+  const a2 = new AbortController();
+  const p2 = call(second, a2.signal);
+  return new Promise<Attempt>((resolve) => {
+    let pending = 2;
+    const settle = (r: Attempt, other: AbortController) => {
+      pending--;
+      if (r.ok) {
+        other.abort();
+        resolve(r);
+      } else if (pending === 0) resolve(r);
+    };
+    void p1.then((r) => settle(r, a2));
+    void p2.then((r) => settle(r, a1));
+  });
 }
 
 function strip(r: Attempt): GeminiResult {
@@ -134,17 +198,17 @@ function strip(r: Attempt): GeminiResult {
   return rest as GeminiResult;
 }
 
-async function callModel(key: string, model: string, system: string, user: string, schema: object, opts: Opts, timeoutMs: number): Promise<Attempt> {
-  const r = await callOnce(key, model, system, user, schema, opts, timeoutMs);
+async function callModel(key: string, model: string, system: string, user: string, schema: object, opts: Opts, timeoutMs: number, signal?: AbortSignal): Promise<Attempt> {
+  const r = await callOnce(key, model, system, user, schema, opts, timeoutMs, signal);
   // A model that doesn't take a thinking level: remember, and ask again without it.
   if (!r.ok && r.status === 400 && r.thinkingLevelUsed && /thinking/i.test(r.detail ?? "")) {
     noThinkingLevel.add(model);
-    return callOnce(key, model, system, user, schema, opts, timeoutMs);
+    return callOnce(key, model, system, user, schema, opts, timeoutMs, signal);
   }
   return r;
 }
 
-async function callOnce(key: string, model: string, system: string, user: string, schema: object, opts: Opts, timeoutMs: number): Promise<Attempt & { thinkingLevelUsed?: boolean }> {
+async function callOnce(key: string, model: string, system: string, user: string, schema: object, opts: Opts, timeoutMs: number, signal?: AbortSignal): Promise<Attempt & { thinkingLevelUsed?: boolean }> {
   if (timeoutMs < 1_000) return { ok: false, code: "busy", message: "The AI took too long. Try again.", retryable: false };
   const noThinking = opts.thinking === false && thinkingOff(model);
   const lowThinking = opts.thinking === false && !noThinking && thinkingLevelModel(model) && !noThinkingLevel.has(model);
@@ -164,7 +228,7 @@ async function callOnce(key: string, model: string, system: string, user: string
         ...(noThinking ? { thinkingConfig: { thinkingBudget: 0 } } : lowThinking ? { thinkingConfig: { thinkingLevel: "low" } } : {}),
       },
     }),
-    signal: AbortSignal.timeout(timeoutMs),
+    signal: signal ? AbortSignal.any([AbortSignal.timeout(timeoutMs), signal]) : AbortSignal.timeout(timeoutMs),
     cache: "no-store",
   }).catch((e: Error) => (e.name === "TimeoutError" ? "timeout" : null));
   if (res === "timeout") return { ok: false, code: "busy", message: "The AI took too long. Try again.", detail: `${model}: timed out`, retryable: true, moveOn: true };
@@ -192,5 +256,5 @@ async function callOnce(key: string, model: string, system: string, user: string
   const text = (c?.content?.parts ?? []).map((p) => p.text ?? "").join("");
   if (!text) return { ok: false, code: c?.finishReason === "SAFETY" ? "blocked" : "error", message: "The AI returned nothing. Try again.", detail: `finishReason ${c?.finishReason ?? "none"}` };
   if (c?.finishReason === "MAX_TOKENS") return { ok: false, code: "error", message: "The AI's answer was cut off. Try again.", detail: "finishReason MAX_TOKENS" };
-  return { ok: true, text };
+  return { ok: true, text, model };
 }

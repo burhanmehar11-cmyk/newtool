@@ -3,6 +3,7 @@ import { z } from "zod";
 import { brand } from "@/config/brand";
 import { PRODUCT_FACTS, QUICK_PICKS } from "@/lib/help-content";
 import { availableModels, generateJson, geminiKey, geminiModel } from "@/server/ai/gemini";
+import { instantAnswers, matchAnswer, normalize } from "@/lib/help-answers";
 import { requireUser } from "@/server/auth";
 import { clientIp } from "@/server/session";
 
@@ -89,7 +90,7 @@ export async function askHelpAssistant(input: unknown): Promise<HelpAnswer> {
   if (!p.success) return { ok: false, error: "Ask a question first." };
   if (!helpAssistantAvailable()) return { ok: false, error: "The assistant isn't available right now. Pick a Quick pick or send us a request below." };
   if (!allowed(user.id)) return { ok: false, error: "That's a lot of questions in a short time. Wait a minute, or send us a request below." };
-  return answer(SYSTEM, p.data.messages);
+  return answer("app", SYSTEM, p.data.messages);
 }
 
 /** The same assistant for signed-out visitors on the website, limited per IP address and overall. */
@@ -99,25 +100,54 @@ export async function askVisitorAssistant(input: unknown): Promise<HelpAnswer> {
   if (!helpAssistantAvailable()) return { ok: false, error: "The assistant isn't available right now. Message the team below." };
   const ip = (await clientIp()) ?? "unknown";
   if (!allowed(`visitor:${ip}`, 5, 25) || !allowed("visitors:all", 60, 600)) return { ok: false, error: "That's a lot of questions in a short time. Wait a minute, or message the team below." };
-  return answer(VISITOR_SYSTEM, p.data.messages);
+  return answer("site", VISITOR_SYSTEM, p.data.messages);
 }
 
-async function answer(system: string, messages: { role: "user" | "assistant"; text: string }[]): Promise<HelpAnswer> {
-  const p = { data: { messages } };
-  const transcript = p.data.messages.map((m) => `${m.role === "user" ? "Person" : "Assistant"}: ${m.text}`).join("\n\n");
-  const r = await generateJson(system, `Conversation so far:\n\n${transcript}\n\nWrite the assistant's next reply.`, SCHEMA, { thinking: false, maxOutputTokens: 1024, budgetMs: 25_000 });
+/**
+ * Speed: Flash-Lite first (Google's fastest models), a second model racing a
+ * slow first one after 3.5s, and at most 15s in all.
+ */
+const AI_OPTS = { thinking: false, maxOutputTokens: 1024, budgetMs: 15_000, prefer: "lite" as const, hedgeAfterMs: 3_500 };
+
+// Answers to the same opening question are reused for a while: the second person to ask gets it instantly.
+const cache = new Map<string, { at: number; answer: Extract<HelpAnswer, { ok: true }> }>();
+const CACHE_MS = 12 * 60 * 60_000;
+
+async function answer(mode: "app" | "site", system: string, messages: { role: "user" | "assistant"; text: string }[]): Promise<HelpAnswer> {
+  const question = [...messages].reverse().find((m) => m.role === "user")?.text ?? "";
+  const cacheKey = messages.length === 1 ? `${mode}:${normalize(question)}` : null;
+  const hit = cacheKey ? cache.get(cacheKey) : undefined;
+  if (hit && Date.now() - hit.at < CACHE_MS) return hit.answer;
+
+  const transcript = messages.map((m) => `${m.role === "user" ? "Person" : "Assistant"}: ${m.text}`).join("\n\n");
+  const r = await generateJson(system, `Conversation so far:\n\n${transcript}\n\nWrite the assistant's next reply.`, SCHEMA, AI_OPTS);
+  const parsed = r.ok ? parse(r.text) : null;
+  if (parsed) {
+    if (cacheKey && !parsed.suggestRequest) {
+      cache.set(cacheKey, { at: Date.now(), answer: parsed });
+      if (cache.size > 500) cache.delete(cache.keys().next().value!);
+    }
+    return parsed;
+  }
   if (!r.ok) console.error(`[help-assistant] ${r.code}: ${r.message}${r.detail ? ` (${r.detail})` : ""}`);
-  if (!r.ok) return { ok: false, error: r.code === "quota" || r.code === "busy" ? "The assistant is busy right now. Try again in a little while, or send us a request below." : "The assistant couldn't answer just now. Try again, or send us a request below." };
+  else console.error(`[help-assistant] unreadable reply: ${r.text.slice(0, 200)}`);
+
+  // No AI answer: give the closest answer from the help content rather than an error.
+  const fallback = matchAnswer(question, instantAnswers(mode), { strict: false });
+  if (fallback) return { ok: true, answer: fallback.text, suggestRequest: false, topic: (TOPICS as readonly string[]).includes(fallback.topic) ? (fallback.topic as (typeof TOPICS)[number]) : "other", subject: fallback.subject };
+  return { ok: false, error: "I couldn't answer that one just now. Try asking it another way, or talk to the team below; we usually reply within a day." };
+}
+
+function parse(text: string): Extract<HelpAnswer, { ok: true }> | null {
   try {
-    const j = JSON.parse(r.text) as { answer?: unknown; suggestRequest?: unknown; topic?: unknown; subject?: unknown };
+    const j = JSON.parse(text) as { answer?: unknown; suggestRequest?: unknown; topic?: unknown; subject?: unknown };
     const answer = typeof j.answer === "string" ? j.answer.trim().slice(0, 2000) : "";
-    if (!answer) throw new Error("empty");
+    if (!answer) return null;
     const topic = (TOPICS as readonly string[]).includes(String(j.topic)) ? (j.topic as (typeof TOPICS)[number]) : "other";
     const subject = typeof j.subject === "string" ? j.subject.trim().slice(0, 200) : "";
     return { ok: true, answer, suggestRequest: j.suggestRequest === true, topic, subject };
   } catch {
-    console.error(`[help-assistant] unreadable reply: ${r.text.slice(0, 200)}`);
-    return { ok: false, error: "The assistant couldn't answer just now. Try again, or send us a request below." };
+    return null;
   }
 }
 
@@ -126,13 +156,13 @@ export async function diagnoseHelpAssistant() {
   const base = { keySet: !!geminiKey(), model: geminiModel() };
   if (!base.keySet) return { ...base, ok: false, code: "not_configured", message: "GEMINI_API_KEY isn't set on this deployment." };
   const started = Date.now();
-  const r = await generateJson(VISITOR_SYSTEM, "Conversation so far:\n\nPerson: What does Locenti do?\n\nWrite the assistant's next reply.", SCHEMA, { thinking: false, maxOutputTokens: 1024, budgetMs: 25_000 });
+  const r = await generateJson(VISITOR_SYSTEM, "Conversation so far:\n\nPerson: Can I use Locenti to find dentists in Leeds and email them?\n\nWrite the assistant's next reply.", SCHEMA, AI_OPTS);
   const ms = Date.now() - started;
   const models = (await availableModels(geminiKey()!)).slice(0, 6);
   if (!r.ok) return { ...base, ok: false, ms, code: r.code, message: r.message, detail: r.detail ?? null, models };
   try {
     const j = JSON.parse(r.text) as { answer?: string };
-    return { ...base, ok: !!j.answer, ms, sample: String(j.answer ?? "").slice(0, 300), models };
+    return { ...base, ok: !!j.answer, ms, answeredBy: r.model ?? null, sample: String(j.answer ?? "").slice(0, 300), models };
   } catch {
     return { ...base, ok: false, ms, code: "unreadable", message: "The AI replied, but not in the expected format.", detail: r.text.slice(0, 300) };
   }

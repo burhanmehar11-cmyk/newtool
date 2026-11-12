@@ -13,6 +13,7 @@ import { ThemeToggle, useAppTheme } from "@/components/app/theme-toggle";
 import { AutoSender } from "@/components/app/auto-sender";
 import { ProductTour, TakeTourButton } from "@/features/product/tour";
 import { ChatWidget } from "@/features/support/chat-widget";
+import type { InstantAnswer } from "@/lib/help-answers";
 
 /**
  * Shell for the live product. Only shipped areas appear in the navigation;
@@ -33,7 +34,7 @@ const nav = [
   { href: "/app/support", label: "Help & Support", icon: LifeBuoy },
 ] as const;
 
-export function ProductShell({ workspaceSlot, assistant = false, children }: { workspaceSlot: React.ReactNode; assistant?: boolean; children: React.ReactNode }) {
+export function ProductShell({ workspaceSlot, assistant = false, instant = [], children }: { workspaceSlot: React.ReactNode; assistant?: boolean; instant?: InstantAnswer[]; children: React.ReactNode }) {
   useAppTheme();
   return (
     <div className="min-h-dvh bg-canvas lg:pl-[240px]">
@@ -46,7 +47,7 @@ export function ProductShell({ workspaceSlot, assistant = false, children }: { w
       <React.Suspense fallback={null}>
         <ProductTour />
       </React.Suspense>
-      <ChatWidget assistant={assistant} />
+      <ChatWidget assistant={assistant} instant={instant} />
       <main id="main" className="mx-auto w-full max-w-[1280px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
         {children}
       </main>

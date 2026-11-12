@@ -11,12 +11,13 @@ import { cn } from "@/lib/utils";
 import type { QuickPick } from "@/lib/help-content";
 import { openSupportAction } from "@/server/actions/support";
 import { HELP_STARTERS, useHelpChat } from "@/features/support/use-help-chat";
+import type { InstantAnswer } from "@/lib/help-answers";
 
 const ICONS = { mail: Mail, pause: PauseCircle, search: Search, pen: PenLine, users: Users, card: CreditCard, ban: Ban, bug: Bug } as const;
 type Draft = { subject: string; topic: string; body: string };
 
 
-export function HelpCenter({ picks, topics, assistant, ready }: { picks: QuickPick[]; topics: { id: string; label: string }[]; assistant: boolean; ready: boolean }) {
+export function HelpCenter({ picks, topics, assistant, ready, instant = [] }: { picks: QuickPick[]; topics: { id: string; label: string }[]; assistant: boolean; ready: boolean; instant?: InstantAnswer[] }) {
   const [draft, setDraft] = React.useState<Draft>({ subject: "", topic: "other", body: "" });
   const [draftKey, setDraftKey] = React.useState(0);
   const formRef = React.useRef<HTMLDivElement>(null);
@@ -31,7 +32,7 @@ export function HelpCenter({ picks, topics, assistant, ready }: { picks: QuickPi
       <QuickPicks picks={picks} onAsk={(p) => prefill({ subject: p.subject, topic: p.topic, body: p.body })} />
       {/* Without the AI set up, the request form takes the full width. */}
       <div className={assistant ? "grid items-start gap-6 xl:grid-cols-2" : ""}>
-        {assistant ? <Assistant onSend={prefill} /> : null}
+        {assistant ? <Assistant onSend={prefill} instant={instant} /> : null}
         <div ref={formRef} className="scroll-mt-6">
           <RequestForm key={draftKey} initial={draft} topics={topics} ready={ready} />
         </div>
@@ -117,8 +118,8 @@ function QuickPicks({ picks, onAsk }: { picks: QuickPick[]; onAsk: (p: QuickPick
 
 /* --------------------------------------------------------------- Assistant */
 
-function Assistant({ onSend }: { onSend: (d: Draft) => void }) {
-  const { msgs, pending, error, ask: askChat, transcript } = useHelpChat();
+function Assistant({ onSend, instant }: { onSend: (d: Draft) => void; instant: InstantAnswer[] }) {
+  const { msgs, pending, error, ask: askChat, retryWithAI, transcript } = useHelpChat(undefined, instant);
   const [text, setText] = React.useState("");
   const listRef = React.useRef<HTMLDivElement>(null);
   React.useEffect(() => {
@@ -163,6 +164,21 @@ function Assistant({ onSend }: { onSend: (d: Draft) => void }) {
             ) : null}
             <div className={cn("max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-6", m.role === "user" ? "rounded-br-md bg-green text-white" : "rounded-bl-md border border-line bg-surface text-ink")}>
               <p className="whitespace-pre-wrap">{m.text}</p>
+              {m.link ? (
+                <Link href={m.link.href} className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-green hover:underline">
+                  {m.link.label} <ArrowRight aria-hidden className="size-3" />
+                </Link>
+              ) : null}
+              {m.instant ? (
+                <span className="mt-2 flex flex-wrap items-center gap-x-2 text-[11px] text-slate">
+                  <span>Instant answer</span>
+                  {!m.instant.retried ? (
+                    <button type="button" onClick={() => retryWithAI(i)} disabled={pending} className="font-semibold text-green hover:underline disabled:opacity-50">
+                      Not quite? Ask the AI
+                    </button>
+                  ) : null}
+                </span>
+              ) : null}
               {m.suggest ? (
                 <button type="button" onClick={() => onSend({ subject: m.suggest!.subject || "Question from the assistant", topic: m.suggest!.topic, body: transcript() })} className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-green hover:underline">
                   Send this to the team <ArrowRight aria-hidden className="size-3" />

@@ -4,6 +4,7 @@ import { ScrollEffects } from "@/components/marketing/scroll-effects";
 import { AttributionCapture } from "@/components/attribution-capture";
 import { ChatWidget } from "@/features/support/chat-widget";
 import { helpAssistantAvailable } from "@/server/services/help-assistant";
+import { instantAnswers } from "@/lib/help-answers";
 
 export default function MarketingLayout({ children }: LayoutProps<"/">) {
   return (
@@ -15,7 +16,7 @@ export default function MarketingLayout({ children }: LayoutProps<"/">) {
         {children}
       </main>
       <SiteFooter />
-      <ChatWidget assistant={helpAssistantAvailable()} site />
+      <ChatWidget assistant={helpAssistantAvailable()} site instant={instantAnswers("site")} />
     </div>
   );
 }

@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, CheckCircle2, Clock, Loader2, MessageCircle, Send, UserRound, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle2, Clock, Loader2, MessageCircle, Send, UserRound, X, Zap } from "lucide-react";
 import { LogoMark } from "@/components/brand/logo";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { Input, Textarea } from "@/components/ui/field";
 import { cn } from "@/lib/utils";
 import { askVisitorHelpAction, contactTeamFromSiteAction, openSupportAction } from "@/server/actions/support";
 import { HELP_STARTERS, useHelpChat } from "@/features/support/use-help-chat";
+import type { InstantAnswer } from "@/lib/help-answers";
 
 const SITE_STARTERS = ["What does Locenti do?", "How does the free trial work?", "Does it send from my own Gmail?", "Where do the emails come from?"];
 
@@ -20,11 +21,11 @@ const SITE_STARTERS = ["What does Locenti do?", "How does the free trial work?",
  * on the website it emails the team, who reply to the visitor's address.
  * The conversation stays as people move between pages.
  */
-export function ChatWidget({ assistant, site = false }: { assistant: boolean; site?: boolean }) {
+export function ChatWidget({ assistant, site = false, instant = [] }: { assistant: boolean; site?: boolean; instant?: InstantAnswer[] }) {
   const [open, setOpen] = React.useState(false);
   const [view, setView] = React.useState<"chat" | "team" | "sent">(assistant ? "chat" : "team");
   const [sent, setSent] = React.useState<{ id: string; ref: string } | { email: string } | null>(null);
-  const chat = useHelpChat(site ? askVisitorHelpAction : undefined);
+  const chat = useHelpChat(site ? askVisitorHelpAction : undefined, instant);
   const [text, setText] = React.useState("");
   const listRef = React.useRef<HTMLDivElement>(null);
   const inputRef = React.useRef<HTMLInputElement>(null);
@@ -127,6 +128,23 @@ export function ChatWidget({ assistant, site = false }: { assistant: boolean; si
                 {chat.msgs.map((m, i) => (
                   <Bubble key={i} role={m.role}>
                     <p className="whitespace-pre-wrap">{m.text}</p>
+                    {m.link && !site ? (
+                      <Link href={m.link.href} onClick={() => setOpen(false)} className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-green hover:underline">
+                        {m.link.label} <ArrowRight aria-hidden className="size-3" />
+                      </Link>
+                    ) : null}
+                    {m.instant ? (
+                      <span className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate">
+                        <span className="inline-flex items-center gap-1">
+                          <Zap aria-hidden className="size-3 text-green" /> Instant answer
+                        </span>
+                        {!m.instant.retried ? (
+                          <button type="button" onClick={() => chat.retryWithAI(i)} disabled={chat.pending} className="font-semibold text-green hover:underline disabled:opacity-50">
+                            Not quite? Ask the AI
+                          </button>
+                        ) : null}
+                      </span>
+                    ) : null}
                   </Bubble>
                 ))}
                 {chat.pending ? (

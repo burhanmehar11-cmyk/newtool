@@ -36,8 +36,23 @@ describe("help assistant", () => {
     expect(await askHelpAssistant({ messages: [{ role: "user", text: "hi" }] })).toMatchObject({ ok: false, error: expect.stringMatching(/isn't available/) });
     h.key = "k";
     h.gen.mockResolvedValue({ ok: false, code: "quota", message: "x" });
-    expect(await askHelpAssistant({ messages: [{ role: "user", text: "hi" }] })).toMatchObject({ ok: false, error: expect.stringMatching(/busy/) });
+    expect(await askHelpAssistant({ messages: [{ role: "user", text: "hi" }] })).toMatchObject({ ok: false, error: expect.stringMatching(/talk to the team/) });
     expect(await askHelpAssistant({ messages: [] })).toMatchObject({ ok: false });
+  });
+
+  it("answers from the help content when the AI is unavailable, instead of an error", async () => {
+    h.gen.mockResolvedValue({ ok: false, code: "busy", message: "busy" });
+    const r = await askHelpAssistant({ messages: [{ role: "user", text: "my mailbox keeps getting disconnected, what now?" }] });
+    expect(r).toMatchObject({ ok: true, answer: expect.stringContaining("Reconnect"), topic: "mailbox" });
+  });
+
+  it("asks for the fast settings and reuses answers to the same opening question", async () => {
+    h.gen.mockResolvedValue({ ok: true, text: JSON.stringify({ answer: "Use Discover.", suggestRequest: false, topic: "search", subject: "" }) });
+    const ask = () => askHelpAssistant({ messages: [{ role: "user", text: "Can I search two cities at once?" }] });
+    expect(await ask()).toMatchObject({ ok: true, answer: "Use Discover." });
+    expect(await ask()).toMatchObject({ ok: true, answer: "Use Discover." });
+    expect(h.gen).toHaveBeenCalledTimes(1);
+    expect(h.gen.mock.calls[0][3]).toMatchObject({ prefer: "lite", hedgeAfterMs: expect.any(Number), budgetMs: 15_000 });
   });
 
   it("limits how fast one person can ask", async () => {

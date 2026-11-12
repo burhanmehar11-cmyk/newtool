@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/misc";
 import { PageLoading } from "@/features/product/page-loading";
 import { HelpCenter } from "@/features/support/help-center";
+import { instantAnswers } from "@/lib/help-answers";
 import { brand } from "@/config/brand";
 import { QUICK_PICKS } from "@/lib/help-content";
 import { formatDateTime } from "@/lib/utils";
@@ -55,7 +56,7 @@ async function HelpSupport() {
         </div>
       </section>
 
-      <HelpCenter picks={QUICK_PICKS} topics={SUPPORT_TOPIC_OPTIONS} assistant={helpAssistantAvailable()} ready={ready} />
+      <HelpCenter picks={QUICK_PICKS} topics={SUPPORT_TOPIC_OPTIONS} assistant={helpAssistantAvailable()} ready={ready} instant={instantAnswers("app")} />
 
       <section aria-labelledby="mine-title" className="card overflow-hidden">
         <div className="flex items-baseline justify-between gap-2 border-b border-line px-5 py-4">

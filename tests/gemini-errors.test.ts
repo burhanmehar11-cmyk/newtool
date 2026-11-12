@@ -21,7 +21,7 @@ describe("generateJson", () => {
     vi.stubEnv("GEMINI_API_KEY", "k");
     vi.stubEnv("GEMINI_MODEL", "gemini-2.5-flash");
     const f = reply(200, { candidates: [{ content: { parts: [{ text: '{"answer":"hi"}' }] }, finishReason: "STOP" }] });
-    expect(await generateJson("s", "u", {}, { thinking: false, maxOutputTokens: 1024 })).toEqual({ ok: true, text: '{"answer":"hi"}' });
+    expect(await generateJson("s", "u", {}, { thinking: false, maxOutputTokens: 1024 })).toMatchObject({ ok: true, text: '{"answer":"hi"}' });
     const body = JSON.parse((f.mock.calls[0] as unknown as [string, { body: string }])[1].body);
     expect(body.generationConfig).toMatchObject({ maxOutputTokens: 1024, thinkingConfig: { thinkingBudget: 0 } });
     await generateJson("s", "u", {});
@@ -51,8 +51,8 @@ describe("generateJson", () => {
         ? new Response(JSON.stringify({ error: { status: "INVALID_ARGUMENT", message: "Unknown name thinkingLevel in thinking_config" } }), { status: 400 })
         : new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: "{}" }] }, finishReason: "STOP" }] }), { status: 200 });
     }));
-    expect(await g.generateJson("s", "u", {}, { thinking: false })).toEqual({ ok: true, text: "{}" });
-    expect(await g.generateJson("s", "u", {}, { thinking: false })).toEqual({ ok: true, text: "{}" });
+    expect(await g.generateJson("s", "u", {}, { thinking: false })).toMatchObject({ ok: true, text: "{}" });
+    expect(await g.generateJson("s", "u", {}, { thinking: false })).toMatchObject({ ok: true, text: "{}" });
     expect(bodies.map((b) => !!b.thinkingConfig)).toEqual([true, false, false]);
   });
 
@@ -74,7 +74,7 @@ describe("generateJson", () => {
     }));
     vi.spyOn(console, "warn").mockImplementation(() => {});
     const started = Date.now();
-    expect(await g.generateJson("s", "u", {}, { budgetMs: 16_000 })).toEqual({ ok: true, text: '{"answer":"fast"}' });
+    expect(await g.generateJson("s", "u", {}, { budgetMs: 16_000 })).toMatchObject({ ok: true, text: '{"answer":"fast"}' });
     expect(calls).toEqual([g.DEFAULT_GEMINI_MODEL, "gemini-3.7-flash"]);
     expect(Date.now() - started).toBeLessThan(12_000);
   }, 20_000);
@@ -126,7 +126,7 @@ describe("generateJson", () => {
     });
     vi.stubGlobal("fetch", f);
     vi.spyOn(console, "warn").mockImplementation(() => {});
-    expect(await generateJson("s", "u", {})).toEqual({ ok: true, text: '{"answer":"ok"}' });
+    expect(await generateJson("s", "u", {})).toMatchObject({ ok: true, text: '{"answer":"ok"}' });
     expect(geminiModel()).toBe("gemini-4.1-flash");
   });
 
@@ -156,7 +156,7 @@ describe("generateJson", () => {
       return new Response(JSON.stringify({ error: { status: "UNAVAILABLE", message: "This model is currently experiencing high demand." } }), { status: 503 });
     }));
     vi.spyOn(console, "warn").mockImplementation(() => {});
-    expect(await g.generateJson("s", "u", {})).toEqual({ ok: true, text: '{"answer":"ok"}' });
+    expect(await g.generateJson("s", "u", {})).toMatchObject({ ok: true, text: '{"answer":"ok"}' });
     expect(calls).toEqual([g.DEFAULT_GEMINI_MODEL, g.DEFAULT_GEMINI_MODEL, "gemini-3-flash"]);
   });
 
@@ -188,11 +188,51 @@ describe("generateJson", () => {
       return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: '{"answer":"lite"}' }] }, finishReason: "STOP" }] }), { status: 200 });
     }));
     vi.spyOn(console, "warn").mockImplementation(() => {});
-    expect(await g.generateJson("s", "u", {})).toEqual({ ok: true, text: '{"answer":"lite"}' });
+    expect(await g.generateJson("s", "u", {})).toMatchObject({ ok: true, text: '{"answer":"lite"}' });
     expect(calls).toEqual(["gemini-3.8-flash", "gemini-2.5-flash", "gemini-3.5-flash-lite"]);
     // Next question skips the used-up model and starts with the next one available.
     calls.length = 0;
-    expect(await g.generateJson("s", "u", {})).toEqual({ ok: true, text: '{"answer":"lite"}' });
+    expect(await g.generateJson("s", "u", {})).toMatchObject({ ok: true, text: '{"answer":"lite"}' });
     expect(calls).toEqual(["gemini-2.5-flash", "gemini-3.5-flash-lite"]);
+  });
+
+  it("tries the fastest (Flash-Lite) model first when asked", async () => {
+    vi.resetModules();
+    const g = await import("@/server/ai/gemini");
+    vi.stubEnv("GEMINI_API_KEY", "k");
+    const calls: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      if (url.includes("/models?")) return new Response(JSON.stringify({ models: ["gemini-3.8-flash", "gemini-3.5-flash-lite", "gemini-3.7-flash"].map((n) => ({ name: `models/${n}`, supportedGenerationMethods: ["generateContent"] })) }), { status: 200 });
+      calls.push(/models\/([^:]+):/.exec(url)![1]);
+      return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: "{}" }] }, finishReason: "STOP" }] }), { status: 200 });
+    }));
+    expect(await g.generateJson("s", "u", {}, { prefer: "lite" })).toMatchObject({ ok: true, model: "gemini-3.5-flash-lite" });
+    expect(calls).toEqual(["gemini-3.5-flash-lite"]);
+  });
+
+  it("races a second model when the first is slow, and takes the first answer", async () => {
+    vi.resetModules();
+    const g = await import("@/server/ai/gemini");
+    vi.stubEnv("GEMINI_API_KEY", "k");
+    const calls: string[] = [];
+    let aborted = false;
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init: { signal?: AbortSignal }) => {
+      if (url.includes("/models?")) return new Response(JSON.stringify({ models: ["gemini-3.5-flash-lite", "gemini-3.8-flash"].map((n) => ({ name: `models/${n}`, supportedGenerationMethods: ["generateContent"] })) }), { status: 200 });
+      const model = /models\/([^:]+):/.exec(url)![1];
+      calls.push(model);
+      if (model === "gemini-3.8-flash") return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: '{"answer":"second"}' }] }, finishReason: "STOP" }] }), { status: 200 });
+      // The first model hangs until it's cancelled.
+      return new Promise<Response>((_, fail) =>
+        init.signal?.addEventListener("abort", () => {
+          aborted = true;
+          fail(Object.assign(new Error("aborted"), { name: "AbortError" }));
+        }),
+      );
+    }));
+    const started = Date.now();
+    expect(await g.generateJson("s", "u", {}, { prefer: "lite", hedgeAfterMs: 200, budgetMs: 15_000 })).toMatchObject({ ok: true, text: '{"answer":"second"}', model: "gemini-3.8-flash" });
+    expect(Date.now() - started).toBeLessThan(2_000);
+    expect(calls).toEqual(["gemini-3.5-flash-lite", "gemini-3.8-flash"]);
+    expect(aborted).toBe(true); // the slow one is cancelled
   });
 });
