@@ -41,6 +41,8 @@ export function gmailCallbackUrl(origin: string) {
   return `${origin}${GMAIL_CALLBACK_PATH}`;
 }
 
+/** Reply tracking is on: the old Gmail read permission, or IMAP for App Password mailboxes ("imap"). */
 export function hasReadScope(scope: string | null | undefined) {
-  return (scope ?? "").split(/\s+/).includes(GMAIL_READ_SCOPE);
+  const s = (scope ?? "").split(/\s+/);
+  return s.includes(GMAIL_READ_SCOPE) || s.includes("imap");
 }

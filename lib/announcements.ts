@@ -47,8 +47,8 @@ The Locenti Team`,
 
 Most people who get replies with Locenti do the same five things. Here they are, in order:
 
-1. Connect your Gmail (2 minutes)
-Mailboxes → Connect Gmail, then send yourself a test email. Campaigns go out from your own address, so replies land in your own inbox.
+1. Connect your mailbox (2 minutes)
+Mailboxes → Add mailbox → Gmail / Google Workspace, paste an App Password, then send yourself a test email. Campaigns go out from your own address, so replies land in your own inbox.
 
 2. Tell Locenti what you sell (2 minutes)
 Settings → your offer, your tone and your signature. Every email is written from this, so a clear offer means better emails.

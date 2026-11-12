@@ -15,7 +15,7 @@ export async function AnnouncementsTab() {
     <div className="space-y-5">
       {!d.ready ? <Callout tone="warn" title="Database update needed">Run database/migrations/0017_announcements.sql in Neon to send announcements.</Callout> : null}
       {!channel ? (
-        <Callout tone="danger" title="Email sending isn't set up">Connect your Gmail on the Mailboxes page (in a workspace you own), or set SMTP_URL, then come back.</Callout>
+        <Callout tone="danger" title="Email sending isn't set up">Connect your mailbox with an App Password on the Mailboxes page (in a workspace you own), or set SMTP_URL, then come back.</Callout>
       ) : (
         <div className="card flex flex-wrap items-start gap-3 p-4 text-sm">
           <Mail aria-hidden className="mt-0.5 size-4 shrink-0 text-green" />

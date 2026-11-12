@@ -6,14 +6,16 @@ import { emitWebhook } from "@/server/services/webhooks";
 import { z } from "zod";
 import { hasReadScope } from "@/lib/gmail/oauth";
 import { classifyReply, type ReplyKind } from "@/lib/replies/classify";
-import { parseMessage } from "@/lib/replies/gmail-thread";
+import { parseMessage, type ParsedMessage } from "@/lib/replies/gmail-thread";
 import { requireWorkspace, isViewer, VIEW_ONLY } from "@/server/auth";
 import type { Q } from "@/server/auth-store";
 import { addSuppression } from "@/server/campaign-store";
 import { withService, withUser } from "@/server/db";
 import { getThread } from "@/server/gmail/google";
-import { markMailbox } from "@/server/mailbox-store";
-import { inboxThreads, knownMessageIds, mailboxesForSync, markSynced, recordInbound, replyCounts, setThreadState, threadDetail, threadsForMailbox, type MailboxForSync } from "@/server/replies-store";
+import { markMailbox, smtpSettings } from "@/server/mailbox-store";
+import { decryptJson, tokenKey } from "@/server/gmail/crypto";
+import { findReplies } from "@/server/mail/client";
+import { inboxThreads, knownMessageIds, mailboxesForSync, markSynced, recordInbound, replyCounts, sentMessageThreads, setThreadState, threadDetail, threadsForMailbox, type MailboxForSync, type SyncThread } from "@/server/replies-store";
 import { accessTokenFor } from "@/server/services/mailboxes";
 
 const svc = <T,>(fn: (q: Q) => Promise<T>) => withService((q) => fn(q as unknown as Q));
@@ -25,6 +27,7 @@ export const SYNC_EVERY_MS = 4 * 60_000;
 export type SyncSummary = { checked: number; newReplies: number; skipped: string[] };
 
 async function syncMailbox(box: MailboxForSync, summary: SyncSummary) {
+  if (box.provider === "smtp") return syncImapMailbox(box, summary);
   const token = await accessTokenFor(box.id);
   if (!token.ok) {
     summary.skipped.push(`${box.email}: ${token.message}`);
@@ -46,57 +49,101 @@ async function syncMailbox(box: MailboxForSync, summary: SyncSummary) {
     for (const raw of r.messages) {
       const m = parseMessage(raw);
       if (!m || known.has(m.id)) continue;
-      if (m.fromEmail === box.email) {
-        // Something the sender wrote in Gmail themselves: keep it for context.
-        await svc((q) =>
-          q.query(
-            `insert into public.messages (workspace_id, thread_id, direction, provider_message_id, from_addr, to_addr, subject, body_text, occurred_at)
-             values ($1, $2, 'outbound', $3, $4, $5, $6, $7, $8) on conflict (workspace_id, provider_message_id) do nothing`,
-            [t.workspace_id, t.id, m.id, m.from.slice(0, 300), m.to.slice(0, 300), m.subject.slice(0, 300), m.text, m.date],
-          ),
-        );
-        continue;
-      }
-      const c = classifyReply(m);
-      const added = await svc((q) =>
-        recordInbound(q, { ws: t.workspace_id, threadId: t.id, messageId: m.id, from: m.from, to: m.to, subject: m.subject, text: m.text, at: m.date, kind: c.kind, classificationSource: t.classification_source, leadId: t.lead_id, campaignId: t.campaign_id }),
-      );
-      if (!added) continue;
-      summary.newReplies++;
-      if (c.kind !== "out_of_office") {
-        const who = m.from.replace(/<.*>/, "").trim() || m.fromEmail;
-        await notifyWorkspace(t.workspace_id, "reply", {
-          title: c.kind === "bounce" ? "An email bounced" : c.kind === "interested" ? `Interested reply from ${who}` : `New reply from ${who}`,
-          body: c.kind === "bounce" ? "The address rejected the email, so it's on your do-not-contact list now." : m.text.replace(/\s+/g, " ").slice(0, 160),
-          href: `/app/inbox/${t.id}`,
-          level: c.kind === "bounce" ? "warning" : c.kind === "interested" ? "success" : "info",
-          dedupeKey: `reply:${m.id}`,
-        });
-      }
-      await emitWebhook(t.workspace_id, "reply.received", m.id, {
-        thread_id: t.id,
-        campaign_id: t.campaign_id,
-        lead_id: t.lead_id,
-        from: m.from,
-        subject: m.subject,
-        text: m.text.slice(0, 2000),
-        label: c.kind,
-        received_at: m.date.toISOString(),
-        url: `${configuredSiteUrl() ?? brand.siteUrl}/app/inbox/${t.id}`,
-      });
-      // Opt-outs and bounces go on the do-not-contact list for the address we emailed.
-      if (c.kind === "bounce" || c.stopRequested) {
-        await svc(async (q) => {
-          const to = (await q.query<{ to_addr: string }>("select to_addr from public.messages where thread_id = $1 and direction = 'outbound' order by occurred_at limit 1", [t.id])).rows[0]?.to_addr;
-          if (to) await addSuppression(q, t.workspace_id, null, to.toLowerCase(), "email", c.kind === "bounce" ? "bounce" : "unsubscribe");
-          if (c.kind === "bounce" && t.campaign_id && t.lead_id) {
-            await q.query("update public.enrollments set state = 'stopped', reason = 'Bounced: the address rejected the email' where campaign_id = $1 and lead_id = $2", [t.campaign_id, t.lead_id]);
-          }
-        });
-      }
+      await handleMessage(box, t, m, summary);
     }
   }
   await svc((q) => markSynced(q, box.id));
+}
+
+/** App Password mailboxes: read the inbox over IMAP for replies (and bounces) to our emails. */
+async function syncImapMailbox(box: MailboxForSync, summary: SyncSummary) {
+  const cfg = await svc((q) => smtpSettings(q, box.id));
+  const login = await imapLogin(box.id);
+  if (!cfg?.imap || !login) {
+    summary.skipped.push(`${box.email}: reply tracking isn't set up`);
+    return;
+  }
+  const threads = await svc((q) => sentMessageThreads(q, box.id));
+  if (!threads.size) {
+    await svc((q) => markSynced(q, box.id));
+    return;
+  }
+  // A day of overlap: IMAP searches by date, and replies already saved are skipped.
+  const since = new Date(box.last_synced_at ? new Date(box.last_synced_at).getTime() - 24 * 3600_000 : Date.now() - 14 * 24 * 3600_000);
+  const r = await findReplies(cfg.imap, login, { since, ours: new Set(threads.keys()), self: box.email.toLowerCase() });
+  if (!r.ok) {
+    if (r.code === "auth" || r.code === "imap_off") await svc((q) => markMailbox(q, box.id, { lastError: r.message }));
+    summary.skipped.push(`${box.email}: ${r.message}`);
+    return;
+  }
+  for (const m of r.replies) {
+    const t = m.refs.map((id) => threads.get(id)).find(Boolean);
+    if (!t) continue;
+    summary.checked++;
+    await handleMessage(box, t, m, summary);
+  }
+  await svc((q) => markSynced(q, box.id));
+}
+
+async function imapLogin(accountId: string) {
+  const { loadSecret } = await import("@/server/mailbox-store");
+  const key = tokenKey();
+  const blob = await svc((q) => loadSecret(q, accountId));
+  const stored = blob && key ? decryptJson<{ password?: string }>(blob, key) : null;
+  const cfg = await svc((q) => smtpSettings(q, accountId));
+  return stored?.password && cfg ? { user: cfg.username, pass: stored.password } : null;
+}
+
+/** One message in a conversation we started: saved, sorted, and acted on (notifications, webhooks, opt-outs). */
+async function handleMessage(box: MailboxForSync, t: SyncThread, m: ParsedMessage, summary: SyncSummary) {
+  if (m.fromEmail === box.email) {
+    // Something the sender wrote themselves: keep it for context.
+    await svc((q) =>
+      q.query(
+        `insert into public.messages (workspace_id, thread_id, direction, provider_message_id, from_addr, to_addr, subject, body_text, occurred_at)
+         values ($1, $2, 'outbound', $3, $4, $5, $6, $7, $8) on conflict (workspace_id, provider_message_id) do nothing`,
+        [t.workspace_id, t.id, m.id, m.from.slice(0, 300), m.to.slice(0, 300), m.subject.slice(0, 300), m.text, m.date],
+      ),
+    );
+    return;
+  }
+  const c = classifyReply(m);
+  const added = await svc((q) =>
+    recordInbound(q, { ws: t.workspace_id, threadId: t.id, messageId: m.id, from: m.from, to: m.to, subject: m.subject, text: m.text, at: m.date, kind: c.kind, classificationSource: t.classification_source, leadId: t.lead_id, campaignId: t.campaign_id }),
+  );
+  if (!added) return;
+  summary.newReplies++;
+  if (c.kind !== "out_of_office") {
+    const who = m.from.replace(/<.*>/, "").trim() || m.fromEmail;
+    await notifyWorkspace(t.workspace_id, "reply", {
+      title: c.kind === "bounce" ? "An email bounced" : c.kind === "interested" ? `Interested reply from ${who}` : `New reply from ${who}`,
+      body: c.kind === "bounce" ? "The address rejected the email, so it's on your do-not-contact list now." : m.text.replace(/\s+/g, " ").slice(0, 160),
+      href: `/app/inbox/${t.id}`,
+      level: c.kind === "bounce" ? "warning" : c.kind === "interested" ? "success" : "info",
+      dedupeKey: `reply:${m.id}`,
+    });
+  }
+  await emitWebhook(t.workspace_id, "reply.received", m.id, {
+    thread_id: t.id,
+    campaign_id: t.campaign_id,
+    lead_id: t.lead_id,
+    from: m.from,
+    subject: m.subject,
+    text: m.text.slice(0, 2000),
+    label: c.kind,
+    received_at: m.date.toISOString(),
+    url: `${configuredSiteUrl() ?? brand.siteUrl}/app/inbox/${t.id}`,
+  });
+  // Opt-outs and bounces go on the do-not-contact list for the address we emailed.
+  if (c.kind === "bounce" || c.stopRequested) {
+    await svc(async (q) => {
+      const to = (await q.query<{ to_addr: string }>("select to_addr from public.messages where thread_id = $1 and direction = 'outbound' order by occurred_at limit 1", [t.id])).rows[0]?.to_addr;
+      if (to) await addSuppression(q, t.workspace_id, null, to.toLowerCase(), "email", c.kind === "bounce" ? "bounce" : "unsubscribe");
+      if (c.kind === "bounce" && t.campaign_id && t.lead_id) {
+        await q.query("update public.enrollments set state = 'stopped', reason = 'Bounced: the address rejected the email' where campaign_id = $1 and lead_id = $2", [t.campaign_id, t.lead_id]);
+      }
+    });
+  }
 }
 
 /** Checks this workspace's mailboxes that have reply tracking on. Throttled per mailbox unless forced. */

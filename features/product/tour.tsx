@@ -18,11 +18,11 @@ type Step = { target?: string; title: string; body: string };
 const STEPS: Step[] = [
   { title: "Welcome to Locenti", body: "A one-minute tour of where everything is. Locenti finds local businesses on Google Maps, finds their public emails, writes a personal first email to each, and sends your approved campaigns from your own Gmail." },
   { target: "/app", title: "Dashboard", body: "Your pipeline at a glance for the last 30 days, and a setup checklist showing what to do next." },
-  { target: "/app/mailboxes", title: "Mailboxes: start here", body: "Connect the Gmail address you send from, then send yourself a test email. Campaigns can't go out until a mailbox is connected." },
+  { target: "/app/mailboxes", title: "Mailboxes: start here", body: "Add the mailbox you send from (Gmail with an App Password, Zoho, Hostinger or any IMAP/SMTP mailbox), then send yourself a test email. Campaigns can't go out until a mailbox is connected." },
   { target: "/app/discover", title: "Discover", body: "Search Google Maps by business type and city. You only get businesses that show an email (and a website, if you tick it), and you're charged only for those." },
   { target: "/app/leads", title: "Leads", body: "Businesses you saved. Open one to see what its website shows, research it, add notes, or import and export leads as a CSV file." },
   { target: "/app/campaigns", title: "Campaigns", body: "Pick leads, and Locenti writes a personal first email for each. You review every message and approve; nothing is sent before that. Pause, resume or edit any time." },
-  { target: "/app/inbox", title: "Inbox", body: "Replies to your campaigns, sorted into interested, not interested and out of office. Answer them from your Gmail." },
+  { target: "/app/inbox", title: "Inbox", body: "Replies to your campaigns, sorted into interested, not interested and out of office. Answer them from your own mailbox." },
   { target: "/app/notifications", title: "Notifications", body: "The bell on your workspace card. A number means something new: replies, campaigns starting and finishing, a mailbox that needs reconnecting, teammates joining." },
   { target: "/app/analytics", title: "Analytics", body: "How your campaigns are doing: emails sent, reply rate and which campaigns get interested replies." },
   { target: "/app/agent", title: "Agent", body: "Optional: connect your own AI app (Claude, Cursor and others) to search, research and draft campaigns for you. It can't send; you still approve." },

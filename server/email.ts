@@ -2,19 +2,20 @@ import "server-only";
 import nodemailer, { type Transporter } from "nodemailer";
 import { brand } from "@/config/brand";
 import { adminEmails } from "@/lib/admin";
-import { buildMessage, toGmailRaw } from "@/lib/gmail/mime";
+import { randomUUID } from "node:crypto";
+import { buildMessage } from "@/lib/gmail/mime";
 import type { Q } from "@/server/auth-store";
 import { withService } from "@/server/db";
-import { sendRaw } from "@/server/gmail/google";
 
 /**
  * Account emails (confirmations, password resets, team invites).
  *
  * Sent over SMTP when SMTP_URL is set, for example a Gmail App Password:
  *   SMTP_URL=smtps://you%40gmail.com:APP_PASSWORD@smtp.gmail.com:465
- * Otherwise through the owner's Gmail mailbox already connected in Locenti
- * (send-only access): SYSTEM_EMAIL_FROM if set, else a connected mailbox in a
- * workspace owned by someone in ADMIN_EMAILS. Never a customer's mailbox.
+ * Otherwise through the owner's mailbox already connected in Locenti (App
+ * Password over SMTP, or an older Gmail connection): SYSTEM_EMAIL_FROM if set,
+ * else a connected mailbox in a workspace owned by someone in ADMIN_EMAILS.
+ * Never a customer's mailbox.
  */
 export function smtpConfigured() {
   return !!process.env.SMTP_URL?.trim();
@@ -36,7 +37,7 @@ async function systemMailbox(): Promise<SystemMailbox | null> {
           await withService((q) =>
             (q as unknown as Q).query<SystemMailbox>(
               `select sa.id, sa.email, sa.sender_name from public.sending_accounts sa
-               where sa.status = 'connected' and coalesce(sa.scopes, '') like '%gmail.send%'
+               where sa.status = 'connected' and (sa.provider = 'smtp' or coalesce(sa.scopes, '') like '%gmail.send%')
                  and (case when $1 <> '' then lower(sa.email) = $1
                       else exists (select 1 from public.memberships m join auth.users u on u.id = m.user_id
                                    where m.workspace_id = sa.workspace_id and m.role = 'owner' and lower(u.email) = any($2::text[])) end)
@@ -87,13 +88,16 @@ export async function sendEmail(to: string, subject: string, text: string, opts:
   }
   const box = await systemMailbox();
   if (!box) throw new Error("Email is not configured");
-  const { accessTokenFor } = await import("@/server/services/mailboxes");
-  const token = await accessTokenFor(box.id);
-  if (!token.ok) {
+  const { mailboxSender } = await import("@/server/services/mailboxes");
+  const sender = await mailboxSender(box.id);
+  if (!sender.ok) {
     mailboxCache = null;
-    throw new Error(token.message);
+    throw new Error(sender.message);
   }
-  const sent = await sendRaw(token.token, toGmailRaw(buildMessage({ from: { email: opts.from || box.email, name: brand.name }, to, subject, text, html: opts.html ?? null, replyTo: opts.replyTo ?? null, headers: opts.headers })));
+  const rfcMessageId = `<${randomUUID()}@${(opts.from || box.email).split("@")[1] ?? "locenti.local"}>`;
+  const message = buildMessage({ from: { email: opts.from || box.email, name: brand.name }, to, subject, text, html: opts.html ?? null, replyTo: opts.replyTo ?? null, headers: { "Message-ID": rfcMessageId, ...opts.headers } });
+  // Over SMTP the envelope sender is the mailbox itself; the From line may show an alias (e.g. hello@).
+  const sent = await sender.send({ message, rfcMessageId, from: box.email, to });
   if (!sent.ok) throw new Error(sent.message);
 }
 

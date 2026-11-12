@@ -27,7 +27,7 @@ export const faqs: { q: string; a: string }[] = [
   },
   {
     q: "Do I connect my own mailbox?",
-    a: "Yes. Connect a Gmail address and Locenti sends from it. By default it only gets permission to send. If you turn on reply tracking, it also reads the replies to your campaigns so they appear in Locenti's inbox, sorted into interested, not interested and out of office.",
+    a: "Yes. Connect your mailbox (Gmail, Google Workspace, Zoho, Hostinger or any IMAP/SMTP mailbox) with an App Password, and Locenti sends from it, so replies land in your own inbox. With reply tracking on, it also spots the replies to your campaigns so they appear in Locenti's inbox, sorted into interested, not interested and out of office. Your password is stored encrypted and you can disconnect any time.",
   },
   {
     q: "How much does it cost?",

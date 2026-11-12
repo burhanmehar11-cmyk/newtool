@@ -36,7 +36,7 @@ async function Dashboard() {
     { done: l.funnel.found > 0, label: "Run your first map search", href: "/app/discover" },
     { done: l.funnel.saved > 0, label: "Save businesses as leads", href: "/app/discover" },
     { done: l.funnel.researched > 0, label: "Research a lead's website", href: "/app/leads" },
-    { done: o.today.connected > 0, label: "Connect Gmail (for outreach)", href: "/app/mailboxes" },
+    { done: o.today.connected > 0, label: "Connect your mailbox (for outreach)", href: "/app/mailboxes" },
     { done: o.campaigns.length > 0, label: "Send your first campaign", href: "/app/campaigns/new" },
   ];
   const doneCount = setup.filter((s) => s.done).length;

@@ -20,6 +20,19 @@ export async function threadsForMailbox(q: Q, accountId: string, limit = 25): Pr
   ).rows;
 }
 
+/** Our sent emails' Message-IDs (last 45 days) and the conversation each belongs to: replies point back at them. */
+export async function sentMessageThreads(q: Q, accountId: string): Promise<Map<string, SyncThread>> {
+  const r = await q.query<SyncThread & { rfc: string }>(
+    `select lower(d.rfc_message_id) as rfc, t.id, t.workspace_id, t.provider_thread_id, t.lead_id, t.campaign_id, t.classification_source
+     from public.dispatches d
+     join public.messages m on m.workspace_id = d.workspace_id and m.provider_message_id = d.provider_message_id and m.direction = 'outbound'
+     join public.threads t on t.id = m.thread_id
+     where d.sending_account_id = $1 and d.status = 'accepted' and d.rfc_message_id is not null and d.accepted_at > now() - interval '45 days'`,
+    [accountId],
+  );
+  return new Map(r.rows.map(({ rfc, ...t }) => [rfc, t]));
+}
+
 export async function knownMessageIds(q: Q, threadId: string): Promise<Set<string>> {
   return new Set((await q.query<{ provider_message_id: string }>("select provider_message_id from public.messages where thread_id = $1", [threadId])).rows.map((r) => r.provider_message_id));
 }
@@ -53,10 +66,10 @@ export async function markSynced(q: Q, accountId: string) {
   await q.query("update public.sending_accounts set last_synced_at = now() where id = $1", [accountId]);
 }
 
-export type MailboxForSync = { id: string; workspace_id: string; email: string; scopes: string | null; last_synced_at: string | null };
+export type MailboxForSync = { id: string; workspace_id: string; email: string; scopes: string | null; last_synced_at: string | null; provider: string };
 
 export async function mailboxesForSync(q: Q, workspaceId: string): Promise<MailboxForSync[]> {
-  return (await q.query<MailboxForSync>("select id, workspace_id, email, scopes, last_synced_at from public.sending_accounts where workspace_id = $1 and status = 'connected'", [workspaceId])).rows;
+  return (await q.query<MailboxForSync>("select id, workspace_id, email, scopes, last_synced_at, provider from public.sending_accounts where workspace_id = $1 and status = 'connected'", [workspaceId])).rows;
 }
 
 /* --------------------------------------------------------------- inbox (RLS) */

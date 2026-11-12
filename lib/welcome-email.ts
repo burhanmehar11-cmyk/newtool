@@ -13,7 +13,7 @@ const C = { midnight: "#0B1218", mint: "#8FF0C0", green: "#0E7A4F", ink: "#0B121
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 const STEPS = [
-  { title: "Connect your Gmail", body: "Campaigns go out from your own address, so replies land in your own inbox.", path: "/app/mailboxes", cta: "Connect" },
+  { title: "Connect your mailbox", body: "Campaigns go out from your own address, so replies land in your own inbox.", path: "/app/mailboxes", cta: "Connect" },
   { title: "Tell Locenti what you sell", body: "Your offer, tone and signature. Every email is written from it.", path: "/app/settings", cta: "Add your offer" },
   { title: "Find your first 20 businesses", body: "Pick a business type and a city. You only get businesses that show a real email.", path: "/app/discover", cta: "Search" },
 ];
@@ -30,7 +30,7 @@ Locenti finds local businesses on Google Maps that show a real email, reads thei
 
 Three steps to your first replies:
 
-1. Connect your Gmail
+1. Connect your mailbox
    Campaigns go out from your own address, so replies land in your own inbox.
    ${v.site}/app/mailboxes
 

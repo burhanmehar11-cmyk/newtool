@@ -122,7 +122,7 @@ const SITE_ONLY: InstantAnswer[] = [
   },
   {
     id: "get-started",
-    text: `Press “Start free trial”, sign up with Google or your email (no card needed), then connect your Gmail, describe what you sell, and run your first search. The ${trialDays()}-day trial lets you try everything.`,
+    text: `Press “Start free trial”, sign up with Google or your email (no card needed), then connect your mailbox (Gmail with an App Password, or any IMAP/SMTP mailbox), describe what you sell, and run your first search. The ${trialDays()}-day trial lets you try everything.`,
     keys: ["sign up", "signup", "get started", "create account", "create an account", "how do i start", "how to start", "register", "try it"],
     topic: "account",
     subject: "Question about signing up",
@@ -132,14 +132,14 @@ const SITE_ONLY: InstantAnswer[] = [
 const APP_ONLY: InstantAnswer[] = [
   {
     id: "connect-gmail",
-    text: "Open Mailboxes and press “Connect Gmail”, pick your Google account and approve on Google's screen. Then send yourself a test email from the same page. A campaign can only send once a mailbox is connected.",
+    text: "Open Mailboxes → Add mailbox → Gmail / Google Workspace. In your Google account: turn on IMAP (Gmail settings), turn on 2-Step Verification, then create an App Password (myaccount.google.com/apppasswords). Paste the 16-character App Password, press Test connection, then Add mailbox. Zoho, Hostinger and other IMAP/SMTP mailboxes work the same way.",
     keys: ["connect gmail", "connect my gmail", "connect a mailbox", "connect mailbox", "add mailbox", "add a mailbox", "link gmail", "add gmail", "connect email", "connect my email"],
     exact: ["How do I connect my Gmail?"],
     link: { href: "/app/mailboxes", label: "Open Mailboxes" },
     topic: "mailbox",
     subject: "Help connecting my Gmail",
   },
-  { id: "mailbox-reconnect", text: steps("mailbox-reconnect"), keys: ["reconnect", "reconnecting", "disconnected", "disconnecting", "keep disconnecting", "lost access", "mailbox error", "token expired"], link: pick("mailbox-reconnect").link, topic: "mailbox", subject: pick("mailbox-reconnect").subject },
+  { id: "mailbox-reconnect", text: steps("mailbox-reconnect"), keys: ["app password", "reconnect", "reconnecting", "disconnected", "disconnecting", "keep disconnecting", "lost access", "mailbox error", "token expired"], link: pick("mailbox-reconnect").link, topic: "mailbox", subject: pick("mailbox-reconnect").subject },
   { id: "campaign-paused", text: steps("campaign-paused"), keys: ["campaign paused", "paused", "pause by itself", "stopped sending", "not sending", "won't send", "wont send", "resume"], exact: ["Why did my campaign pause?"], link: pick("campaign-paused").link, topic: "campaigns", subject: pick("campaign-paused").subject },
   { id: "few-emails", text: steps("few-emails"), keys: ["few result", "only a few", "not many result", "no result", "few business", "search found only", "too few", "more result", "more business", "not enough result"], link: pick("few-emails").link, topic: "search", subject: pick("few-emails").subject },
   { id: "better-emails", text: steps("better-emails"), keys: ["better email", "improve email", "improve my email", "write better", "email quality", "more personal", "better ai email"], exact: ["How do I write better emails?"], link: pick("better-emails").link, topic: "campaigns", subject: pick("better-emails").subject },

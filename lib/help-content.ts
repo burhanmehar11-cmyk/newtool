@@ -23,7 +23,8 @@ export const QUICK_PICKS: QuickPick[] = [
     icon: "mail",
     title: "My mailbox says “needs reconnecting”",
     answer: [
-      "Open Mailboxes and press Reconnect next to the address, then approve on Google's screen.",
+      "Open Mailboxes and press “Update password” (or “Reconnect with App Password”) next to the address.",
+      "Paste a new App Password: Google Account → App passwords (needs 2-Step Verification). Changing your Google password removes old App Passwords, so create a new one.",
       "Send yourself a test email from the Mailboxes page to make sure it works.",
       "Paused campaigns don't restart on their own: open each one and press Resume.",
     ],
@@ -37,7 +38,7 @@ export const QUICK_PICKS: QuickPick[] = [
     icon: "pause",
     title: "A campaign paused by itself",
     answer: [
-      "Locenti pauses a campaign when its mailbox loses access or Gmail's daily sending limit is reached, so nothing is lost.",
+      "Locenti pauses a campaign when its mailbox stops accepting the password or the mailbox's daily sending limit is reached, so nothing is lost.",
       "Check the bell for the reason. If the mailbox needs it, reconnect it on the Mailboxes page.",
       "Then open the campaign and press Resume. Emails continue within its sending hours.",
     ],
@@ -129,9 +130,9 @@ export const QUICK_PICKS: QuickPick[] = [
 /** Facts for the AI help assistant, beyond the Quick picks. */
 export const PRODUCT_FACTS = `
 Locenti is a prospecting and cold-email tool for agencies and freelancers who sell to local businesses.
-Main pages (sidebar): Dashboard (pipeline and setup checklist), Discover (search Google Maps by business type and city; only businesses showing a public email; filters: email, phone, website, minimum rating, minimum reviews, open only; keeps searching nearby areas until it has the number asked for; charged one unit per business returned with an email), Leads (saved businesses, website research, notes, CSV import and export, "Find missing emails"), Campaigns (pick leads, AI writes a personal first email per lead from its website research and your offer; optional follow-ups; review and approve, nothing sent before approval; pause, resume, edit, delete), Inbox (replies sorted into interested, not interested, out of office; reply from Gmail), Analytics (sent, reply rate per campaign), Mailboxes (connect Gmail, send a test, daily limit), Agent (connect your own AI app over MCP; it can't send), Team (invite admins, members, viewers), Billing (plan and trial), Settings (offer, signature, Suppression tab = do-not-contact list), Help & Support (this page).
+Main pages (sidebar): Dashboard (pipeline and setup checklist), Discover (search Google Maps by business type and city; only businesses showing a public email; filters: email, phone, website, minimum rating, minimum reviews, open only; keeps searching nearby areas until it has the number asked for; charged one unit per business returned with an email), Leads (saved businesses, website research, notes, CSV import and export, "Find missing emails"), Campaigns (pick leads, AI writes a personal first email per lead from its website research and your offer; optional follow-ups; review and approve, nothing sent before approval; pause, resume, edit, delete), Inbox (replies sorted into interested, not interested, out of office; reply from Gmail), Analytics (sent, reply rate per campaign), Mailboxes (Add mailbox: Gmail / Google Workspace with an App Password, Zoho, Hostinger or custom IMAP/SMTP; Test connection; send a test email; daily limit; reply tracking over IMAP), Agent (connect your own AI app over MCP; it can't send), Team (invite admins, members, viewers), Billing (plan and trial), Settings (offer, signature, Suppression tab = do-not-contact list), Help & Support (this page).
 The bell on the workspace card shows notifications. "Take the tour" on the Dashboard explains each page.
-Sending: emails go from the user's own Gmail within the campaign's days and hours and the mailbox's daily limit (default 25, max 200). Replies stop follow-ups for that person. Every campaign email includes the sender's business address and an unsubscribe link.
+Sending: emails go from the user's own mailbox over SMTP within the campaign's days and hours and the mailbox's daily limit (default 25, max 200). Replies stop follow-ups for that person. Every campaign email includes the sender's business address and an unsubscribe link.
 Trial: free, no card; trial workspaces can find 200 businesses a month (resets on the 1st). Paid plans Starter, Growth and Agency are coming soon.
 Contact: the team answers support requests, usually within a day; email hello@locenti.com.
 `;

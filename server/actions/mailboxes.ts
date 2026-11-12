@@ -20,3 +20,15 @@ export async function disconnectMailboxAction(accountId: string) {
   if (r.ok) revalidatePath("/app/mailboxes");
   return r;
 }
+
+export async function testMailboxConnectionAction(input: unknown) {
+  const { testMailboxConnection } = await import("@/server/services/mailboxes");
+  return testMailboxConnection(input);
+}
+
+export async function addSmtpMailboxAction(input: unknown) {
+  const { addSmtpMailbox } = await import("@/server/services/mailboxes");
+  const r = await addSmtpMailbox(input);
+  if (r.ok) revalidatePath("/app/mailboxes");
+  return r;
+}

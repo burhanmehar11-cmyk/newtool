@@ -119,7 +119,7 @@ export async function startAnnouncement(input: unknown, actor?: Actor): Promise<
   const admin = await actorOr(actor);
   const p = draftSchema.extend({ confirm: z.literal(true, { message: "Tick the box to confirm." }) }).safeParse(input);
   if (!p.success) return { ok: false, error: p.error.issues[0].message };
-  if ((await emailChannel()).kind === "none") return { ok: false, error: "Email sending isn't set up: connect your Gmail in Mailboxes (or set SMTP_URL) first." };
+  if ((await emailChannel()).kind === "none") return { ok: false, error: "Email sending isn't set up: connect your mailbox with an App Password in Mailboxes (or set SMTP_URL) first." };
   try {
     const { id, total } = await svc(async (q) => ({
       id: await store.createAnnouncement(q, { template: findTemplate(p.data.template)?.id ?? null, subject: p.data.subject, body: p.data.body, createdBy: admin.email ?? "admin" }),

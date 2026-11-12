@@ -47,6 +47,8 @@ export function buildMessage(m: OutgoingEmail): string {
     `Subject: ${encodeHeaderText(m.subject.trim())}`,
   ];
   if (m.replyTo) lines.push(`Reply-To: ${mailbox(m.replyTo)}`);
+  // SMTP sends the message exactly as built, so it needs its own Date (the Gmail API used to add one).
+  if (!Object.keys(m.headers ?? {}).some((k) => k.toLowerCase() === "date")) lines.push(`Date: ${new Date().toUTCString()}`);
   for (const [k, v] of Object.entries(m.headers ?? {})) {
     if (!/^[A-Za-z][A-Za-z0-9-]{0,60}$/.test(k)) throw new Error("Invalid header name");
     lines.push(`${k}: ${safe(v, k)}`);

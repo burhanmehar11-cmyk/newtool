@@ -28,7 +28,7 @@ export function NewCampaignForm({ leads, mailboxes, hasOffer }: { leads: Eligibl
   if (!mailboxes.length)
     return (
       <Callout tone="warn" title="Connect a mailbox first">
-        Campaigns send from your own Gmail address. <Link href="/app/mailboxes">Connect Gmail</Link>.
+        Campaigns send from your own mailbox. <Link href="/app/mailboxes?connect=1">Add a mailbox</Link>.
       </Callout>
     );
   if (!leads.length)

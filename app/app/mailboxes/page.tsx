@@ -12,11 +12,11 @@ import { getMailboxes } from "@/server/services/mailboxes";
 export const metadata: Metadata = { title: "Mailboxes" };
 
 const rules = [
-  { icon: MailCheck, title: "Only what you approve", text: "Nothing is sent until you approve a campaign. Each email goes out from your own Gmail." },
+  { icon: MailCheck, title: "Only what you approve", text: "Nothing is sent until you approve a campaign. Each email goes out from your own mailbox, so replies land in your inbox." },
   { icon: Timer, title: "Paced like a person", text: "One email per mailbox at a time, at least 3 minutes apart, up to the daily cap you set." },
   { icon: Clock, title: "Inside your sending window", text: "Each campaign sends only on the days and hours you choose, in its time zone." },
   { icon: UserX, title: "Opt-outs are honoured", text: "Every email has a one-click unsubscribe. Unsubscribes and bounces join your do-not-contact list." },
-  { icon: ShieldCheck, title: "Limited access", text: "Send access only. With reply tracking on, Locenti reads only the threads it started. Disconnect any time." },
+  { icon: ShieldCheck, title: "Your password stays safe", text: "Use an App Password, not your real one. It's stored encrypted, used only to send approved campaigns and spot replies to them. Disconnect any time." },
 ];
 
 export default function MailboxesPage({ searchParams }: PageProps<"/app/mailboxes">) {
@@ -34,6 +34,8 @@ async function Mailboxes({ searchParams }: { searchParams: PageProps<"/app/mailb
   const notice = {
     connected: sp.mailbox === "connected" && typeof sp.email === "string" ? sp.email.slice(0, 254) : undefined,
     error: typeof sp.mailbox_error === "string" ? sp.mailbox_error.slice(0, 40) : undefined,
+    repliesOff: sp.replies === "off",
+    openConnect: sp.connect === "1",
   };
   const connected = mailboxes.filter((m) => m.status === "connected");
   const tracking = connected.filter((m) => hasReadScope(m.scopes)).length;
@@ -44,7 +46,7 @@ async function Mailboxes({ searchParams }: { searchParams: PageProps<"/app/mailb
         icon={Mail}
         eyebrow="Sending"
         title="Mailboxes"
-        description="The Gmail accounts your campaigns send from. Connect with Google; Locenti never sees your password."
+        description="The email addresses your campaigns send from: Gmail, Google Workspace, Zoho, Hostinger or any IMAP/SMTP mailbox, connected with an App Password."
         stats={[
           { label: "Connected", value: String(connected.length), hint: mailboxes.length > connected.length ? `${mailboxes.length - connected.length} need attention` : undefined },
           { label: "Reply tracking", value: connected.length ? `${tracking} of ${connected.length}` : "—", hint: "mailboxes with replies sorted in Inbox" },

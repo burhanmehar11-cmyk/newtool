@@ -260,7 +260,7 @@ export function EmailsTab({ d, days }: { d: Of<"emails">; days: number }) {
           { label: "Failed sends", value: num(s.failed), hint: "rejected or unclear", tone: s.failed ? "warn" : undefined },
           { label: "Connected mailboxes", value: num(s.mailboxes), hint: s.reconnect ? `${s.reconnect} need reconnecting` : "all healthy", tone: s.reconnect ? "warn" : undefined },
           { label: "Running campaigns", value: num(s.running) },
-          { label: "Account emails", value: d.channel.kind === "none" ? "Off" : "On", hint: d.channel.kind === "smtp" ? "sent over SMTP" : d.channel.kind === "gmail" ? `sent from ${d.channel.email}` : "connect your Gmail or set SMTP_URL", tone: d.channel.kind === "none" ? "warn" : undefined },
+          { label: "Account emails", value: d.channel.kind === "none" ? "Off" : "On", hint: d.channel.kind === "smtp" ? "sent over SMTP" : d.channel.kind === "gmail" ? `sent from ${d.channel.email}` : "connect your mailbox (App Password) or set SMTP_URL", tone: d.channel.kind === "none" ? "warn" : undefined },
         ]}
       />
       <Panel title="Emails sent and replies" description={`Per day, last ${days} days`}>

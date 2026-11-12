@@ -1,19 +1,25 @@
 import "server-only";
 import { track } from "@/server/events";
 import { z } from "zod";
+import { lookup } from "node:dns/promises";
 import { buildMessage, toGmailRaw } from "@/lib/gmail/mime";
+import { cleanPassword, findPreset } from "@/lib/mail/presets";
+import { isPublicAddress } from "@/lib/research/net-policy";
+import { sendSmtp, verifyImap, verifySmtp, type MailLogin } from "@/server/mail/client";
 import { requireWorkspace } from "@/server/auth";
 import type { Q } from "@/server/auth-store";
 import { withService, withUser } from "@/server/db";
 import { decryptJson, encryptJson, tokenKey } from "@/server/gmail/crypto";
 import { refreshAccessToken, revokeToken, sendRaw } from "@/server/gmail/google";
-import { deleteSecret, getMailbox, listMailboxes, loadSecret, markMailbox, saveSecret, updateMailboxSettings, upsertMailbox } from "@/server/mailbox-store";
+import { deleteSecret, getMailbox, listMailboxes, loadSecret, markMailbox, saveSecret, smtpSettings, updateMailboxSettings, upsertMailbox, upsertSmtpMailbox, type SmtpSettings } from "@/server/mailbox-store";
 
 const asQ = <T,>(userId: string, fn: (q: Q) => Promise<T>) => withUser(userId, (q) => fn(q as unknown as Q));
 const svc = <T,>(fn: (q: Q) => Promise<T>) => withService((q) => fn(q as unknown as Q));
 const uuid = z.string().uuid();
 
 type StoredTokens = { refreshToken: string; scope: string };
+/** App Password mailboxes store the password (encrypted, like tokens). */
+type StoredPassword = { password: string };
 
 /** Called from the OAuth callback after every check has passed. */
 export async function connectMailbox(p: { userId: string; workspaceId: string; email: string; name: string | null; refreshToken: string; scope: string }) {
@@ -45,16 +51,21 @@ export async function healMailbox(accountId: string): Promise<boolean> {
   if (!box || box.status === "disconnected" || box.status === "revoked") return false;
   if (box.status === "connected") return true;
   accessCache.delete(accountId);
-  const t = await accessTokenFor(accountId);
-  if (!t.ok) return false;
+  const sender = await mailboxSender(accountId, { quiet: true });
+  if (!sender.ok) return false;
+  if (sender.provider === "smtp") {
+    const cfg = await svc((q) => smtpSettings(q, accountId));
+    const login = await smtpLogin(accountId);
+    if (!cfg || !login || !(await verifySmtp(cfg.smtp, login)).ok) return false;
+  }
   await svc((q) => markMailbox(q, accountId, { status: "connected", lastError: null }));
   const info = await mailboxInfo(accountId);
-  await track({ workspaceId: info?.workspace_id, kind: "mailbox_healed", area: "mailbox", outcome: "success", summary: `Mailbox ${info?.email ?? ""} works again (rechecked with Google, no reconnect needed)` });
+  await track({ workspaceId: info?.workspace_id, kind: "mailbox_healed", area: "mailbox", outcome: "success", summary: `Mailbox ${info?.email ?? ""} works again (rechecked, no reconnect needed)` });
   return true;
 }
 
 async function mailboxInfo(accountId: string) {
-  return (await svc((q) => q.query<{ workspace_id: string; email: string }>("select workspace_id, email from public.sending_accounts where id = $1", [accountId]))).rows[0] ?? null;
+  return (await svc((q) => q.query<{ workspace_id: string; email: string; provider: string }>("select workspace_id, email, provider from public.sending_accounts where id = $1", [accountId]))).rows[0] ?? null;
 }
 
 /**
@@ -74,7 +85,10 @@ export async function flagReconnect(accountId: string, reason: string) {
     summary: `Mailbox ${info.email} lost access: ${reason}`,
     notify: {
       title: `Reconnect ${info.email}`,
-      body: "Google stopped Locenti's access to this mailbox, so campaigns using it are paused. Reconnect it on the Mailboxes page.",
+      body:
+        info.provider === "smtp"
+          ? "The mailbox's password stopped working (it was changed, or the App Password was removed), so campaigns using it are paused. Update it on the Mailboxes page."
+          : "Google stopped Locenti's access to this mailbox, so campaigns using it are paused. Reconnect it on the Mailboxes page with an App Password.",
       href: "/app/mailboxes",
       level: "failed",
       to: "managers",
@@ -116,20 +130,20 @@ export async function sendTestEmail(accountId: string): Promise<{ ok: true; to: 
   const box = await asQ(user.id, (q) => getMailbox(q, accountId));
   if (!box || box.status === "disconnected") return { ok: false, error: "Mailbox not found." };
 
-  const token = await accessTokenFor(box.id);
-  if (!token.ok) {
-    await track({ workspaceId: workspace.id, userId: user.id, kind: "mailbox_test_failed", area: "mailbox", outcome: "failed", summary: `Test email from ${box.email} failed: ${token.message}` });
-    return { ok: false, error: token.message };
+  const sender = await mailboxSender(box.id);
+  if (!sender.ok) {
+    await track({ workspaceId: workspace.id, userId: user.id, kind: "mailbox_test_failed", area: "mailbox", outcome: "failed", summary: `Test email from ${box.email} failed: ${sender.message}` });
+    return { ok: false, error: sender.message };
   }
-  const raw = toGmailRaw(
-    buildMessage({
-      from: { email: box.email, name: box.sender_name },
-      to: box.email,
-      subject: "Locenti test email",
-      text: `This is a test from Locenti for the workspace "${workspace.name}".\n\nIf you're reading it, Locenti can send from ${box.email}. Nothing was sent to anyone else.`,
-    }),
-  );
-  const sent = await sendRaw(token.token, raw);
+  const rfcMessageId = `<${crypto.randomUUID()}@${box.email.split("@")[1] ?? "locenti.local"}>`;
+  const message = buildMessage({
+    from: { email: box.email, name: box.sender_name },
+    to: box.email,
+    subject: "Locenti test email",
+    text: `This is a test from Locenti for the workspace "${workspace.name}".\n\nIf you're reading it, Locenti can send from ${box.email}. Nothing was sent to anyone else.`,
+    headers: { "Message-ID": rfcMessageId },
+  });
+  const sent = await sender.send({ message, rfcMessageId, from: box.email, to: box.email });
   if (!sent.ok) {
     if (sent.code === "auth" || sent.code === "permission") await flagReconnect(box.id, sent.message);
     else await asQ(user.id, (q) => markMailbox(q, box.id, { lastError: sent.message }));
@@ -173,3 +187,158 @@ export async function disconnectMailbox(accountId: string): Promise<{ ok: true }
   await track({ workspaceId: workspace.id, userId: user.id, kind: "mailbox_disconnected", area: "mailbox", outcome: "info", summary: `Disconnected mailbox ${box.email}` });
   return { ok: true };
 }
+
+/* ------------------------------------------------- App Password mailboxes */
+
+/** Sending one message through whichever connection the mailbox uses. */
+export type MailboxSend = (m: { message: string; rfcMessageId: string; from: string; to: string; threadId?: string }) => Promise<
+  { ok: true; id: string; threadId: string } | { ok: false; code: "auth" | "permission" | "api_disabled" | "rate_limited" | "rejected" | "network"; message: string }
+>;
+
+async function smtpLogin(accountId: string): Promise<MailLogin | null> {
+  const key = tokenKey();
+  const blob = await svc((q) => loadSecret(q, accountId));
+  const stored = blob && key ? decryptJson<StoredPassword>(blob, key) : null;
+  const cfg = await svc((q) => smtpSettings(q, accountId));
+  return stored?.password && cfg ? { user: cfg.username, pass: stored.password } : null;
+}
+
+/**
+ * How to send from a mailbox: SMTP with its App Password, or (older
+ * mailboxes) the Gmail API. Fails with `reconnect` when the mailbox's access
+ * is gone and someone has to fix it.
+ */
+export async function mailboxSender(accountId: string, opts: { quiet?: boolean } = {}): Promise<{ ok: true; provider: "smtp" | "gmail"; send: MailboxSend } | { ok: false; message: string; reconnect: boolean }> {
+  const cfg = await svc((q) => smtpSettings(q, accountId));
+  if (cfg?.provider === "smtp") {
+    const login = await smtpLogin(accountId);
+    if (!login) {
+      if (!opts.quiet) await flagReconnect(accountId, "The saved password couldn't be read. Enter it again.");
+      return { ok: false, message: "This mailbox's password needs to be entered again.", reconnect: true };
+    }
+    return {
+      ok: true,
+      provider: "smtp",
+      send: async (m) => {
+        const r = await sendSmtp(cfg.smtp, login, { from: m.from, to: m.to, raw: m.message });
+        // With SMTP our own Message-ID identifies the email, and the first one identifies the conversation.
+        return r.ok ? { ok: true, id: m.rfcMessageId.toLowerCase(), threadId: m.threadId ?? m.rfcMessageId.toLowerCase() } : r;
+      },
+    };
+  }
+  const token = await accessTokenFor(accountId);
+  if (!token.ok) return token;
+  return { ok: true, provider: "gmail", send: (m) => sendRaw(token.token, toGmailRaw(m.message), m.threadId) };
+}
+
+const MAIL_PORTS = { smtp: [25, 465, 587, 2525], imap: [143, 993] };
+const host = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .regex(/^(?=.{3,253}$)[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/, "Enter a server name like mail.example.com.");
+const server = z.object({ host, port: z.coerce.number().int(), secure: z.boolean() });
+const connectSchema = z.object({
+  preset: z.enum(["google", "zoho", "hostinger", "custom"]),
+  email: z.string().trim().toLowerCase().email("Enter the full email address."),
+  senderName: z.string().trim().max(80).optional().default(""),
+  password: z.string().min(1, "Enter the password.").max(300),
+  username: z.string().trim().max(254).optional(),
+  smtp: server.optional(),
+  imap: server.nullable().optional(),
+});
+
+/** The servers to use: the provider's, or the ones typed in for "custom". Only public mail servers on mail ports. */
+async function resolveConnection(input: unknown): Promise<{ ok: true; email: string; senderName: string | null; password: string; settings: SmtpSettings } | { ok: false; error: string }> {
+  const p = connectSchema.safeParse(input);
+  if (!p.success) return { ok: false, error: p.error.issues[0].message };
+  const d = p.data;
+  const preset = findPreset(d.preset);
+  const smtp = preset.smtp ?? d.smtp;
+  const imap = preset.imap ?? d.imap ?? null;
+  if (!smtp) return { ok: false, error: "Enter the SMTP server (for sending)." };
+  if (!MAIL_PORTS.smtp.includes(smtp.port)) return { ok: false, error: "The SMTP port is usually 465 (SSL) or 587 (STARTTLS)." };
+  if (imap && !MAIL_PORTS.imap.includes(imap.port)) return { ok: false, error: "The IMAP port is usually 993 (SSL) or 143." };
+  // Our own presets are known public mail servers; check only servers people type in.
+  for (const h of preset.smtp ? [] : ([smtp.host, imap?.host].filter(Boolean) as string[])) {
+    const addrs = await lookup(h, { all: true }).catch(() => []);
+    if (!addrs.length) return { ok: false, error: `Couldn't find the server ${h}. Check the spelling.` };
+    if (!addrs.every((a) => isPublicAddress(a.address))) return { ok: false, error: `${h} isn't a public mail server.` };
+  }
+  return {
+    ok: true,
+    email: d.email,
+    senderName: d.senderName || null,
+    password: cleanPassword(d.preset, d.password),
+    settings: { preset: d.preset, smtp, imap, username: d.username?.trim() || d.email },
+  };
+}
+
+// Connection tests per person, so the form can't be used to guess passwords.
+const tests = new Map<string, number[]>();
+function testAllowed(userId: string) {
+  const now = Date.now();
+  const list = (tests.get(userId) ?? []).filter((t) => now - t < 10 * 60_000);
+  if (list.length >= 15) return false;
+  list.push(now);
+  tests.set(userId, list);
+  return true;
+}
+
+type TestResult = { ok: true; imap: { ok: true } | { ok: false; message: string } } | { ok: false; error: string };
+
+async function check(settings: SmtpSettings, login: MailLogin): Promise<TestResult> {
+  const [smtp, imap] = await Promise.all([verifySmtp(settings.smtp, login), settings.imap ? verifyImap(settings.imap, login) : Promise.resolve(null)]);
+  if (!smtp.ok) return { ok: false, error: smtp.message };
+  return { ok: true, imap: imap ? (imap.ok ? { ok: true } : { ok: false, message: imap.message }) : { ok: false, message: "No IMAP server given, so replies can't be tracked." } };
+}
+
+/** "Test connection": logs in to SMTP and IMAP without saving or sending anything. */
+export async function testMailboxConnection(input: unknown): Promise<TestResult> {
+  const { user, workspace } = await requireWorkspace("/app/mailboxes");
+  if (!["owner", "admin"].includes(workspace.role)) return { ok: false, error: "Only workspace owners and admins can connect mailboxes." };
+  if (!testAllowed(user.id)) return { ok: false, error: "That's a lot of tries. Wait a few minutes, then try again." };
+  const c = await resolveConnection(input);
+  if (!c.ok) return c;
+  return check(c.settings, { user: c.settings.username, pass: c.password });
+}
+
+/**
+ * "Add mailbox" (also used to update a password): checks the login, then
+ * saves the mailbox with its password encrypted. Sending needs SMTP to work;
+ * reply tracking is on when IMAP works too.
+ */
+export async function addSmtpMailbox(input: unknown): Promise<{ ok: true; id: string; email: string; replies: boolean; note: string | null } | { ok: false; error: string }> {
+  const { user, workspace } = await requireWorkspace("/app/mailboxes");
+  if (!["owner", "admin"].includes(workspace.role)) return { ok: false, error: "Only workspace owners and admins can connect mailboxes." };
+  if (!testAllowed(user.id)) return { ok: false, error: "That's a lot of tries. Wait a few minutes, then try again." };
+  const key = tokenKey();
+  if (!key) return { ok: false, error: "The server can't store passwords safely yet (SESSION_SECRET is missing)." };
+  const c = await resolveConnection(input);
+  if (!c.ok) return c;
+  const login = { user: c.settings.username, pass: c.password };
+  const r = await check(c.settings, login);
+  if (!r.ok) {
+    await track({ workspaceId: workspace.id, userId: user.id, kind: "mailbox_connect_failed", area: "mailbox", outcome: "failed", summary: `Couldn't connect ${c.email}: ${r.error}` });
+    return { ok: false, error: r.error };
+  }
+  const settings = { ...c.settings, imap: r.imap.ok ? c.settings.imap : null };
+  try {
+    const id = await asQ(user.id, (q) => upsertSmtpMailbox(q, workspace.id, user.id, { email: c.email, senderName: c.senderName, ...settings }));
+    await svc((q) => saveSecret(q, id, encryptJson({ password: c.password } satisfies StoredPassword, key)));
+    accessCache.delete(id);
+    await track({
+      workspaceId: workspace.id,
+      userId: user.id,
+      kind: "mailbox_connected",
+      area: "mailbox",
+      outcome: "success",
+      summary: `Connected ${c.email} (${findPreset(c.settings.preset).label}${settings.imap ? ", reply tracking on" : ", sending only"})`,
+    });
+    return { ok: true, id, email: c.email, replies: !!settings.imap, note: r.imap.ok ? null : r.imap.message };
+  } catch (e) {
+    const msg = (e as Error).message;
+    return { ok: false, error: /smtp_host|preset|provider_check|login_username/.test(msg) ? "The database needs the update 0022_smtp_mailboxes.sql (run it in Neon), then try again." : "Couldn't save the mailbox. Try again." };
+  }
+}
+

@@ -92,7 +92,7 @@ Google calls this **Google Auth Platform** (older screens say **OAuth consent sc
 3. When asked which environments to connect, keep **Production** and **Preview** (and **Development** if offered). Vercel adds `DATABASE_URL` and related settings automatically.
 4. Open the database's **Open in Neon** (or **Neon Console**) link → **SQL Editor**.
 5. In another tab, open GitHub → **burhanmehar11-cmyk/newtool** → branch `claude/compassionate-knuth-hewpfn` → `database/migrations/0000_auth.sql` → **Copy raw file** (two-squares icon). Paste into the SQL Editor → **Run**.
-6. Clear the editor. Do the same, one file at a time, with `database/migrations/0001_foundation.sql` → **Run**, then `0002_password_and_discovery.sql` → **Run**, then `0003_research.sql` → **Run**, then `0004_google_places.sql` → **Run**, then `0005_mailboxes.sql` → **Run**, then `0006_campaigns.sql` → **Run**, then `0007_agents.sql` → **Run**, then `0008_replies.sql` → **Run**, then `0009_team.sql` → **Run**, then `0010_followups.sql` → **Run**, then `0011_admin.sql` → **Run**, then `0012_webhooks.sql` → **Run**, then `0013_viewer.sql` → **Run**, then `0014_billing.sql` → **Run**, then `0015_campaign_delete.sql` → **Run**, then `0016_activity_notifications.sql` → **Run**, then `0017_announcements.sql` → **Run**, then `0018_welcome.sql` → **Run**, then `0019_support.sql` → **Run**, then `0020_admin_users.sql` → **Run**, then `0021_support_numbers.sql` → **Run**.
+6. Clear the editor. Do the same, one file at a time, with `database/migrations/0001_foundation.sql` → **Run**, then `0002_password_and_discovery.sql` → **Run**, then `0003_research.sql` → **Run**, then `0004_google_places.sql` → **Run**, then `0005_mailboxes.sql` → **Run**, then `0006_campaigns.sql` → **Run**, then `0007_agents.sql` → **Run**, then `0008_replies.sql` → **Run**, then `0009_team.sql` → **Run**, then `0010_followups.sql` → **Run**, then `0011_admin.sql` → **Run**, then `0012_webhooks.sql` → **Run**, then `0013_viewer.sql` → **Run**, then `0014_billing.sql` → **Run**, then `0015_campaign_delete.sql` → **Run**, then `0016_activity_notifications.sql` → **Run**, then `0017_announcements.sql` → **Run**, then `0018_welcome.sql` → **Run**, then `0019_support.sql` → **Run**, then `0020_admin_users.sql` → **Run**, then `0021_support_numbers.sql` → **Run**, then `0022_smtp_mailboxes.sql` → **Run**.
    - Already ran some of them earlier? Run only the ones after the last you ran (for example just **0003**). Later files only add things and are safe to run on top.
 7. Check by running:
 
@@ -156,34 +156,29 @@ Google Maps search uses the official **Places API (New)**. Google requires a bil
 
 Check: in the app, **Discover** shows a **Google Maps** / **OpenStreetMap** switch.
 
-## Part G: Gmail sending (free)
+## Part G: Sending mailboxes (App Passwords, no Google setup)
 
-Uses the **same OAuth client** as sign-in. No new credential is needed. Locenti asks for Gmail access only when someone clicks **Connect Gmail**, and only for the `gmail.send` permission (send, not read).
+Locenti no longer uses the Gmail API or any Gmail permission (`gmail.send` / `gmail.readonly` were removed from the consent screen). Mailboxes connect with an **App Password** over SMTP (sending) and IMAP (reply tracking), like other cold-email tools. Nothing to configure in Google Cloud.
 
-1. **APIs & Services → Library → Gmail API → Enable** (done if you already enabled it).
-2. **Google Auth Platform → Branding** (or "OAuth consent screen"):
-   - App name `Locenti`, user support email, developer contact email.
-   - **App logo (optional):** upload `public/brand/locentio-logo-120.png` from the repository (120×120 PNG). Google may ask for brand verification before it shows a logo to everyone; while the app is in **Testing**, that doesn't block anything. If it asks for verification and you'd rather avoid it, leave the logo empty.
-   - App home page: `https://YOUR-URL`. Privacy policy: `https://YOUR-URL/legal/privacy`. Terms: `https://YOUR-URL/legal/terms`.
-   - Authorised domains: your domain (for example `your-app.vercel.app`).
-3. **Data Access → Add or remove scopes** → search `gmail.send` → tick `https://www.googleapis.com/auth/gmail.send` → **Update** → **Save**. It appears under sensitive scopes. Don't add read or modify scopes.
-4. **Clients → (your existing Web client)** → **Authorized redirect URIs → Add URI** → `https://YOUR-URL/api/gmail/callback` → **Save**. Keep the existing `/api/auth/google/callback` URI.
-   - **Using a separate client for Gmail instead?** Create it as type **Web application**, add only `https://YOUR-URL/api/gmail/callback` as its redirect URI, and set `GMAIL_OAUTH_CLIENT_ID` and `GMAIL_OAUTH_CLIENT_SECRET` in Vercel (both from that client). It must be in the same Google Cloud project, which holds the consent screen and the `gmail.send` scope.
-5. **Audience → Test users**: add every Gmail address that will be connected for sending. Keep the app in **Testing**; publishing with Gmail access needs Google's verification review.
-6. Neon SQL Editor: run `database/migrations/0005_mailboxes.sql`.
-7. Optional: `TOKEN_ENCRYPTION_KEY` in Vercel (32 random bytes, base64). Without it, the key is derived from `SESSION_SECRET`. Changing either later means mailboxes must be reconnected.
+1. Neon SQL Editor: run `database/migrations/0005_mailboxes.sql`, `0008_replies.sql` (if not done) and **`0022_smtp_mailboxes.sql`**.
+2. Optional: `TOKEN_ENCRYPTION_KEY` in Vercel (32 random bytes, base64). Without it, the key is derived from `SESSION_SECRET`. Changing either later means mailbox passwords must be entered again.
+3. **Google Cloud (tidy-up):** in **Google Auth Platform → Data Access**, make sure only `openid`, `email` and `profile` remain. You can remove the `/api/gmail/callback` redirect URI from the OAuth client; old "Connect Gmail" links now open the App Password panel.
 
-Check: in the app, **Settings → Sending mailboxes → Connect Gmail**. On Google's screen, leave "Send email on your behalf" ticked. You'll see "This app isn't verified" in Testing; choose **Continue**. Then click **Send test email to myself**; it arrives in that inbox.
+Connecting a Gmail / Google Workspace mailbox (what users do, about two minutes):
 
-## Part G2: Reply tracking (optional)
+1. Gmail → Settings → **Forwarding and POP/IMAP** → **Enable IMAP** → Save.
+2. Google Account → **Security → 2-Step Verification** → turn it on (App Passwords only appear after this).
+3. Google Account → **App passwords** (https://myaccount.google.com/apppasswords) → name it "Locenti" → **Create** → copy the 16 characters.
+4. Locenti → **Mailboxes → Add mailbox → Gmail / Google Workspace** → Gmail address, optional From name, the App Password → **Test connection** → **Add mailbox**. `smtp.gmail.com:465` and `imap.gmail.com:993` are filled in automatically.
+5. **Send test email to myself**: it arrives in that inbox.
 
-Lets Locenti read replies to campaign emails (only threads it started), sort them, and stop emailing people who decline or bounce.
+Google Workspace: the admin may have to allow App Passwords (Admin console → Security → Authentication → 2-Step Verification, allow users to turn it on). Changing the Google password removes all App Passwords: the mailbox then shows "Needs reconnecting" and campaigns pause until a new App Password is saved (**Update password**).
 
-1. **Google Auth Platform → Data Access → Add or remove scopes** → search `gmail.readonly` → tick `https://www.googleapis.com/auth/gmail.readonly` → **Update** → **Save**. Google lists it under **restricted** scopes.
-   - Fine in **Testing** mode for your test users. Publishing the app with this scope later needs Google's verification, including a paid third-party security assessment. Keep the app in Testing for the beta.
-2. Neon SQL Editor: run `database/migrations/0008_replies.sql`.
-3. In the app: **Mailboxes** → your mailbox → **Reply tracking: Turn on** → on Google's screen, leave both boxes ticked.
-4. **Inbox** in the sidebar shows replies (checked every few minutes while Locenti is open, or click **Check for replies**).
+Other providers: **Zoho Mail** (smtp.zoho.com / imap.zoho.com), **Hostinger Email** (smtp.hostinger.com / imap.hostinger.com) and **Custom IMAP/SMTP** (any server, ports 465/587/2525 for SMTP and 993/143 for IMAP; only public servers are accepted).
+
+Reply tracking is on when IMAP works: every few minutes Locenti opens the inbox **read-only**, picks only messages that answer or bounce an email it sent (by Message-ID), and files them in **Inbox**. If IMAP fails at connect time the mailbox still sends, with reply tracking off ("Turn on" next to Reply tracking fixes it after IMAP is enabled).
+
+Mailboxes connected earlier with Google sign-in show "old Google sign-in connection" with **Switch now**: enter an App Password for the same address and it switches in place (same daily limit, campaigns keep using it).
 
 ## Part G3: Team invites (no Google setup)
 
@@ -194,7 +189,7 @@ Lets Locenti read replies to campaign emails (only threads it started), sort the
 ## Part G4: Follow-up emails (no Google setup)
 
 1. Neon SQL Editor: run `database/migrations/0010_followups.sql`.
-2. On a draft campaign: **Follow-ups → Add follow-up** (up to two), set the wait in days, edit the text, **Save follow-ups**, then approve. They go to people who haven't replied, unsubscribed or bounced, in the same Gmail thread.
+2. On a draft campaign: **Follow-ups → Add follow-up** (up to two), set the wait in days, edit the text, **Save follow-ups**, then approve. They go to people who haven't replied, unsubscribed or bounced, as replies in the same conversation.
 
 ## Part G5: Admin panel (owners only)
 
@@ -261,8 +256,8 @@ Google checks three things before approving the app: you own the home page, the 
    - Back in Search Console, click **Verify**.
 3. **Branding page** in Google Cloud: home page `https://YOUR-URL`, privacy policy `https://YOUR-URL/legal/privacy`, terms `https://YOUR-URL/legal/terms`, authorised domain = your domain (e.g. `your-app.vercel.app`).
 4. **Wait 24 hours** after verifying ownership (Google's systems need to update), then submit verification again.
-5. **Scopes:** submit with `openid`, `email`, `profile` and `gmail.send` only. `gmail.readonly` (reply tracking) is a restricted scope: publishing it requires an annual third-party security assessment that costs money. Remove it from **Data Access** before submitting; reply tracking then works only for test users while the app stays in Testing, or after that assessment.
-6. In the verification form, explain each scope in plain words (e.g. "gmail.send: sends emails the user reviewed and approved, from their own address") and, if asked, record a short screen video showing Connect Gmail → approve campaign → email sent.
+5. **Scopes:** submit with `openid`, `email` and `profile` only. Mailboxes use App Passwords, so no Gmail scope (and no security assessment) is needed.
+6. In the verification form, explain that sign-in uses the basic profile only ("to create your account and sign you in").
 
 If Google refuses a `*.vercel.app` address, the dependable fix is a custom domain (Vercel → Settings → Domains), verified in Search Console as a **Domain** property.
 
@@ -387,4 +382,4 @@ Tip: on Google's error page, **"error details"** shows the `redirect_uri` that w
 
 ## Later: Gmail sending (not needed now)
 
-Sending campaign emails from a user's Gmail uses the **same OAuth client**, plus the Gmail API and the `gmail.send` permission. While the app stays in Testing it works for your test users at no cost. A public launch with Gmail sending needs Google's verification for that permission. A separate guide will cover it when that step is built.
+Sending campaign emails uses the user's own mailbox with an App Password over SMTP/IMAP (Part G), not the Gmail API, so it needs no Google permission or verification.

@@ -6,12 +6,11 @@ import { brand } from "@/config/brand";
 import { inSendingWindow } from "@/lib/campaigns/schedule";
 import { signUnsubscribe, unsubscribeHeaders, unsubscribeUrl, withFooter } from "@/lib/campaigns/compose";
 import { followUpSubject, renderFollowUp } from "@/lib/campaigns/followups";
-import { buildMessage, toGmailRaw } from "@/lib/gmail/mime";
+import { buildMessage } from "@/lib/gmail/mime";
 import type { Q } from "@/server/auth-store";
 import { withService } from "@/server/db";
 import { configuredSiteUrl, sessionSecret } from "@/server/env";
-import { sendRaw } from "@/server/gmail/google";
-import { accessTokenFor, flagReconnect, healMailbox } from "@/server/services/mailboxes";
+import { flagReconnect, healMailbox, mailboxSender } from "@/server/services/mailboxes";
 import { claimDispatch, completeFinished, isSuppressedEmail, mailboxUsage, nextDue, pauseCampaign, recordAccepted, recordFailure, runningCampaigns } from "@/server/dispatch-store";
 import { markMailbox } from "@/server/mailbox-store";
 import { emitWebhook } from "@/server/services/webhooks";
@@ -111,7 +110,7 @@ export async function runDispatch(opts: { workspaceId?: string | null; now?: Dat
       continue;
     }
 
-    const token = await accessTokenFor(c.account_id);
+    const token = await mailboxSender(c.account_id);
     if (!token.ok) {
       // Release the claim so the email goes out later. Pause only when Google ended the access;
       // a passing problem (Google unreachable) just waits for the next pass.
@@ -134,22 +133,20 @@ export async function runDispatch(opts: { workspaceId?: string | null; now?: Dat
     const threading: Record<string, string> = isFollowUp && due.message_ids.length ? { "In-Reply-To": due.message_ids[due.message_ids.length - 1], References: due.message_ids.join(" ") } : {};
     let raw: string;
     try {
-      raw = toGmailRaw(
-        buildMessage({
-          from: { email: c.account_email, name: c.sender_name },
-          to: due.email,
-          subject,
-          text: body,
-          headers: { "Message-ID": rfcMessageId, ...threading, ...unsubscribeHeaders(`${origin}/api/unsubscribe/${unsubToken}`) },
-        }),
-      );
+      raw = buildMessage({
+        from: { email: c.account_email, name: c.sender_name },
+        to: due.email,
+        subject,
+        text: body,
+        headers: { "Message-ID": rfcMessageId, ...threading, ...unsubscribeHeaders(`${origin}/api/unsubscribe/${unsubToken}`) },
+      });
     } catch (e) {
       await svc((q) => recordFailure(q, dispatchId, due.id, "failed", `Message couldn't be built: ${(e as Error).message}`, due.step));
       summary.failed++;
       continue;
     }
 
-    const sent = await sendRaw(token.token, raw, isFollowUp ? (due.thread_id ?? undefined) : undefined);
+    const sent = await token.send({ message: raw, rfcMessageId, from: c.account_email, to: due.email, threadId: isFollowUp ? (due.thread_id ?? undefined) : undefined });
     if (sent.ok) {
       await svc((q) =>
         recordAccepted(q, { ws: c.workspace_id, dispatchId, enrollmentId: due.id, leadId: due.lead_id, campaignId: c.id, accountId: c.account_id, messageId: sent.id, threadId: sent.threadId, from: c.account_email, to: due.email, subject, body, step: due.step, rfcMessageId }),

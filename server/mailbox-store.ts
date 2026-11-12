@@ -17,9 +17,51 @@ export type MailboxRow = {
   created_at: string;
   scopes: string | null;
   last_synced_at: string | null;
+  /** gmail = the old Google connection (Gmail API); smtp = App Password over SMTP/IMAP. */
+  provider: "gmail" | "smtp";
+  preset: string | null;
 };
 
-const COLS = "id, email, sender_name, status, daily_cap, last_tested_at, last_error, created_at, scopes, last_synced_at";
+// preset arrived in 0022; read through to_jsonb so listing works before that update runs.
+const COLS = "id, email, sender_name, status, daily_cap, last_tested_at, last_error, created_at, scopes, last_synced_at, provider, (to_jsonb(sending_accounts)->>'preset') as preset";
+
+export type SmtpSettings = {
+  preset: string;
+  smtp: { host: string; port: number; secure: boolean };
+  imap: { host: string; port: number; secure: boolean } | null;
+  username: string;
+};
+
+/** Adds or updates an App Password mailbox (SMTP to send, IMAP for replies). */
+export async function upsertSmtpMailbox(q: Q, ws: string, userId: string, m: { email: string; senderName: string | null } & SmtpSettings): Promise<string> {
+  const r = await q.query<{ id: string }>(
+    `insert into public.sending_accounts (workspace_id, provider, email, sender_name, scopes, status, connected_by, preset, smtp_host, smtp_port, smtp_secure, imap_host, imap_port, imap_secure, login_username)
+     values ($1, 'smtp', $2, $3, $4, 'connected', $5, $6, $7, $8, $9, $10, $11, $12, $13)
+     on conflict (workspace_id, email) do update set provider = 'smtp', status = 'connected', scopes = excluded.scopes, connected_by = excluded.connected_by,
+       sender_name = coalesce(excluded.sender_name, public.sending_accounts.sender_name), last_error = null,
+       preset = excluded.preset, smtp_host = excluded.smtp_host, smtp_port = excluded.smtp_port, smtp_secure = excluded.smtp_secure,
+       imap_host = excluded.imap_host, imap_port = excluded.imap_port, imap_secure = excluded.imap_secure, login_username = excluded.login_username
+     returning id`,
+    [ws, m.email.toLowerCase(), m.senderName?.slice(0, 80) || null, m.imap ? "imap" : "", userId, m.preset, m.smtp.host, m.smtp.port, m.smtp.secure, m.imap?.host ?? null, m.imap?.port ?? null, m.imap?.secure ?? null, m.username],
+  );
+  return r.rows[0].id;
+}
+
+/** Server settings of an App Password mailbox (service connection). */
+export async function smtpSettings(q: Q, id: string): Promise<(SmtpSettings & { email: string; provider: string }) | null> {
+  const r = await q.query<{ j: Record<string, unknown> }>("select to_jsonb(sa) as j from public.sending_accounts sa where id = $1", [id]);
+  const j = r.rows[0]?.j;
+  if (!j) return null;
+  const imapHost = j.imap_host as string | null;
+  return {
+    email: j.email as string,
+    provider: j.provider as string,
+    preset: (j.preset as string) ?? "custom",
+    smtp: { host: (j.smtp_host as string) ?? "", port: Number(j.smtp_port ?? 465), secure: j.smtp_secure !== false },
+    imap: imapHost ? { host: imapHost, port: Number(j.imap_port ?? 993), secure: j.imap_secure !== false } : null,
+    username: (j.login_username as string) ?? (j.email as string),
+  };
+}
 
 export async function upsertMailbox(q: Q, ws: string, userId: string, email: string, senderName: string | null, scopes: string): Promise<string> {
   const r = await q.query<{ id: string }>(

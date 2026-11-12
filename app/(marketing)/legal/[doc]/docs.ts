@@ -4,7 +4,7 @@ import { brand } from "@/config/brand";
  * Published legal pages. Owner, contact and address come from brand config
  * (NEXT_PUBLIC_LEGAL_NAME, NEXT_PUBLIC_CONTACT_EMAIL, NEXT_PUBLIC_BUSINESS_ADDRESS,
  * NEXT_PUBLIC_LEGAL_COUNTRY). Keep the Google user data section in step with
- * the scopes the app requests (lib/auth/oidc.ts, lib/gmail/oauth.ts).
+ * the scopes the app requests (lib/auth/oidc.ts; mailboxes use App Passwords, not Gmail scopes).
  */
 
 export const LEGAL_UPDATED = "November 5, 2026";
@@ -29,7 +29,7 @@ export const legalDocs: Record<string, Doc> = {
       {
         h: "2. Summary",
         p: [
-          `${name} helps agencies and consultants find local businesses, research their public websites and send personal emails from their own Gmail account after reviewing and approving each message.`,
+          `${name} helps agencies and consultants find local businesses, research their public websites and send personal emails from their own mailbox (for example Gmail) after reviewing and approving each message.`,
           "We collect only what the Service needs to work. We do not sell personal information, we do not use it for advertising, and we do not use Google user data to train AI models.",
         ],
       },
@@ -39,7 +39,7 @@ export const legalDocs: Record<string, Doc> = {
           "Account information: your name, email address and Google account identifier when you sign in with Google, or your email address and a securely hashed password if you sign up with email. We also keep the date of your last sign-in and records of active sessions so you can be signed out remotely.",
           "Workspace content: the offer profile you write (service, value proposition, sender name, business address, booking link), leads you save, notes, research results, email drafts, campaigns, approval records, your do-not-contact list, and access tokens you create for AI agents (stored only as a hash).",
           "Business information: when you search, we receive business listings from the Google Places API (Google Maps) or OpenStreetMap. Google Maps results are shown to you live and are not stored, except the Google place ID of businesses you save. When you research a lead, we read up to a few public pages of that business's own website (respecting its robots.txt) and keep short excerpts as sources, plus any business email address the website publicly shows.",
-          "Mailbox information: if you connect a Gmail account, see section 4.",
+          "Mailbox information: if you connect a mailbox, see section 4a.",
           "Technical information: IP address and browser information in server logs, used for security, abuse prevention and rate limits; and the cookies described in section 7.",
           "How you found us: if you sign up, we save which site or campaign link first brought you to Locenti (for example a Google search, LinkedIn, or a link with utm tags) and the page you landed on, so we can tell which channels work. Separately, we count first visits per source as anonymous daily totals, with no cookie, IP address or other identifier attached.",
         ],
@@ -49,14 +49,23 @@ export const legalDocs: Record<string, Doc> = {
         p: [
           `${name} uses Google APIs only for the features you choose. Here is exactly what we request and why:`,
           "Sign in with Google (openid, email, profile): your Google account identifier, email address, name and profile picture URL, used only to create your account and sign you in.",
-          "Gmail sending (gmail.send), when you click Connect Gmail: lets the Service send emails from your Gmail address. It is used only to send emails you reviewed and approved in a campaign, or a test email to yourself. This permission cannot read your mailbox.",
-          "Reply tracking (gmail.readonly), only if you turn it on for a mailbox: used only to read the email conversations that the Service started, so it can show you replies, label them (for example interested or out of office), and stop emailing people who decline, unsubscribe or whose address bounces. We do not read, store or use any other email in your mailbox. Reply text is stored as plain text in your workspace so you can see it in the Inbox.",
-          "Storage and security: the long-lived Google access grant (refresh token) for a connected mailbox is encrypted (AES-256-GCM) before it is stored, and short-lived access tokens are kept only in server memory. Only you and members of your workspace can see your workspace's emails and replies.",
+          "We do not request any Gmail API permissions. Mailboxes (including Gmail and Google Workspace) are connected separately with an App Password, as described in section 4a.",
+          "Storage and security: only you and members of your workspace can see your workspace's emails and replies.",
           "Use: Google user data is used only to provide the features above that you can see in the Service. It is not used for advertising, not sold, not used to build user profiles for other purposes, not used to train or improve any AI or machine-learning model, and not sent to any AI service, including the optional built-in AI writer.",
           "Sharing: we do not transfer Google user data to anyone except our hosting and database providers (section 6) as needed to run the Service, when you direct us to, for security purposes, or to comply with the law.",
           "Human access: no person at " + name + " reads your email content unless you ask us to for support, it is necessary for security or to investigate abuse, or it is required by law.",
           `Limited Use: ${name}'s use and transfer of information received from Google APIs to any other app will adhere to the Google API Services User Data Policy (https://developers.google.com/terms/api-services-user-data-policy), including the Limited Use requirements.`,
-          "Your control: disconnect a mailbox at any time on the Mailboxes page. Disconnecting revokes the grant at Google and deletes the stored token. You can also remove access at https://myaccount.google.com/permissions.",
+          "Your control: you can remove Locenti's sign-in access at https://myaccount.google.com/permissions.",
+        ],
+      },
+      {
+        h: "4a. Connected mailboxes (App Passwords)",
+        p: [
+          "To send campaigns from your own address, you connect a mailbox (for example Gmail, Google Workspace, Zoho, Hostinger or another provider) with its standard mail servers: SMTP to send and, if available, IMAP to see replies. You give an App Password (or mailbox password) for this; we recommend an App Password, which you can remove at any time without changing your main password.",
+          "Sending (SMTP): used only to send emails you reviewed and approved in a campaign, or a test email to yourself.",
+          "Replies (IMAP): the Service looks in your inbox only for messages that answer or bounce emails it sent (it matches their message identifiers) so it can show you replies, label them (for example interested or out of office), and stop emailing people who decline, unsubscribe or whose address bounces. It opens the inbox read-only, does not mark anything as read, and does not store or use any other email. Reply text is stored as plain text in your workspace so you can see it in the Inbox.",
+          "Storage and security: the password is encrypted (AES-256-GCM) before it is stored and is used only by our servers for the purposes above.",
+          "Your control: disconnect a mailbox at any time on the Mailboxes page; this deletes the stored password. You can also revoke the App Password in your email provider's settings (for Google: https://myaccount.google.com/apppasswords).",
         ],
       },
       {
@@ -71,7 +80,7 @@ export const legalDocs: Record<string, Doc> = {
       {
         h: "6. Who we share information with",
         p: [
-          "Service providers that process data for us to run the Service: Vercel (hosting), Neon (database), Google (sign-in, Gmail API, Google Maps Places API and, if enabled, the Gemini API), OpenStreetMap services (the search area and business type you enter), and our email delivery provider for account emails.",
+          "Service providers that process data for us to run the Service: Vercel (hosting), Neon (database), Google (sign-in, Google Maps Places API and, if enabled, the Gemini API), OpenStreetMap services (the search area and business type you enter), and our email delivery provider for account emails.",
           "Business websites you research receive a normal web request from our server, identified as a bot.",
           "We may disclose information if required by law, to protect rights and safety, or as part of a merger or acquisition, in which case this policy continues to apply to it.",
           "We do not sell or rent personal information.",
@@ -80,7 +89,7 @@ export const legalDocs: Record<string, Doc> = {
       {
         h: "7. Cookies and local storage",
         p: [
-          "We use only essential cookies: a signed session cookie to keep you signed in, a short-lived cookie that protects the Google sign-in and Gmail connection steps (and, when you sign up with Google, carries how you found us for that one step), and a cookie that remembers your active workspace. Your light or dark appearance choice is kept in your browser's local storage.",
+          "We use only essential cookies: a signed session cookie to keep you signed in, a short-lived cookie that protects the Google sign-in step (and, when you sign up with Google, carries how you found us for that one step), and a cookie that remembers your active workspace. Your light or dark appearance choice is kept in your browser's local storage.",
           "When you first open the site, your browser's session storage notes which site or campaign link brought you. It is cleared when you close the tab, is never shared, and is only sent to us if you sign up (see section 3).",
           "We do not use advertising cookies or third-party tracking, and campaign emails contain no tracking pixels.",
         ],

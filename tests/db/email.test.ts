@@ -7,7 +7,14 @@ import { as, createTestDb, createUser } from "./harness";
 const h = vi.hoisted(() => ({ db: null as unknown as PGlite, send: vi.fn(), token: vi.fn() }));
 vi.mock("@/server/db", () => ({ withService: (fn: (q: unknown) => Promise<unknown>) => fn(h.db) }));
 vi.mock("@/server/gmail/google", () => ({ sendRaw: (...a: unknown[]) => h.send(...a) }));
-vi.mock("@/server/services/mailboxes", () => ({ accessTokenFor: (...a: unknown[]) => h.token(...a) }));
+vi.mock("@/server/services/mailboxes", () => ({
+  accessTokenFor: (...a: unknown[]) => h.token(...a),
+  mailboxSender: async (id: string) => {
+    const t = await h.token(id);
+    if (!t.ok) return t;
+    return { ok: true, provider: "gmail", send: (m: { message: string; threadId?: string }) => h.send(t.token, Buffer.from(m.message, "utf8").toString("base64url"), m.threadId) };
+  },
+}));
 
 const OWNER = "00000000-0000-4000-8000-00000000e0a1";
 const CUSTOMER = "00000000-0000-4000-8000-00000000e0a2";

@@ -29,6 +29,7 @@ const MARKERS: { file: string; sql: string }[] = [
   { file: "0019_support.sql", sql: "select 1 from information_schema.tables where table_schema = 'public' and table_name = 'support_tickets'" },
   { file: "0020_admin_users.sql", sql: "select 1 from information_schema.tables where table_schema = 'app' and table_name = 'admin_users'" },
   { file: "0021_support_numbers.sql", sql: "select 1 from information_schema.columns where table_schema = 'public' and table_name = 'support_tickets' and column_name = 'number'" },
+  { file: "0022_smtp_mailboxes.sql", sql: "select 1 from information_schema.columns where table_schema = 'public' and table_name = 'sending_accounts' and column_name = 'smtp_host'" },
 ];
 
 export const LATEST_MIGRATION = MARKERS.at(-1)!.file;

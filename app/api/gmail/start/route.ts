@@ -1,47 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { STATE_MAX_AGE_S } from "@/lib/auth/constants";
-import { pkceChallenge, randomToken, resolveAppOrigin } from "@/lib/auth/oidc";
-import { signState } from "@/lib/auth/tokens";
-import { buildGmailAuthorizeUrl, gmailCallbackUrl, GMAIL_STATE_COOKIE } from "@/lib/gmail/oauth";
-import { getActiveWorkspace, getCurrentUser } from "@/server/auth";
-import { accountsConfigured, configuredSiteUrl, gmailOAuth, sessionSecret } from "@/server/env";
-import { tokenKey } from "@/server/gmail/crypto";
 
-/** Step 1 of "Connect Gmail": signed-in owners/admins are sent to Google's consent screen for the send permission. */
+/**
+ * The old "Connect Gmail" (Google sign-in with the Gmail API) is retired:
+ * Locenti no longer asks Google for Gmail permissions. Old links open the
+ * App Password panel on the Mailboxes page instead.
+ */
 export async function GET(request: NextRequest) {
-  const back = (code: string) => NextResponse.redirect(new URL(`/app/mailboxes?mailbox_error=${code}`, request.url));
-  if (!accountsConfigured() || !tokenKey()) return back("not_configured");
-
-  const origin = resolveAppOrigin(configuredSiteUrl(), request.nextUrl.origin);
-  if (origin !== request.nextUrl.origin) return NextResponse.redirect(new URL(`${request.nextUrl.pathname}${request.nextUrl.search}`, origin));
-
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.redirect(new URL("/sign-in?next=/app/mailboxes", request.url));
-  const ws = await getActiveWorkspace();
-  if (!ws) return NextResponse.redirect(new URL("/app/onboarding", request.url));
-  if (!["owner", "admin"].includes(ws.role)) return back("not_allowed");
-
-  const verifier = randomToken(32);
-  const state = randomToken(16);
-  const nonce = randomToken(16);
-  const res = NextResponse.redirect(
-    buildGmailAuthorizeUrl({
-      clientId: gmailOAuth()!.clientId,
-      redirectUri: gmailCallbackUrl(origin),
-      state,
-      nonce,
-      codeChallenge: await pkceChallenge(verifier),
-      loginHint: request.nextUrl.searchParams.get("email")?.slice(0, 254) || user.email,
-      withReplies: request.nextUrl.searchParams.get("replies") === "1",
-    }),
-  );
-  // Bind the round trip to this user and workspace.
-  res.cookies.set(GMAIL_STATE_COOKIE, await signState({ state, verifier, nonce, next: `${user.id}:${ws.id}` }, sessionSecret()!), {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/api/gmail",
-    maxAge: STATE_MAX_AGE_S,
-  });
-  return res;
+  return NextResponse.redirect(new URL("/app/mailboxes?connect=1", request.url));
 }

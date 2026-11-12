@@ -27,7 +27,15 @@ const h = vi.hoisted(() => {
 
 vi.mock("@/server/db", () => ({ withService: (fn: (q: unknown) => Promise<unknown>) => fn(h.db) }));
 vi.mock("@/server/gmail/google", () => ({ sendRaw: (...a: unknown[]) => h.send(...a) }));
-vi.mock("@/server/services/mailboxes", () => ({ accessTokenFor: (...a: unknown[]) => h.token(...a), healMailbox: (...a: unknown[]) => h.heal(...a),
+vi.mock("@/server/services/mailboxes", () => ({
+  accessTokenFor: (...a: unknown[]) => h.token(...a),
+  healMailbox: (...a: unknown[]) => h.heal(...a),
+  // The Gmail path of the real mailboxSender: token, then the API's raw (base64url) message.
+  mailboxSender: async (id: string) => {
+    const t = await h.token(id);
+    if (!t.ok) return t;
+    return { ok: true, provider: "gmail", send: (m: { message: string; threadId?: string }) => h.send(t.token, Buffer.from(m.message, "utf8").toString("base64url"), m.threadId) };
+  },
   flagReconnect: async (id: string, reason: string) => {
     await h.db.query("update public.sending_accounts set status = 'needs_reconnect', last_error = $2 where id = $1", [id, reason]);
   },
