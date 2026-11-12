@@ -100,4 +100,16 @@ describe("announcements", () => {
     expect(await svc.unsubscribeFromUpdates(token)).toBe(true);
     expect((await svc.getAnnouncementsData()).recipients).toBe(1);
   });
+
+  it("posts a notification to every member's bell, once per key", async () => {
+    await h.db.query("insert into public.workspaces (id, name) values ('00000000-0000-4000-8000-00000000ab01', 'Ann Co') on conflict do nothing");
+    await h.db.query(`insert into public.memberships (workspace_id, user_id, role) values ('00000000-0000-4000-8000-00000000ab01', '${ids[0]}', 'owner'), ('00000000-0000-4000-8000-00000000ab01', '${ids[1]}', 'member') on conflict do nothing`);
+    const n = { title: "Meet your AI assistant", body: "Click the chat button.", href: "/app/support", key: "ai-assistant" };
+    expect(await svc.broadcastNotification(n)).toEqual({ ok: true, added: 2 });
+    expect(await svc.broadcastNotification(n)).toEqual({ ok: true, added: 0 });
+    const r = await h.db.query<{ kind: string; level: string; href: string }>("select kind, level, href from public.notifications where dedupe_key = 'announcement:ai-assistant'");
+    expect(r.rows).toHaveLength(2);
+    expect(r.rows[0]).toMatchObject({ kind: "announcement", level: "info", href: "/app/support" });
+    expect(await svc.broadcastNotification({ ...n, href: "https://evil.example" })).toMatchObject({ ok: false });
+  });
 });

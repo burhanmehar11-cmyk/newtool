@@ -79,6 +79,41 @@ export async function sendAnnouncementTest(input: unknown, actor?: Actor): Promi
   }
 }
 
+/**
+ * Posts a notification to every user's bell (each workspace they belong to).
+ * `key` makes it safe to repeat: nobody gets the same one twice.
+ */
+export async function broadcastNotification(input: unknown, actor?: Actor): Promise<{ ok: true; added: number } | { ok: false; error: string }> {
+  const admin = await actorOr(actor);
+  const p = z
+    .object({
+      title: z.string().trim().min(3).max(160),
+      body: z.string().trim().max(600).optional().default(""),
+      href: z.string().trim().startsWith("/").max(300).optional(),
+      key: z.string().trim().min(3).max(120),
+    })
+    .safeParse(input);
+  if (!p.success) return { ok: false, error: p.error.issues[0].message };
+  const { title, body, href, key } = p.data;
+  try {
+    const added = await svc(async (q) =>
+      (
+        await q.query(
+          `insert into public.notifications (workspace_id, user_id, kind, level, title, body, href, dedupe_key)
+           select m.workspace_id, m.user_id, 'announcement', 'info', $1, $2, $3, $4 from public.memberships m
+           on conflict (user_id, workspace_id, dedupe_key) where dedupe_key is not null do nothing
+           returning user_id`,
+          [title, body, href ?? null, `announcement:${key}`],
+        )
+      ).rows.length,
+    );
+    await track({ email: admin.email, kind: "notification_broadcast", area: "account", outcome: "success", summary: `Posted "${title}" to ${added} bells` });
+    return { ok: true, added };
+  } catch {
+    return { ok: false, error: "Couldn't post the notification: run the database update 0016 in Neon first." };
+  }
+}
+
 /** Starts a send to everyone eligible. The browser then calls continueAnnouncement until it's done. */
 export async function startAnnouncement(input: unknown, actor?: Actor): Promise<{ ok: true; id: string; total: number } | { ok: false; error: string }> {
   const admin = await actorOr(actor);

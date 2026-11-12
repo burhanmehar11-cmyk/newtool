@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { adminApiActor } from "@/server/admin-api-auth";
 import { findTemplate } from "@/lib/announcements";
-import { continueAnnouncement, getAnnouncementsData, sendAnnouncementTest, sendWelcomeTest, startAnnouncement, stopAnnouncement, type Actor } from "@/server/services/announcements";
+import { broadcastNotification, continueAnnouncement, getAnnouncementsData, sendAnnouncementTest, sendWelcomeTest, startAnnouncement, stopAnnouncement, type Actor } from "@/server/services/announcements";
 
 /**
  * Private admin API for announcements, so the owner (or their assistant) can
@@ -14,6 +14,7 @@ import { continueAnnouncement, getAnnouncementsData, sendAnnouncementTest, sendW
  *   GET                                   → templates, recipients, sender, history
  *   POST {action:"test", template | subject+body}          → test to the owner
  *   POST {action:"send", template | subject+body, confirm:true} → starts and sends for ~45 s
+ *   POST {action:"notify", title, body?, href?, key} → a notification in every user's bell (once per key)
  *   POST {action:"continue", id}          → sends the next batch
  *   POST {action:"stop", id}              → stops a send
  *   POST {action:"welcome_test"}          → the new-user welcome email, to the owner
@@ -47,6 +48,7 @@ const draft = z.object({ template: z.string().max(40).optional(), subject: z.str
 const bodySchema = z.discriminatedUnion("action", [
   draft.extend({ action: z.literal("test") }),
   draft.extend({ action: z.literal("send"), confirm: z.literal(true) }),
+  z.object({ action: z.literal("notify"), title: z.string().max(160), body: z.string().max(600).optional(), href: z.string().max(300).optional(), key: z.string().max(120) }),
   z.object({ action: z.literal("continue"), id: z.string().uuid() }),
   z.object({ action: z.literal("stop"), id: z.string().uuid() }),
   z.object({ action: z.literal("welcome_test") }),
@@ -66,6 +68,7 @@ export async function POST(request: NextRequest) {
   const b = parsed.data;
 
   if (b.action === "test") return NextResponse.json(await sendAnnouncementTest(resolveDraft(b), actor));
+  if (b.action === "notify") return NextResponse.json(await broadcastNotification(b, actor));
   if (b.action === "welcome_test") return NextResponse.json(await sendWelcomeTest(actor));
   if (b.action === "stop") return NextResponse.json(await stopAnnouncement(b.id, actor));
   if (b.action === "continue") return NextResponse.json(await continueAnnouncement(b.id, actor));
