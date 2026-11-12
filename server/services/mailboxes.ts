@@ -231,7 +231,8 @@ export async function mailboxSender(accountId: string, opts: { quiet?: boolean }
   return { ok: true, provider: "gmail", send: (m) => sendRaw(token.token, toGmailRaw(m.message), m.threadId) };
 }
 
-const MAIL_PORTS = { smtp: [25, 465, 587, 2525], imap: [143, 993] };
+// Port 25 is left out: Vercel (like most clouds) blocks it.
+const MAIL_PORTS = { smtp: [465, 587, 2525], imap: [143, 993] };
 const host = z
   .string()
   .trim()
