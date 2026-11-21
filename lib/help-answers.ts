@@ -82,7 +82,7 @@ const SHARED: InstantAnswer[] = [
   },
   {
     id: "send-limits",
-    text: "Each mailbox sends within its daily limit: 25 emails a day by default, up to 200 (change it on the Mailboxes page). Campaigns only send on the days and hours you choose, and stop following up with anyone who replies.",
+    text: "Each mailbox sends within its daily limit: 25 emails a day by default, up to 200 (change it on the Mailboxes page). Emails go out a varying 3 to 9 minutes apart, with at most a third of the daily limit in any hour, so they look like a person sending them. Campaigns only send on the days and hours you choose, and stop following up with anyone who replies.",
     keys: ["daily limit", "email per day", "email a day", "sending limit", "send limit", "how many email can i send", "how many email", "emails per day"],
     topic: "mailbox",
     subject: "Question about sending limits",

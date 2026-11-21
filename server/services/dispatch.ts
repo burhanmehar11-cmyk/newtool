@@ -4,6 +4,7 @@ import { accessProblem } from "@/server/services/billing";
 import { randomUUID } from "node:crypto";
 import { brand } from "@/config/brand";
 import { inSendingWindow } from "@/lib/campaigns/schedule";
+import { gapAfter, hourlyCap } from "@/lib/campaigns/pacing";
 import { signUnsubscribe, unsubscribeHeaders, unsubscribeUrl, withFooter } from "@/lib/campaigns/compose";
 import { followUpSubject, renderFollowUp } from "@/lib/campaigns/followups";
 import { buildMessage } from "@/lib/gmail/mime";
@@ -17,8 +18,8 @@ import { emitWebhook } from "@/server/services/webhooks";
 
 const svc = <T,>(fn: (q: Q) => Promise<T>) => withService((q) => fn(q as unknown as Q));
 
-/** At least this long between two emails from the same mailbox. */
-export const MIN_GAP_MS = 3 * 60_000;
+/** Pace between emails from one mailbox (re-exported for callers and tests). */
+export { MIN_GAP_MS, MAX_GAP_MS } from "@/lib/campaigns/pacing";
 
 export type DispatchSummary = { sent: number; skipped: string[]; failed: number };
 
@@ -26,7 +27,8 @@ export type DispatchSummary = { sent: number; skipped: string[]; failed: number 
  * One sending pass. Called by the scheduler (/api/cron/dispatch, every few
  * minutes) or by "Send due emails now". Sends at most one email per mailbox
  * per pass, only inside each campaign's sending window, within the mailbox's
- * daily limit, at least MIN_GAP_MS apart, and never to a suppressed address.
+ * daily and hourly limits, a varying 3–9 minutes apart (lib/campaigns/pacing),
+ * and never to a suppressed address.
  */
 /** Completes a campaign with nothing left to send, and tells webhooks once. */
 async function finish(c: { id: string; workspace_id: string }) {
@@ -91,7 +93,11 @@ export async function runDispatch(opts: { workspaceId?: string | null; now?: Dat
       summary.skipped.push(`${c.id}: daily limit reached`);
       continue;
     }
-    if (!opts.ignoreGap && usage.lastAt && now.getTime() - new Date(usage.lastAt).getTime() < MIN_GAP_MS) {
+    if (usage.lastHour >= hourlyCap(c.daily_cap)) {
+      summary.skipped.push(`${c.id}: hourly limit reached (spreading the day's emails)`);
+      continue;
+    }
+    if (!opts.ignoreGap && usage.lastAt && now.getTime() - new Date(usage.lastAt).getTime() < gapAfter(c.account_id, usage.lastAt)) {
       summary.skipped.push(`${c.id}: spacing between emails`);
       continue;
     }

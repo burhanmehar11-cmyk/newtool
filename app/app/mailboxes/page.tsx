@@ -13,7 +13,7 @@ export const metadata: Metadata = { title: "Mailboxes" };
 
 const rules = [
   { icon: MailCheck, title: "Only what you approve", text: "Nothing is sent until you approve a campaign. Each email goes out from your own mailbox, so replies land in your inbox." },
-  { icon: Timer, title: "Paced like a person", text: "One email per mailbox at a time, at least 3 minutes apart, up to the daily cap you set." },
+  { icon: Timer, title: "Paced like a person", text: "One email per mailbox at a time, a varying 3 to 9 minutes apart, spread over several hours (at most a third of the daily limit in any hour), up to the daily cap you set." },
   { icon: Clock, title: "Inside your sending window", text: "Each campaign sends only on the days and hours you choose, in its time zone." },
   { icon: UserX, title: "Opt-outs are honoured", text: "Every email has a one-click unsubscribe. Unsubscribes and bounces join your do-not-contact list." },
   { icon: ShieldCheck, title: "Your password stays safe", text: "Use an App Password, not your real one. It's stored encrypted, used only to send approved campaigns and spot replies to them. Disconnect any time." },

@@ -34,14 +34,15 @@ export async function runningCampaigns(q: Q, workspaceId: string | null): Promis
 }
 
 /** Emails from this mailbox counted against today's limit (in the campaign's time zone), plus the last attempt time. */
-export async function mailboxUsage(q: Q, accountId: string, timezone: string): Promise<{ today: number; lastAt: string | null }> {
-  const r = await q.query<{ today: number; last_at: string | null }>(
+export async function mailboxUsage(q: Q, accountId: string, timezone: string): Promise<{ today: number; lastHour: number; lastAt: string | null }> {
+  const r = await q.query<{ today: number; last_hour: number; last_at: string | null }>(
     `select count(*) filter (where attempted_at >= (date_trunc('day', now() at time zone $2) at time zone $2) and status in ('sending', 'accepted', 'ambiguous'))::int as today,
+            count(*) filter (where attempted_at > now() - interval '1 hour' and status in ('sending', 'accepted', 'ambiguous'))::int as last_hour,
             max(attempted_at) as last_at
      from public.dispatches where sending_account_id = $1`,
     [accountId, timezone],
   );
-  return { today: r.rows[0]?.today ?? 0, lastAt: r.rows[0]?.last_at ?? null };
+  return { today: r.rows[0]?.today ?? 0, lastHour: r.rows[0]?.last_hour ?? 0, lastAt: r.rows[0]?.last_at ?? null };
 }
 
 export type DueEnrollment = {

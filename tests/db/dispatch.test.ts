@@ -121,6 +121,19 @@ describe("sending pass", () => {
     expect(h.send).toHaveBeenCalledTimes(2);
   });
 
+  it("spreads a day's emails: no more than a third of the daily limit in any hour", async () => {
+    const c = await runningCampaign(["h1@shop.example", "h2@shop.example", "h3@shop.example", "h4@shop.example"]);
+    await only(c.id);
+    await db.query("update public.sending_accounts set daily_cap = 6 where id = $1", [c.mailbox]); // 2 an hour → at least 3
+    for (let i = 0; i < 3; i++) expect((await runDispatch({ workspaceId: ws, ignoreGap: true })).sent).toBe(1);
+    const fourth = await runDispatch({ workspaceId: ws, ignoreGap: true });
+    expect(fourth.sent).toBe(0);
+    expect(fourth.skipped.join()).toMatch(/hourly limit reached/);
+    // An hour later the last email goes out.
+    await db.query("update public.dispatches set attempted_at = attempted_at - interval '61 minutes' where campaign_id = $1", [c.id]);
+    expect((await runDispatch({ workspaceId: ws, ignoreGap: true })).sent).toBe(1);
+  });
+
   it("never retries an ambiguous send (network cut), so nobody gets the email twice", async () => {
     const c = await runningCampaign(["amb@shop.example"]);
     await only(c.id);
