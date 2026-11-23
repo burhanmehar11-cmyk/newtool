@@ -82,6 +82,13 @@ async function monthlyLimitFor(workspaceId: string): Promise<number | null> {
   return limit;
 }
 
+/** For the private admin API: a workspace's monthly limit and use, read with the service connection. */
+export async function monthlyDiscoveryForAdmin(workspaceId: string): Promise<{ limit: number | null; used: number }> {
+  const limit = await monthlyLimitFor(workspaceId);
+  const used = await withService((q) => monthlyDiscoveryUse(q as unknown as Q, workspaceId));
+  return { limit, used };
+}
+
 /** First day of next month (UTC), when the monthly limit resets. */
 export function monthlyResetDate(now = new Date()): Date {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));

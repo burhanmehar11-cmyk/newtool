@@ -6,7 +6,7 @@ import { adminEmails } from "@/lib/admin";
 /**
  * The private admin API token (ADMIN_API_TOKEN, 32+ characters), sent as
  * "Authorization: Bearer …". Acts as the first owner in ADMIN_EMAILS.
- * Used only by /api/admin/announcements, /api/admin/support, /api/admin/ai-check and /api/admin/mail-check.
+ * Used only by /api/admin/announcements, /api/admin/support, /api/admin/ai-check, /api/admin/mail-check and /api/admin/workspaces.
  */
 export function adminApiActor(request: NextRequest): { email: string } | null {
   const expected = process.env.ADMIN_API_TOKEN?.trim() ?? "";
