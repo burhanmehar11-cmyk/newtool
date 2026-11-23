@@ -28,6 +28,12 @@ const nextConfig: NextConfig = {
   /* config options here */
   cacheComponents: true,
   partialPrefetching: true,
+  // The sign-in consent page for AI apps must never load inside another site's frame (clickjacking).
+  headers() {
+    return Promise.resolve([
+      { source: "/oauth/:path*", headers: [{ key: "X-Frame-Options", value: "DENY" }, { key: "Content-Security-Policy", value: "frame-ancestors 'none'" }] },
+    ]);
+  },
   // The interactive demo is retired: Locenti is the real product now.
   redirects() {
     return [

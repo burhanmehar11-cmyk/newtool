@@ -75,6 +75,7 @@ export const legalDocs: Record<string, Doc> = {
           "To keep the Service safe: preventing abuse, enforcing usage limits, honouring opt-outs, and investigating security issues.",
           "To communicate with you: account emails such as sign-up confirmation and password resets. We do not send marketing email without your consent.",
           "Optional AI writing: if you use the built-in AI writer, the lead's research summary (facts found on the business's public website) and your offer profile are sent to Google's Gemini API to draft an email. No Gmail data is included. If you connect your own AI agent, the data your agent requests is shared with your agent's provider under your own agreement with them.",
+          "Connected AI apps: if you connect an AI app such as ChatGPT or Claude to Locenti (by signing in and pressing Allow, or with an access token you create), that app can use your chosen workspace through Locenti's tools: search for businesses, read your leads, research, replies and campaigns, and write drafts and draft campaigns. It cannot send email; campaigns are only sent after you approve them in Locenti. What the app reads is processed by that app's provider under its own terms and privacy policy. We store only hashed tokens for these connections, and you can disconnect an app at any time on the Agent page.",
         ],
       },
       {

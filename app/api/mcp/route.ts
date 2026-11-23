@@ -5,25 +5,46 @@ import type { Q } from "@/server/auth-store";
 import { withService } from "@/server/db";
 import { MCP_INSTRUCTIONS, mcpTools, type McpCtx } from "@/server/mcp/tools";
 import { resolveToken } from "@/server/token-store";
+import { isOAuthAccessToken } from "@/lib/oauth";
+import { oauthOrigin, resolveAccessToken } from "@/server/services/oauth";
 
 /**
- * MCP endpoint (Streamable HTTP, stateless, JSON responses). Authenticate
- * with a personal access token from Settings → AI agents:
- *   Authorization: Bearer loc_…
+ * MCP endpoint (Streamable HTTP, stateless, JSON responses). Two ways in:
+ *   - AI apps (ChatGPT, Claude, …) sign the person in with OAuth 2.1; the
+ *     401 below points them to /.well-known/oauth-protected-resource.
+ *   - Personal access tokens from the Agent page: Authorization: Bearer loc_…
  */
 
 export const maxDuration = 60;
 
-const unauthorized = () =>
-  NextResponse.json({ jsonrpc: "2.0", id: null, error: { code: -32001, message: "Missing or invalid access token. Create one in Locenti: Settings → AI agents." } }, { status: 401, headers: { "www-authenticate": 'Bearer realm="locentio"' } });
+const unauthorized = (invalid: boolean) =>
+  NextResponse.json(
+    { jsonrpc: "2.0", id: null, error: { code: -32001, message: "Sign in to Locenti to connect, or use a personal access token from the Agent page." } },
+    {
+      status: 401,
+      headers: {
+        "www-authenticate": `Bearer realm="locenti", resource_metadata="${oauthOrigin()}/.well-known/oauth-protected-resource", scope="locenti"${invalid ? ', error="invalid_token"' : ""}`,
+        "access-control-expose-headers": "www-authenticate",
+      },
+    },
+  );
 
-export async function POST(request: NextRequest) {
-  const token = request.headers.get("authorization")?.match(/^Bearer\s+(loc_[A-Za-z0-9_-]{20,100})$/)?.[1];
-  if (!token) return unauthorized();
+async function contextFor(token: string): Promise<McpCtx | null> {
+  if (isOAuthAccessToken(token)) {
+    const g = await resolveAccessToken(token).catch(() => null);
+    return g ? { user: { id: g.userId }, workspace: { id: g.workspaceId, name: g.workspaceName, role: g.role } } : null;
+  }
+  if (!/^loc_[A-Za-z0-9_-]{20,100}$/.test(token)) return null;
   const hash = createHash("sha256").update(token).digest("hex");
   const t = await withService((q) => resolveToken(q as unknown as Q, hash)).catch(() => null);
-  if (!t) return unauthorized();
-  const ctx: McpCtx = { user: { id: t.userId }, workspace: { id: t.workspaceId, name: t.workspaceName, role: t.role } };
+  return t ? { user: { id: t.userId }, workspace: { id: t.workspaceId, name: t.workspaceName, role: t.role } } : null;
+}
+
+export async function POST(request: NextRequest) {
+  const token = request.headers.get("authorization")?.match(/^Bearer\s+(\S{20,120})$/)?.[1];
+  if (!token) return unauthorized(false);
+  const ctx = await contextFor(token);
+  if (!ctx) return unauthorized(true);
 
   let body: unknown;
   try {

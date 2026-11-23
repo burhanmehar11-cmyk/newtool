@@ -48,7 +48,7 @@ export const mcpTools: ToolDef<McpCtx>[] = [
     name: "get_workspace",
     description: "The workspace, the sender's offer profile (what they sell, tone, signature), connected Gmail mailboxes, and whether Google Maps search is available today.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
-    annotations: { readOnlyHint: true },
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
     run: async (_args, ctx) => {
       const [offer, mailboxes] = await Promise.all([getOfferProfileFor(ctx.user.id, ctx.workspace.id), asQ(ctx, (q) => listMailboxes(q, ctx.workspace.id))]);
       return {
@@ -82,7 +82,7 @@ export const mcpTools: ToolDef<McpCtx>[] = [
       required: ["business_type", "place"],
       additionalProperties: false,
     },
-    annotations: { readOnlyHint: true, openWorldHint: true },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     run: async (args, ctx) => {
       const a = parse(
         z.object({
@@ -112,6 +112,7 @@ export const mcpTools: ToolDef<McpCtx>[] = [
   },
   {
     name: "save_google_leads",
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     description: "Save Google Maps results as leads (only those with a website). Locenti keeps the place ID and website; research fills in the rest.",
     inputSchema: {
       type: "object",
@@ -133,7 +134,7 @@ export const mcpTools: ToolDef<McpCtx>[] = [
     name: "list_leads",
     description: "Saved leads with their website, public email, whether they've been researched, and whether a draft exists.",
     inputSchema: { type: "object", properties: { limit: { type: "number", minimum: 1, maximum: 200, default: 50 } }, additionalProperties: false },
-    annotations: { readOnlyHint: true },
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
     run: async (args, ctx) => {
       const a = parse(z.object({ limit: z.number().int().min(1).max(200).default(50) }), args);
       const rows = await asQ(ctx, async (q) => {
@@ -168,7 +169,7 @@ export const mcpTools: ToolDef<McpCtx>[] = [
     name: "research_lead",
     description: "Read the lead's public website (up to 3 pages, respecting robots.txt) and build an Opportunity Brief scored for the sender's offer. Takes up to ~20 seconds.",
     inputSchema: { type: "object", properties: { lead_id: { type: "string" } }, required: ["lead_id"], additionalProperties: false },
-    annotations: { openWorldHint: true },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     run: async (args, ctx) => {
       const a = parse(z.object({ lead_id: uuid }), args);
       const r = await researchLeadAs(ctx, a.lead_id);
@@ -180,7 +181,7 @@ export const mcpTools: ToolDef<McpCtx>[] = [
     name: "get_lead",
     description: "Everything known about a lead: business, Opportunity Brief (facts with source URLs, suggested opportunities, unknowns, fit), public contacts, latest draft and notes. Write emails only from these facts.",
     inputSchema: { type: "object", properties: { lead_id: { type: "string" } }, required: ["lead_id"], additionalProperties: false },
-    annotations: { readOnlyHint: true },
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
     run: async (args, ctx) => {
       const a = parse(z.object({ lead_id: uuid }), args);
       const d = await asQ(ctx, (q) => leadDetail(q, a.lead_id));
@@ -210,6 +211,7 @@ export const mcpTools: ToolDef<McpCtx>[] = [
   },
   {
     name: "save_draft",
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     description: "Save a first email for a lead (plain text). Saved as a new version for a person to review; any draft campaign containing this lead must be approved again. Locenti adds the business address and an unsubscribe link when sending.",
     inputSchema: {
       type: "object",
@@ -235,6 +237,7 @@ export const mcpTools: ToolDef<McpCtx>[] = [
   },
   {
     name: "create_campaign_draft",
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     description: "Create a draft campaign from leads that already have a saved draft. Nothing is sent: the person reviews every message and approves in Locenti (link returned).",
     inputSchema: {
       type: "object",
@@ -271,7 +274,7 @@ export const mcpTools: ToolDef<McpCtx>[] = [
     name: "list_campaigns",
     description: "Campaigns with status and counts (recipients, sent, queued).",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
-    annotations: { readOnlyHint: true },
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
     run: async (_args, ctx) => {
       const rows = await asQ(ctx, (q) => listCampaigns(q, ctx.workspace.id));
       return { campaigns: rows.map((c) => ({ campaign_id: c.id, name: c.name, status: c.status, recipients: c.recipients, sent: c.sent, queued: c.queued, url: `${origin()}/app/campaigns/${c.id}` })) };
@@ -281,7 +284,7 @@ export const mcpTools: ToolDef<McpCtx>[] = [
     name: "get_campaign",
     description: "A campaign's results: each recipient's state (sent, queued, replied, stopped and why) and the reply label (interested, not_interested, out_of_office, bounce, unclassified).",
     inputSchema: { type: "object", properties: { campaign_id: { type: "string" } }, required: ["campaign_id"], additionalProperties: false },
-    annotations: { readOnlyHint: true },
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
     run: async (args, ctx) => {
       const a = parse(z.object({ campaign_id: uuid }), args);
       return asQ(ctx, async (q) => {
@@ -316,7 +319,7 @@ export const mcpTools: ToolDef<McpCtx>[] = [
       },
       additionalProperties: false,
     },
-    annotations: { readOnlyHint: true },
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
     run: async (args, ctx) => {
       const a = parse(z.object({ label: z.enum(["all", "interested", "not_interested", "out_of_office", "bounce", "unclassified"]).default("all"), limit: z.number().int().min(1).max(200).default(50) }), args);
       const rows = await asQ(ctx, (q) => inboxThreads(q, ctx.workspace.id, a.label));

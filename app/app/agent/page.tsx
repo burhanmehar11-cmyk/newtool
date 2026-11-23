@@ -3,6 +3,8 @@ import { Suspense } from "react";
 import { brand } from "@/config/brand";
 import { AgentHub } from "@/features/agent/agent-hub";
 import { ApiReference, WebhooksSection } from "@/features/agent/developers";
+import { ConnectedApps } from "@/features/agent/connected-apps";
+import { connectedApps } from "@/server/services/oauth";
 import { getWebhooks } from "@/server/services/webhooks";
 import { PageLoading } from "@/features/product/page-loading";
 import { requireWorkspace } from "@/server/auth";
@@ -27,13 +29,14 @@ export default function AgentPage() {
 }
 
 async function Agent() {
-  const { workspace } = await requireWorkspace("/app/agent");
-  const [tokens, usage, googleLeft] = await Promise.all([
+  const { user, workspace } = await requireWorkspace("/app/agent");
+  const [tokens, usage, googleLeft, apps] = await Promise.all([
     getMyTokens(),
     getUsage(workspace),
     googlePlacesConfigured()
       ? remainingToday().catch(() => null)
       : Promise.resolve(null),
+    connectedApps(user.id, workspace.id),
   ]);
   const hooks = await getWebhooks();
   const base = configuredSiteUrl() ?? brand.siteUrl;
@@ -55,6 +58,7 @@ async function Agent() {
         google={{ configured: googlePlacesConfigured(), left: googleLeft }}
         canManage={["owner", "admin"].includes(workspace.role)}
       />
+      <ConnectedApps endpoint={`${base}/api/mcp`} apps={apps} />
       <ApiReference base={base} />
       <WebhooksSection hooks={hooks} />
     </div>
