@@ -36,7 +36,7 @@ describe("MCP protocol core", () => {
   });
 
   it("handles unknown methods, unknown tools, notifications and bad requests", async () => {
-    expect((await call({ jsonrpc: "2.0", id: 7, method: "resources/list" }))?.error?.code).toBe(-32601);
+    expect((await call({ jsonrpc: "2.0", id: 7, method: "sampling/createMessage" }))?.error?.code).toBe(-32601);
     expect((await call({ jsonrpc: "2.0", id: 8, method: "tools/call", params: { name: "missing" } }))?.error?.code).toBe(-32602);
     expect(await call({ jsonrpc: "2.0", method: "notifications/initialized" })).toBeNull();
     expect((await call({ id: 9, method: "ping" }))?.error?.code).toBe(-32600);

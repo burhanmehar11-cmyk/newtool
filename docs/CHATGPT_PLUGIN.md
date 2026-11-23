@@ -16,6 +16,9 @@ Locenti's MCP server (`https://locenti.com/api/mcp`) works as a ChatGPT plugin (
 | ChatGPT domain verification | `/.well-known/openai-apps-challenge` (reads `OPENAI_APPS_CHALLENGE`) |
 | Database | migration `0023_oauth.sql` (only hashes of codes and tokens are stored) |
 
+| **Plugin package** (manifest, MCP config, skill, icons) | `plugin/`, build the upload zip with `npm run plugin:pack` → `dist/locenti-plugin.zip` |
+| **Visual cards in the chat** (search results, lead research) | `server/mcp/widgets.ts` (MCP Apps `ui://` resources, also linked with ChatGPT's `openai/outputTemplate`) |
+
 Apps can find, research and write drafts and draft campaigns. They can't send email: a person approves every campaign in Locenti.
 
 ## Before anything: run the migration
@@ -30,6 +33,16 @@ Neon → SQL Editor → run `database/migrations/0023_oauth.sql`.
 4. In a new chat, choose Locenti from the tools menu and try: "Find 10 dentists in Austin with emails and save them as leads."
 
 Claude: **Settings → Connectors → Add custom connector** → `https://locenti.com/api/mcp` → Connect → sign in → Allow.
+
+## The plugin package
+
+`plugin/` follows OpenAI's Agent Plugins format:
+- `plugin.json`: name, version, description, author, and under `extensions.com.openai.interface` the display name, short and long description, category, links (website, privacy, terms), example prompts, brand colour, icon and logo.
+- `mcp.json`: the Locenti MCP server (`https://locenti.com/api/mcp`).
+- `skills/locenti-prospecting/SKILL.md`: tells ChatGPT when to use Locenti and how (search → save → research → draft → campaign), plus the writing rules and "you cannot send email".
+- `assets/`: icon (128 px) and logo (512 px).
+
+Run `npm run plugin:pack` and upload `dist/locenti-plugin.zip` when submitting. Bump `version` in `plugin.json` for each new upload.
 
 ## Submitting to the ChatGPT plugin directory
 

@@ -1,0 +1,47 @@
+{
+  "name": "locenti",
+  "version": "1.0.0",
+  "description": "Find local businesses on Google Maps that show a public email, research their websites and draft personal cold emails, in your Locenti workspace.",
+  "author": {
+    "name": "Locenti",
+    "email": "hello@locenti.com",
+    "url": "https://locenti.com"
+  },
+  "homepage": "https://locenti.com",
+  "license": "Proprietary",
+  "keywords": [
+    "lead generation",
+    "prospecting",
+    "cold email",
+    "google maps",
+    "local business",
+    "outreach",
+    "agency"
+  ],
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "Locenti",
+        "shortDescription": "Find local businesses with public emails, research their websites and draft personal outreach.",
+        "longDescription": "Locenti helps agencies and freelancers who sell to local businesses. Ask in plain words, for example \"find 20 dentists in Austin with emails\": Locenti searches Google Maps (official Places API), keeps only businesses that show a public email, saves the ones you pick as leads, reads each website to build a research brief with sources, and drafts a short personal first email from those facts. Drafts and draft campaigns appear in your Locenti workspace, where you review and approve before anything is sent from your own mailbox. Locenti never sends email from ChatGPT.",
+        "developerName": "Locenti",
+        "category": "Productivity",
+        "capabilities": [
+          "Read",
+          "Write"
+        ],
+        "websiteURL": "https://locenti.com",
+        "privacyPolicyURL": "https://locenti.com/legal/privacy",
+        "termsOfServiceURL": "https://locenti.com/legal/terms",
+        "defaultPrompt": [
+          "Find 20 dentists in Austin, Texas that have a public email",
+          "Research my newest lead and tell me what its website is missing",
+          "Write a short first email to that lead and save it as a draft"
+        ],
+        "brandColor": "#0F6B4F",
+        "composerIcon": "./assets/icon.png",
+        "logo": "./assets/logo.png"
+      }
+    }
+  }
+}

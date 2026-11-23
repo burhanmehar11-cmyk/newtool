@@ -18,6 +18,7 @@ import { runGoogleSearchAs, saveGoogleSearchLeadsAs } from "@/server/services/di
 import { researchLeadAs } from "@/server/services/research";
 import { getOfferProfileFor } from "@/server/services/workspaces";
 import { inboxThreads } from "@/server/replies-store";
+import { LEAD_CARD_URI, SEARCH_CARD_URI, cardMeta } from "@/server/mcp/widgets";
 
 /**
  * Tools exposed to a person's own AI agent over MCP. Each call runs as that
@@ -82,6 +83,7 @@ export const mcpTools: ToolDef<McpCtx>[] = [
       required: ["business_type", "place"],
       additionalProperties: false,
     },
+    _meta: cardMeta(SEARCH_CARD_URI, "Searching Google Maps…", "Found businesses"),
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     run: async (args, ctx) => {
       const a = parse(
@@ -181,6 +183,7 @@ export const mcpTools: ToolDef<McpCtx>[] = [
     name: "get_lead",
     description: "Everything known about a lead: business, Opportunity Brief (facts with source URLs, suggested opportunities, unknowns, fit), public contacts, latest draft and notes. Write emails only from these facts.",
     inputSchema: { type: "object", properties: { lead_id: { type: "string" } }, required: ["lead_id"], additionalProperties: false },
+    _meta: cardMeta(LEAD_CARD_URI, "Reading the lead…", "Lead ready"),
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
     run: async (args, ctx) => {
       const a = parse(z.object({ lead_id: uuid }), args);

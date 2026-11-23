@@ -11,7 +11,8 @@
     "test": "vitest run",
     "brand": "node --no-warnings scripts/build-brand.mjs",
     "check": "npm run lint && npm run typecheck && npm run test && npm run build",
-    "test:e2e": "node tests/e2e/smoke.mjs"
+    "test:e2e": "node tests/e2e/smoke.mjs",
+    "plugin:pack": "node scripts/pack-plugin.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "5.9.2",

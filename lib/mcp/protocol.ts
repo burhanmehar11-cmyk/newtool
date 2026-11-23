@@ -1,7 +1,8 @@
 /**
  * Minimal Model Context Protocol server core (JSON-RPC 2.0 over the
  * Streamable HTTP transport, stateless, JSON responses). Supports
- * initialize, ping, tools/list and tools/call. Pure: no I/O here.
+ * initialize, ping, tools/list, tools/call and (for visual cards shown
+ * inside apps like ChatGPT) resources/list and resources/read. Pure: no I/O.
  */
 
 export const SUPPORTED_VERSIONS = ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"];
@@ -12,8 +13,13 @@ export type ToolDef<C> = {
   description: string;
   inputSchema: Record<string, unknown>;
   annotations?: { readOnlyHint?: boolean; destructiveHint?: boolean; idempotentHint?: boolean; openWorldHint?: boolean };
+  /** Extra metadata, e.g. which visual card renders the result (`ui.resourceUri`, `openai/outputTemplate`). */
+  _meta?: Record<string, unknown>;
   run: (args: Record<string, unknown>, ctx: C) => Promise<unknown>;
 };
+
+/** A static resource, e.g. the HTML of a visual card. */
+export type ResourceDef = { uri: string; name: string; description?: string; mimeType: string; text: string; _meta?: Record<string, unknown> };
 
 type Rpc = { jsonrpc?: unknown; id?: unknown; method?: unknown; params?: unknown };
 export type RpcResponse = { jsonrpc: "2.0"; id: string | number | null; result?: unknown; error?: { code: number; message: string } };
@@ -23,7 +29,7 @@ export class ToolError extends Error {}
 
 const err = (id: RpcResponse["id"], code: number, message: string): RpcResponse => ({ jsonrpc: "2.0", id, error: { code, message } });
 
-export async function handleMessage<C>(msg: unknown, tools: ToolDef<C>[], ctx: C, instructions: string): Promise<RpcResponse | null> {
+export async function handleMessage<C>(msg: unknown, tools: ToolDef<C>[], ctx: C, instructions: string, resources: ResourceDef[] = []): Promise<RpcResponse | null> {
   const m = (msg ?? {}) as Rpc;
   const id = typeof m.id === "string" || typeof m.id === "number" ? m.id : null;
   if (m.jsonrpc !== "2.0" || typeof m.method !== "string") return err(id, -32600, "Invalid request");
@@ -39,7 +45,7 @@ export async function handleMessage<C>(msg: unknown, tools: ToolDef<C>[], ctx: C
         id,
         result: {
           protocolVersion: SUPPORTED_VERSIONS.includes(asked) ? asked : SUPPORTED_VERSIONS[0],
-          capabilities: { tools: { listChanged: false } },
+          capabilities: { tools: { listChanged: false }, ...(resources.length ? { resources: { listChanged: false, subscribe: false } } : {}) },
           serverInfo: SERVER_INFO,
           instructions,
         },
@@ -48,7 +54,16 @@ export async function handleMessage<C>(msg: unknown, tools: ToolDef<C>[], ctx: C
     case "ping":
       return { jsonrpc: "2.0", id, result: {} };
     case "tools/list":
-      return { jsonrpc: "2.0", id, result: { tools: tools.map(({ name, description, inputSchema, annotations }) => ({ name, description, inputSchema, ...(annotations ? { annotations } : {}) })) } };
+      return { jsonrpc: "2.0", id, result: { tools: tools.map(({ name, description, inputSchema, annotations, _meta }) => ({ name, description, inputSchema, ...(annotations ? { annotations } : {}), ...(_meta ? { _meta } : {}) })) } };
+    case "resources/list":
+      return { jsonrpc: "2.0", id, result: { resources: resources.map(({ uri, name, description, mimeType, _meta }) => ({ uri, name, description, mimeType, ...(_meta ? { _meta } : {}) })) } };
+    case "resources/templates/list":
+      return { jsonrpc: "2.0", id, result: { resourceTemplates: [] } };
+    case "resources/read": {
+      const r = resources.find((x) => x.uri === params.uri);
+      if (!r) return err(id, -32002, `Resource not found: ${String(params.uri)}`);
+      return { jsonrpc: "2.0", id, result: { contents: [{ uri: r.uri, mimeType: r.mimeType, text: r.text, ...(r._meta ? { _meta: r._meta } : {}) }] } };
+    }
     case "tools/call": {
       const tool = tools.find((t) => t.name === params.name);
       if (!tool) return err(id, -32602, `Unknown tool: ${String(params.name)}`);

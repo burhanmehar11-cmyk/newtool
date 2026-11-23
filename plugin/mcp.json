@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "locenti": {
+      "type": "http",
+      "url": "https://locenti.com/api/mcp"
+    }
+  }
+}

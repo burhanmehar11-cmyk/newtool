@@ -4,6 +4,7 @@ import { handleMessage } from "@/lib/mcp/protocol";
 import type { Q } from "@/server/auth-store";
 import { withService } from "@/server/db";
 import { MCP_INSTRUCTIONS, mcpTools, type McpCtx } from "@/server/mcp/tools";
+import { MCP_RESOURCES } from "@/server/mcp/widgets";
 import { resolveToken } from "@/server/token-store";
 import { isOAuthAccessToken } from "@/lib/oauth";
 import { oauthOrigin, resolveAccessToken } from "@/server/services/oauth";
@@ -53,10 +54,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ jsonrpc: "2.0", id: null, error: { code: -32700, message: "Parse error" } }, { status: 400 });
   }
   if (Array.isArray(body)) {
-    const out = (await Promise.all(body.slice(0, 20).map((m) => handleMessage(m, mcpTools, ctx, MCP_INSTRUCTIONS)))).filter(Boolean);
+    const out = (await Promise.all(body.slice(0, 20).map((m) => handleMessage(m, mcpTools, ctx, MCP_INSTRUCTIONS, MCP_RESOURCES)))).filter(Boolean);
     return out.length ? NextResponse.json(out) : new NextResponse(null, { status: 202 });
   }
-  const res = await handleMessage(body, mcpTools, ctx, MCP_INSTRUCTIONS);
+  const res = await handleMessage(body, mcpTools, ctx, MCP_INSTRUCTIONS, MCP_RESOURCES);
   return res ? NextResponse.json(res, { headers: { "cache-control": "no-store" } }) : new NextResponse(null, { status: 202 });
 }
 
